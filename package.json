@@ -10,9 +10,11 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.97.0",
+    "bootstrap": "^5.3.8",
     "next": "16.1.6",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "reactstrap": "^9.2.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
