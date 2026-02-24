@@ -11,25 +11,36 @@ export default function LoginPage() {
   const router = useRouter()
 
   const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
+  e.preventDefault()
+  setLoading(true)
+  setError('')
 
-    const email = `${username.toLowerCase().trim()}@fmb.internal`
+  const email = `${username.toLowerCase().trim()}@fmb.internal`
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+  const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
 
-    if (error) {
-      setError('Invalid username or password')
-      setLoading(false)
-      return
-    }
-
-    router.push('/dashboard')
+  if (authError) {
+    setError('Invalid username or password')
+    setLoading(false)
+    return
   }
+
+  // Check if user is active
+  const { data: adminData } = await supabase
+    .from('admin_users')
+    .select('status')
+    .eq('username', username.toLowerCase().trim())
+    .single()
+
+  if (!adminData || adminData.status !== 'active') {
+    await supabase.auth.signOut()
+    setError('Your account has been deactivated. Please contact admin.')
+    setLoading(false)
+    return
+  }
+
+  router.push('/dashboard')
+}
 
   return (
     <div className="auth-page-wrapper pt-5" style={{
@@ -98,7 +109,7 @@ export default function LoginPage() {
 
               <div className="mt-4 text-center">
                 <p className="text-white-50 mb-0">
-                  AMB FMB Niyaz Niyat © {new Date().getFullYear()}
+                  Faiz ul Mawaid il Burhaniyah © {new Date().getFullYear()}
                 </p>
               </div>
 
