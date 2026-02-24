@@ -256,14 +256,13 @@ export default function MumineenPage() {
 
   return (
     <>
-      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
 
-      <div className="d-flex justify-content-between align-items-center mb-3">
+      <div className="d-flex flex-wrap justify-content-between align-items-start align-items-sm-center gap-2 mb-3">
         <div>
           <h4 className="mb-0" style={{ color: '#212529' }}>Mumineen</h4>
           <p className="text-muted mb-0" style={{ fontSize: '13px' }}>Heads of Family — {mumineen.length} total</p>
         </div>
-        <div className="d-flex gap-2">
+        <div className="d-flex gap-2 flex-wrap">
           <button className="btn btn-outline-secondary btn-sm" onClick={handleSample}><i className="bi bi-file-earmark-arrow-down me-1" />Sample</button>
           <button className="btn btn-outline-success btn-sm" onClick={() => fileInputRef.current?.click()} disabled={importing}><i className="bi bi-upload me-1" />{importing ? 'Importing...' : 'Import'}</button>
           <input ref={fileInputRef} type="file" accept=".csv" style={{ display: 'none' }} onChange={handleImport} />
@@ -297,6 +296,7 @@ export default function MumineenPage() {
             <div className="text-center py-4"><div className="spinner-border spinner-border-sm text-primary" /></div>
           ) : (
             <>
+              <div className="table-responsive">
               <table className="table table-hover mb-0" style={{ fontSize: '13px' }}>
                 <thead style={{ background: '#f8f9fa' }}>
                   <tr>
@@ -336,6 +336,7 @@ export default function MumineenPage() {
                   {paginated.length === 0 && <tr><td colSpan={10} className="text-center text-muted py-4">No mumineen found</td></tr>}
                 </tbody>
               </table>
+              </div>
 
               <div className="d-flex justify-content-between align-items-center mt-3">
                 <small className="text-muted">Showing {paginated.length ? (page - 1) * PAGE_SIZE + 1 : 0}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length} records</small>

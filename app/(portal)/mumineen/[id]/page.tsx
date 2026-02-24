@@ -243,7 +243,6 @@ export default function MuminDetailPage() {
 
   return (
     <div>
-      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
 
       {/* Header */}
       <div className="d-flex align-items-center gap-3 mb-4">
@@ -314,7 +313,7 @@ export default function MuminDetailPage() {
             <h6 className="mb-0">Family Members</h6>
             <button className="btn btn-primary btn-sm" onClick={openAddMember}>+ Add Member</button>
           </div>
-          <table className="table table-hover mb-0" style={{ fontSize: '13px' }}>
+          <div className="table-responsive"><table className="table table-hover mb-0" style={{ fontSize: '13px' }}>
             <thead style={{ background: '#f8f9fa' }}>
               <tr>
                 {['#', 'SF#', 'ITS#', 'Full Name', 'Phone', 'WhatsApp', 'Date of Birth', 'Age Group', 'Actions'].map(h => (
@@ -348,6 +347,7 @@ export default function MuminDetailPage() {
               {family.length === 0 && <tr><td colSpan={9} className="text-center text-muted py-4">No family members added yet</td></tr>}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
 
