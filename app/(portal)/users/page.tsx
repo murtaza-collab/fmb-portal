@@ -54,6 +54,7 @@ export default function UsersPage() {
   const [search, setSearch] = useState('')
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false)
 
   const [showUserModal, setShowUserModal] = useState(false)
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null)
@@ -66,7 +67,23 @@ export default function UsersPage() {
   const [groupName, setGroupName] = useState('')
   const [groupPerms, setGroupPerms] = useState<Record<string, Record<string, boolean>>>({})
 
-  useEffect(() => { fetchUsers(); fetchGroups() }, [])
+  useEffect(() => {
+    fetchUsers()
+    fetchGroups()
+    checkIfSuperAdmin()
+  }, [])
+
+  const checkIfSuperAdmin = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.user) return
+    const { data: adminUser } = await supabase
+      .from('admin_users')
+      .select('user_groups(name)')
+      .eq('auth_id', session.user.id)
+      .single()
+    const groupName = (adminUser?.user_groups as any)?.name || ''
+    setIsSuperAdmin(groupName === 'Super Admin')
+  }
 
   const fetchUsers = async () => {
     setLoading(true)
@@ -109,11 +126,30 @@ export default function UsersPage() {
     setSaving(true)
     try {
       if (editingUser) {
+        // Update profile fields
         await supabase.from('admin_users').update({
           full_name: userForm.full_name,
           username: userForm.username,
           user_group_id: userForm.user_group_id ? parseInt(userForm.user_group_id) : null,
         }).eq('id', editingUser.id)
+
+        // If Super Admin filled in a new password, call the API route
+        if (isSuperAdmin && userForm.password.trim()) {
+          const res = await fetch('/api/admin/change-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              auth_id: editingUser.auth_id,
+              new_password: userForm.password.trim()
+            })
+          })
+          const result = await res.json()
+          if (!res.ok) {
+            setFormError(result.error || 'Password change failed')
+            setSaving(false)
+            return
+          }
+        }
       } else {
         const email = `${userForm.username}@fmb.internal`
         const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -440,12 +476,26 @@ export default function UsersPage() {
                       onChange={(e) => setUserForm(p => ({ ...p, username: e.target.value }))} />
                   </div>
                   <div className="col-6">
-                    <label className="form-label" style={{ fontSize: '13px' }}>
-                      Password {editingUser ? '(leave blank to keep)' : '*'}
-                    </label>
-                    <input type="password" className="form-control form-control-sm" value={userForm.password}
-                      onChange={(e) => setUserForm(p => ({ ...p, password: e.target.value }))}
-                      placeholder={editingUser ? 'Leave blank to keep' : 'Enter password'} />
+                    {/* Show password field always for new users, or only for Super Admin on edit */}
+                    {(!editingUser || isSuperAdmin) && (
+                      <>
+                        <label className="form-label" style={{ fontSize: '13px' }}>
+                          Password {editingUser ? '(leave blank to keep)' : '*'}
+                        </label>
+                        <input
+                          type="password"
+                          className="form-control form-control-sm"
+                          value={userForm.password}
+                          onChange={(e) => setUserForm(p => ({ ...p, password: e.target.value }))}
+                          placeholder={editingUser ? 'Leave blank to keep' : 'Enter password'}
+                        />
+                        {editingUser && isSuperAdmin && (
+                          <div style={{ fontSize: '11px', color: '#6c757d', marginTop: '4px' }}>
+                            🔒 Super Admin only
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
                   <div className="col-12">
                     <label className="form-label" style={{ fontSize: '13px' }}>User Group</label>

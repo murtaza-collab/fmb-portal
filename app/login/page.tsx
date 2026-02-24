@@ -29,7 +29,7 @@ export default function LoginPage() {
   const { data: adminData } = await supabase
     .from('admin_users')
     .select('status')
-    .eq('username', username.toLowerCase().trim())
+    .ilike('username', username.trim())
     .single()
 
   if (!adminData || adminData.status !== 'active') {
