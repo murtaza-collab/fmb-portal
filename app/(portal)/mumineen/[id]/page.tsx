@@ -60,35 +60,16 @@ const classifyAge = (dob: string): 'adult' | 'child' | 'infant' | null => {
   return 'adult'
 }
 
-const Modal = ({ children, onClose, size = '' }: { children: React.ReactNode; onClose: () => void; size?: string }) => {
-  const maxW = size === 'modal-lg' ? '800px' : size === 'modal-sm' ? '400px' : '560px'
-  return (
-    <div
-      style={{
-        position: 'fixed', top: 0, left: 0,
-        width: '100vw', height: '100vh',
-        background: 'rgba(0,0,0,0.6)',
-        zIndex: 9999,
-        overflowY: 'auto',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'flex-start',
-        padding: '40px 16px',
-        boxSizing: 'border-box',
-      }}
-      onClick={onClose}
-    >
-      <div
-        style={{ width: '100%', maxWidth: maxW, flexShrink: 0 }}
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="modal-content">
-          {children}
-        </div>
+// Modal — uses Bootstrap's own modal show pattern (confirmed working)
+const Modal = ({ children, onClose, size = '' }: { children: React.ReactNode; onClose: () => void; size?: string }) => (
+  <div className="modal show d-block" style={{ background: 'rgba(0,0,0,0.5)' }} onClick={onClose}>
+    <div className={`modal-dialog ${size}`} onClick={e => e.stopPropagation()}>
+      <div className="modal-content">
+        {children}
       </div>
     </div>
-  )
-}
+  </div>
+)
 
 export default function MuminDetailPage() {
   const { id } = useParams()

@@ -23,25 +23,16 @@ interface Sector { id: number; name: string }
 interface NiyyatStatus { id: number; name: string }
 interface MuminCategory { id: number; name: string; colour: string }
 
-// Modal backdrop — position:fixed so it always covers the full screen
-const Modal = ({ children, onClose, size = '' }: { children: React.ReactNode; onClose: () => void; size?: string }) => {
-  const maxW = size === 'modal-lg' ? '780px' : size === 'modal-sm' ? '380px' : '540px'
-  return (
-    <div
-      style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.6)', zIndex: 9999, overflowY: 'auto' }}
-      onClick={onClose}
-    >
-      <div
-        style={{ maxWidth: maxW, width: '100%', margin: '40px auto', padding: '0 16px', boxSizing: 'border-box' }}
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="modal-content">
-          {children}
-        </div>
+// Modal — uses Bootstrap's own modal show pattern (same as Distributors page — confirmed working)
+const Modal = ({ children, onClose, size = '' }: { children: React.ReactNode; onClose: () => void; size?: string }) => (
+  <div className="modal show d-block" style={{ background: 'rgba(0,0,0,0.5)' }} onClick={onClose}>
+    <div className={`modal-dialog ${size}`} onClick={e => e.stopPropagation()}>
+      <div className="modal-content">
+        {children}
       </div>
     </div>
-  )
-}
+  </div>
+)
 
 const PAGE_SIZE = 100
 const HOUSE_TYPES = ['Flat', 'Bungalow', 'Portion']
@@ -189,7 +180,23 @@ export default function MumineenPage() {
   }
 
   const handleSample = () => {
-    const csv = `"SF#","ITS#","Full Name","Phone","WhatsApp","Email","Date of Birth","Full Address"\n"1001","40000001","Husain bhai Ali bhai Examplewala","+923001234567","+923001234567","husain@example.com","1980-01-15","Flat 4A, 2nd Floor, Block B, AHMED MARKET SF-13"`
+    const headers = [
+      'SF#', 'ITS#', 'Full Name', 'Date of Birth', 'Phone', 'WhatsApp', 'Email',
+      'Mumin Category', 'Remarks',
+      'House Type', 'Number', 'Category (A-Z)', 'Floor', 'Block', 'Sector Name'
+    ]
+    const example = [
+      '1001', '40000001', 'Husain bhai Ali bhai Examplewala', '1980-01-15',
+      '+923001234567', '+923001234567', 'husain@example.com',
+      'Normal', '',
+      'Flat', '4', 'A', '2', 'B', 'AHMED MARKET SF-13'
+    ]
+    const note = [
+      '', '', '', 'YYYY-MM-DD format', '', '', '',
+      'Must match category name exactly', 'Optional notes',
+      'Flat / Bungalow / Portion', 'e.g. 4', 'e.g. A or 2', '1-20', 'A-Z', 'Must match sector name exactly'
+    ]
+    const csv = [headers, example, note].map(r => r.map(v => `"${v}"`).join(',')).join('\n')
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = 'mumineen_sample.csv'; a.click()
   }
 
@@ -202,9 +209,35 @@ export default function MumineenPage() {
     const rows = lines.slice(1).map(line => {
       const values = line.replace(/"/g, '').split(',').map(v => v.trim())
       const obj: any = {}; headers.forEach((h, i) => { obj[h] = values[i] || null }); return obj
-    }).filter(r => r['sf#'] || r['full name'])
+    }).filter(r => (r['sf#'] || r['full name']) && !r['sf#']?.startsWith('e.g') && !r['full name']?.startsWith('YYYY'))
     if (rows.length === 0) { setImportError('No valid rows found.'); setImporting(false); return }
-    const payload = rows.map(r => ({ sf_no: r['sf#'] || null, its_no: r['its#'] || null, full_name: r['full name'] || '', phone_no: r['phone'] || null, whatsapp_no: r['whatsapp'] || null, email: r['email'] || null, dob: r['date of birth'] || null, full_address: r['full address'] || null, is_hof: true, hof_id: null, status: 'active', niyyat_status_id: noShowId || null }))
+    const payload = rows.map(r => {
+      // Build address from individual components
+      const houseType = r['house type'] || ''
+      const num = r['number'] || ''
+      const cat = r['category (a-z)'] || ''
+      const floor = r['floor'] || ''
+      const block = r['block'] || ''
+      const sectorName = r['sector name'] || ''
+      const sectorMatch = sectors.find(s => s.name.toLowerCase() === sectorName.toLowerCase())
+      const fullAddress = buildAddress(houseType, num, cat, floor, block, sectorName)
+      const catMatch = categories.find(c => c.name.toLowerCase() === (r['mumin category'] || '').toLowerCase())
+      return {
+        sf_no: r['sf#'] || null,
+        its_no: r['its#'] || null,
+        full_name: r['full name'] || '',
+        phone_no: r['phone'] || null,
+        whatsapp_no: r['whatsapp'] || null,
+        email: r['email'] || null,
+        dob: r['date of birth'] || null,
+        remarks: r['remarks'] || null,
+        full_address: fullAddress || null,
+        address_sector_id: sectorMatch?.id || null,
+        mumin_category_id: catMatch?.id || null,
+        is_hof: true, hof_id: null, status: 'active',
+        niyyat_status_id: noShowId || null,
+      }
+    })
     const { error } = await supabase.from('mumineen').insert(payload)
     if (error) { setImportError(error.message) } else { setImportSuccess(`Imported ${payload.length} records.`); await fetchAll() }
     setImporting(false); if (fileInputRef.current) fileInputRef.current.value = ''
