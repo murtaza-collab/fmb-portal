@@ -9,7 +9,7 @@ const menuItems = [
   { label: 'Distribution', href: '/distribution', icon: '📦' },
   { label: 'Distributors', href: '/distributors', icon: '🚗' },
   { label: 'Sectors', href: '/sectors', icon: '🗺️' },
-  { label: 'Takhmeem', href: '/takhmeem', icon: '💰' },
+  { label: 'Takhmeen', href: '/takhmeen', icon: '💰' },
   { label: 'Calendar', href: '/calendar', icon: '📅' },
   { label: 'Users', href: '/users', icon: '⚙️' },
 ]
