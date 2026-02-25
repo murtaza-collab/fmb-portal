@@ -9,32 +9,25 @@ interface Registration {
   thaali_type_id: number | null
   thaali_category_id: number | null
   distributor_id: number | null
-  fiscal_year_id: number | null
-  status: string
   remarks: string
   mumineen?: {
     sf_no: string
     full_name: string
     its_no: string
-    whatsapp_no: string
-    full_address: string
     house_sectors?: { name: string }
   }
   thaalis?: { thaali_number: number }
   thaali_types?: { name: string }
   thaali_categories?: { name: string }
   distributors?: { full_name: string }
-  fiscal_years?: { gregorian_year: number; hijri_year: string }
 }
 
 interface Thaali { id: number; thaali_number: number }
 interface ThaaliType { id: number; name: string }
 interface ThaaliCategory { id: number; name: string }
 interface Distributor { id: number; full_name: string }
-interface FiscalYear { id: number; gregorian_year: number; hijri_year: string; is_active: boolean }
 interface Mumin { id: number; sf_no: string; full_name: string; its_no: string }
 
-const REG_STATUSES = ['approved', 'pending', 'stopped', 'transfered', 'not required', 'required distributor']
 const STATUS_COLORS: Record<string, string> = {
   approved: 'bg-success', pending: 'bg-warning text-dark', stopped: 'bg-danger',
   transfered: 'bg-info', 'not required': 'bg-secondary', 'required distributor': 'bg-primary'
@@ -52,50 +45,57 @@ export default function ThaaliRegistrationsPage() {
   // Filters
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
-  const [filterStatus, setFilterStatus] = useState('')
-  const [filterFiscalYear, setFilterFiscalYear] = useState('')
   const [filterDistributor, setFilterDistributor] = useState('')
   const [filterType, setFilterType] = useState('')
   const [filterCategory, setFilterCategory] = useState('')
 
   // Lookups
-  const [thaaliNumbers, setThaaliNumbers] = useState<Thaali[]>([])
+  const [availableThaalis, setAvailableThaalis] = useState<Thaali[]>([])
+  const [allThaalis, setAllThaalis] = useState<Thaali[]>([])
   const [thaaliTypes, setThaaliTypes] = useState<ThaaliType[]>([])
   const [thaaliCategories, setThaaliCategories] = useState<ThaaliCategory[]>([])
   const [distributors, setDistributors] = useState<Distributor[]>([])
-  const [fiscalYears, setFiscalYears] = useState<FiscalYear[]>([])
 
   // Modal
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<Registration | null>(null)
   const [saving, setSaving] = useState(false)
-  const [muminSearch, setMuminSearch] = useState('')
-  const [muminResults, setMuminResults] = useState<Mumin[]>([])
-  const [muminSearching, setMuminSearching] = useState(false)
+  const [muminList, setMuminList] = useState<Mumin[]>([])
   const [form, setForm] = useState({
     mumin_id: 0, mumin_label: '',
     thaali_id: '', thaali_type_id: '', thaali_category_id: '',
-    distributor_id: '', fiscal_year_id: '', status: 'approved', remarks: ''
+    distributor_id: '', remarks: ''
   })
 
   useEffect(() => { fetchLookups() }, [])
-  useEffect(() => { fetchRegistrations() }, [page, search, filterStatus, filterFiscalYear, filterDistributor, filterType, filterCategory])
+  useEffect(() => { fetchRegistrations() }, [page, search, filterDistributor, filterType, filterCategory])
 
   const fetchLookups = async () => {
-    const [tn, tt, tc, d, fy] = await Promise.all([
-      supabase.from('thaalis').select('id, thaali_number').order('thaali_number'),
+    const [tt, tc, d, allTn] = await Promise.all([
       supabase.from('thaali_types').select('id, name').eq('status', 'active'),
       supabase.from('thaali_categories').select('id, name'),
       supabase.from('distributors').select('id, full_name').eq('status', 'active').order('full_name'),
-      supabase.from('fiscal_years').select('*').order('id', { ascending: false }),
+      supabase.from('thaalis').select('id, thaali_number').order('thaali_number'),
     ])
-    setThaaliNumbers(tn.data || [])
     setThaaliTypes(tt.data || [])
     setThaaliCategories(tc.data || [])
     setDistributors(d.data || [])
-    setFiscalYears(fy.data || [])
-    const activeFY = (fy.data || []).find((f: FiscalYear) => f.is_active)
-    if (activeFY) setFilterFiscalYear(activeFY.id.toString())
+    setAllThaalis(allTn.data || [])
+  }
+
+  const fetchAvailableThaalis = async (excludeThaaliId?: number) => {
+    // Get all assigned thaali IDs
+    const { data: assigned } = await supabase
+      .from('thaali_registrations')
+      .select('thaali_id')
+      .not('thaali_id', 'is', null)
+
+    const assignedIds = new Set((assigned || []).map((r: any) => r.thaali_id))
+    // If editing, exclude current thaali from the "taken" set so it shows in dropdown
+    if (excludeThaaliId) assignedIds.delete(excludeThaaliId)
+
+    const available = allThaalis.filter(t => !assignedIds.has(t.id))
+    setAvailableThaalis(available)
   }
 
   const fetchRegistrations = async () => {
@@ -103,37 +103,33 @@ export default function ThaaliRegistrationsPage() {
     let query = supabase
       .from('thaali_registrations')
       .select(`
-        *,
-        mumineen!fk_tr_mumin(sf_no, full_name, its_no, whatsapp_no, full_address, house_sectors(name)),
+        id, mumin_id, thaali_id, thaali_type_id, thaali_category_id, distributor_id, remarks,
+        mumineen!fk_tr_mumin(sf_no, full_name, its_no, house_sectors(name)),
         thaalis!fk_tr_thaali(thaali_number),
         thaali_types!fk_tr_type(name),
         thaali_categories!fk_tr_category(name),
-        distributors!fk_tr_distributor(full_name),
-        fiscal_years!fk_tr_fiscal(gregorian_year, hijri_year)
+        distributors!fk_tr_distributor(full_name)
       `, { count: 'exact' })
-      .order('id', { ascending: false })
+      .order('thaali_id', { nullsFirst: false })
       .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
 
-    if (filterStatus) query = query.eq('status', filterStatus)
-    if (filterFiscalYear) query = query.eq('fiscal_year_id', parseInt(filterFiscalYear))
     if (filterDistributor) query = query.eq('distributor_id', parseInt(filterDistributor))
     if (filterType) query = query.eq('thaali_type_id', parseInt(filterType))
     if (filterCategory) query = query.eq('thaali_category_id', parseInt(filterCategory))
 
     const { data, count } = await query
-    let filtered = data || []
+    let filtered: any[] = data || []
     if (search) {
-      filtered = filtered.filter((r: Registration) =>
+      filtered = filtered.filter((r: any) =>
         r.mumineen?.full_name?.toLowerCase().includes(search.toLowerCase()) ||
         r.mumineen?.sf_no?.toLowerCase().includes(search.toLowerCase()) ||
         r.mumineen?.its_no?.toLowerCase().includes(search.toLowerCase()) ||
         r.thaalis?.thaali_number?.toString().includes(search)
       )
     }
-    setRegistrations(filtered)
+    setRegistrations(filtered as Registration[])
     setTotal(count || 0)
 
-    // Stats
     const [approved, inactive, unassigned] = await Promise.all([
       supabase.from('thaali_registrations').select('*', { count: 'exact', head: true }).eq('status', 'approved'),
       supabase.from('thaali_registrations').select('*', { count: 'exact', head: true }).not('status', 'eq', 'approved'),
@@ -143,28 +139,29 @@ export default function ThaaliRegistrationsPage() {
     setLoading(false)
   }
 
-  const searchMumin = async (val: string) => {
-    setMuminSearch(val)
-    if (val.length < 2) { setMuminResults([]); return }
-    setMuminSearching(true)
+  // Load all unregistered mumineen for dropdown
+  const fetchMuminList = async (editingMuminId?: number) => {
+    const { data: existing } = await supabase
+      .from('thaali_registrations')
+      .select('mumin_id')
+
+    const registeredIds = (existing || [])
+      .map((r: any) => r.mumin_id)
+      .filter((id: number) => id !== editingMuminId)
+
     const { data } = await supabase.from('mumineen')
       .select('id, sf_no, full_name, its_no')
-      .or(`full_name.ilike.%${val}%,sf_no.ilike.%${val}%,its_no.ilike.%${val}%`)
-      .eq('is_hof', true).limit(10)
-    setMuminResults(data || [])
-    setMuminSearching(false)
-  }
+      .not('id', 'in', `(${registeredIds.length > 0 ? registeredIds.join(',') : '0'})`)
+      .order('sf_no')
 
-  const selectMumin = (m: Mumin) => {
-    setForm(f => ({ ...f, mumin_id: m.id, mumin_label: `${m.sf_no} — ${m.full_name}` }))
-    setMuminSearch(''); setMuminResults([])
+    setMuminList((data || []) as Mumin[])
   }
 
   const openAdd = () => {
     setEditing(null)
-    const activeFY = fiscalYears.find(f => f.is_active)
-    setForm({ mumin_id: 0, mumin_label: '', thaali_id: '', thaali_type_id: '', thaali_category_id: '', distributor_id: '', fiscal_year_id: activeFY?.id.toString() || '', status: 'approved', remarks: '' })
-    setMuminSearch(''); setMuminResults([])
+    setForm({ mumin_id: 0, mumin_label: '', thaali_id: '', thaali_type_id: '', thaali_category_id: '', distributor_id: '', remarks: '' })
+    fetchMuminList()
+    fetchAvailableThaalis()
     setShowModal(true)
   }
 
@@ -177,11 +174,10 @@ export default function ThaaliRegistrationsPage() {
       thaali_type_id: r.thaali_type_id?.toString() || '',
       thaali_category_id: r.thaali_category_id?.toString() || '',
       distributor_id: r.distributor_id?.toString() || '',
-      fiscal_year_id: r.fiscal_year_id?.toString() || '',
-      status: r.status || 'approved',
       remarks: r.remarks || ''
     })
-    setMuminSearch(''); setMuminResults([])
+    fetchMuminList(r.mumin_id)
+    fetchAvailableThaalis(r.thaali_id || undefined)
     setShowModal(true)
   }
 
@@ -194,8 +190,7 @@ export default function ThaaliRegistrationsPage() {
       thaali_type_id: form.thaali_type_id ? parseInt(form.thaali_type_id) : null,
       thaali_category_id: form.thaali_category_id ? parseInt(form.thaali_category_id) : null,
       distributor_id: form.distributor_id ? parseInt(form.distributor_id) : null,
-      fiscal_year_id: form.fiscal_year_id ? parseInt(form.fiscal_year_id) : null,
-      status: form.status,
+      status: 'approved',
       remarks: form.remarks,
     }
     if (editing) {
@@ -208,25 +203,22 @@ export default function ThaaliRegistrationsPage() {
     setSaving(false)
   }
 
-  const quickStatus = async (r: Registration, status: string) => {
+  const quickStatus = async (r: any, status: string) => {
     await supabase.from('thaali_registrations').update({ status }).eq('id', r.id)
     await fetchRegistrations()
   }
 
   const clearFilters = () => {
-    setSearchInput(''); setSearch(''); setFilterStatus('')
+    setSearchInput(''); setSearch('')
     setFilterDistributor(''); setFilterType(''); setFilterCategory('')
-    const activeFY = fiscalYears.find(f => f.is_active)
-    setFilterFiscalYear(activeFY ? activeFY.id.toString() : '')
     setPage(0)
   }
 
-  const activeFilterCount = [filterStatus, filterDistributor, filterType, filterCategory, search].filter(Boolean).length
+  const activeFilterCount = [filterDistributor, filterType, filterCategory, search].filter(Boolean).length
   const totalPages = Math.ceil(total / PAGE_SIZE)
 
   return (
     <div>
-      {/* Header */}
       <div className="d-flex flex-wrap justify-content-between align-items-start align-items-sm-center gap-2 mb-4">
         <div>
           <h4 className="mb-0">Thaali Registrations</h4>
@@ -277,23 +269,7 @@ export default function ThaaliRegistrationsPage() {
         <div className="card mb-3" style={{ border: 'none', boxShadow: '0 1px 4px rgba(0,0,0,0.1)', borderRadius: '10px' }}>
           <div className="card-body py-3">
             <div className="row g-2">
-              <div className="col-6 col-md-2">
-                <label style={{ fontSize: '12px', color: '#6c757d' }}>Status</label>
-                <select className="form-select form-select-sm" value={filterStatus}
-                  onChange={e => { setFilterStatus(e.target.value); setPage(0) }}>
-                  <option value="">All</option>
-                  {REG_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-              <div className="col-6 col-md-2">
-                <label style={{ fontSize: '12px', color: '#6c757d' }}>Fiscal Year</label>
-                <select className="form-select form-select-sm" value={filterFiscalYear}
-                  onChange={e => { setFilterFiscalYear(e.target.value); setPage(0) }}>
-                  <option value="">All</option>
-                  {fiscalYears.map(fy => <option key={fy.id} value={fy.id}>{fy.gregorian_year} / {fy.hijri_year}{fy.is_active ? ' ★' : ''}</option>)}
-                </select>
-              </div>
-              <div className="col-6 col-md-3">
+              <div className="col-6 col-md-4">
                 <label style={{ fontSize: '12px', color: '#6c757d' }}>Distributor</label>
                 <select className="form-select form-select-sm" value={filterDistributor}
                   onChange={e => { setFilterDistributor(e.target.value); setPage(0) }}>
@@ -301,7 +277,7 @@ export default function ThaaliRegistrationsPage() {
                   {distributors.map(d => <option key={d.id} value={d.id}>{d.full_name}</option>)}
                 </select>
               </div>
-              <div className="col-6 col-md-2">
+              <div className="col-6 col-md-3">
                 <label style={{ fontSize: '12px', color: '#6c757d' }}>Type</label>
                 <select className="form-select form-select-sm" value={filterType}
                   onChange={e => { setFilterType(e.target.value); setPage(0) }}>
@@ -309,7 +285,7 @@ export default function ThaaliRegistrationsPage() {
                   {thaaliTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
               </div>
-              <div className="col-6 col-md-2">
+              <div className="col-6 col-md-3">
                 <label style={{ fontSize: '12px', color: '#6c757d' }}>Category</label>
                 <select className="form-select form-select-sm" value={filterCategory}
                   onChange={e => { setFilterCategory(e.target.value); setPage(0) }}>
@@ -330,16 +306,16 @@ export default function ThaaliRegistrationsPage() {
           ) : (
             <>
               <div className="table-responsive">
-                <table className="table table-hover mb-0" style={{ fontSize: '13px', minWidth: '900px' }}>
+                <table className="table table-hover mb-0" style={{ fontSize: '13px', minWidth: '800px' }}>
                   <thead style={{ background: '#f8f9fa' }}>
                     <tr>
-                      {['#', 'SF#', 'Name', 'Thaali No', 'Type', 'Category', 'Distributor', 'FY', 'Status', 'Actions'].map(h => (
+                      {['#', 'SF#', 'Name', 'Thaali No', 'Type', 'Category', 'Distributor', 'Status', 'Actions'].map(h => (
                         <th key={h} style={{ fontSize: '12px', color: '#6c757d', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {registrations.map((r, i) => (
+                    {registrations.map((r: any, i) => (
                       <tr key={r.id}>
                         <td style={{ color: '#6c757d', fontSize: '12px' }}>{page * PAGE_SIZE + i + 1}</td>
                         <td style={{ fontWeight: 600, color: '#364574' }}>{r.mumineen?.sf_no || '—'}</td>
@@ -352,7 +328,6 @@ export default function ThaaliRegistrationsPage() {
                         <td>{r.thaali_types?.name || '—'}</td>
                         <td>{r.thaali_categories?.name || '—'}</td>
                         <td style={{ whiteSpace: 'nowrap', fontSize: '12px' }}>{r.distributors?.full_name || '—'}</td>
-                        <td style={{ fontSize: '11px', color: '#6c757d' }}>{r.fiscal_years?.gregorian_year || '—'}</td>
                         <td>
                           <span className={`badge ${STATUS_COLORS[r.status] || 'bg-secondary'}`} style={{ fontSize: '10px' }}>
                             {r.status}
@@ -373,7 +348,7 @@ export default function ThaaliRegistrationsPage() {
                       </tr>
                     ))}
                     {registrations.length === 0 && (
-                      <tr><td colSpan={10} className="text-center text-muted py-4">No registrations found</td></tr>
+                      <tr><td colSpan={9} className="text-center text-muted py-4">No registrations found</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -409,55 +384,46 @@ export default function ThaaliRegistrationsPage() {
               <div className="modal-body" style={{ maxHeight: '65vh', overflowY: 'auto' }}>
                 <div className="row g-3">
 
-                  {/* Mumin search */}
+                  {/* Mumin dropdown — only unregistered mumineen */}
                   <div className="col-12">
-                    <label className="form-label" style={{ fontSize: '13px' }}>Mumin (HOF) *</label>
-                    {form.mumin_id ? (
-                      <div className="d-flex align-items-center gap-2">
-                        <div className="form-control form-control-sm" style={{ background: '#f8f9fa', flex: 1 }}>
-                          {form.mumin_label}
-                        </div>
-                        {!editing && (
-                          <button className="btn btn-sm btn-outline-secondary"
-                            onClick={() => setForm(f => ({ ...f, mumin_id: 0, mumin_label: '' }))}>
-                            Change
-                          </button>
-                        )}
-                      </div>
-                    ) : (
-                      <div style={{ position: 'relative' }}>
-                        <input type="text" className="form-control form-control-sm"
-                          placeholder="Search by name, SF# or ITS#..."
-                          value={muminSearch} onChange={e => searchMumin(e.target.value)} />
-                        {muminSearching && <div style={{ fontSize: '12px', color: '#6c757d', padding: '4px' }}>Searching...</div>}
-                        {muminResults.length > 0 && (
-                          <div style={{
-                            position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 1000,
-                            background: '#fff', border: '1px solid #dee2e6', borderRadius: '6px',
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.1)', maxHeight: '200px', overflowY: 'auto'
-                          }}>
-                            {muminResults.map(m => (
-                              <div key={m.id} onClick={() => selectMumin(m)}
-                                style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '13px', borderBottom: '1px solid #f0f0f0' }}
-                                onMouseEnter={e => (e.currentTarget.style.background = '#f8f9fa')}
-                                onMouseLeave={e => (e.currentTarget.style.background = '')}>
-                                <strong>{m.sf_no}</strong> — {m.full_name}
-                                <span style={{ color: '#6c757d', marginLeft: '8px', fontSize: '11px' }}>{m.its_no}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                    <label className="form-label" style={{ fontSize: '13px' }}>
+                      Mumin * <span className="text-muted" style={{ fontSize: '11px' }}>— only shows mumineen without a registration</span>
+                    </label>
+                    <select
+                      className="form-select form-select-sm"
+                      value={form.mumin_id || ''}
+                      onChange={e => {
+                        const id = parseInt(e.target.value)
+                        const m = muminList.find(m => m.id === id)
+                        setForm(f => ({ ...f, mumin_id: id, mumin_label: m ? `${m.sf_no} — ${m.full_name}` : '' }))
+                      }}
+                      disabled={!!editing}
+                    >
+                      <option value="">— Select Mumin —</option>
+                      {muminList.map(m => (
+                        <option key={m.id} value={m.id}>{m.sf_no} — {m.full_name}</option>
+                      ))}
+                    </select>
+                    {muminList.length === 0 && (
+                      <div style={{ fontSize: '11px', color: '#f06548', marginTop: '4px' }}>
+                        No unregistered mumineen found
                       </div>
                     )}
                   </div>
 
+                  {/* Thaali number — only unassigned */}
                   <div className="col-12 col-sm-6">
-                    <label className="form-label" style={{ fontSize: '13px' }}>Thaali Number</label>
+                    <label className="form-label" style={{ fontSize: '13px' }}>
+                      Thaali Number <span className="text-muted" style={{ fontSize: '11px' }}>— unassigned only</span>
+                    </label>
                     <select className="form-select form-select-sm" value={form.thaali_id}
                       onChange={e => setForm(f => ({ ...f, thaali_id: e.target.value }))}>
                       <option value="">— Unassigned —</option>
-                      {thaaliNumbers.map(t => <option key={t.id} value={t.id}>#{t.thaali_number}</option>)}
+                      {availableThaalis.map(t => <option key={t.id} value={t.id}>#{t.thaali_number}</option>)}
                     </select>
+                    {availableThaalis.length === 0 && (
+                      <div style={{ fontSize: '11px', color: '#f06548', marginTop: '4px' }}>All thaali numbers are assigned</div>
+                    )}
                   </div>
 
                   <div className="col-12 col-sm-6">
@@ -484,23 +450,6 @@ export default function ThaaliRegistrationsPage() {
                       onChange={e => setForm(f => ({ ...f, distributor_id: e.target.value }))}>
                       <option value="">Select distributor</option>
                       {distributors.map(d => <option key={d.id} value={d.id}>{d.full_name}</option>)}
-                    </select>
-                  </div>
-
-                  <div className="col-12 col-sm-6">
-                    <label className="form-label" style={{ fontSize: '13px' }}>Fiscal Year</label>
-                    <select className="form-select form-select-sm" value={form.fiscal_year_id}
-                      onChange={e => setForm(f => ({ ...f, fiscal_year_id: e.target.value }))}>
-                      <option value="">Select year</option>
-                      {fiscalYears.map(fy => <option key={fy.id} value={fy.id}>{fy.gregorian_year} / {fy.hijri_year}{fy.is_active ? ' ★' : ''}</option>)}
-                    </select>
-                  </div>
-
-                  <div className="col-12 col-sm-6">
-                    <label className="form-label" style={{ fontSize: '13px' }}>Status</label>
-                    <select className="form-select form-select-sm" value={form.status}
-                      onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
-                      {REG_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </div>
 

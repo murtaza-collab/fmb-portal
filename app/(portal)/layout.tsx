@@ -19,6 +19,7 @@ const ALL_MENU_ITEMS = [
       { label: 'Thaali Numbers', href: '/thaali/numbers' },
       { label: 'Types', href: '/thaali/types' },
       { label: 'Categories', href: '/thaali/categories' },
+      { label: 'Stickers', href: '/thaali/stickers' },
     ]
   },
   { label: 'Distribution', href: '/distribution', icon: 'bi-box-seam', module: 'distribution' },
