@@ -12,7 +12,15 @@ const ALL_MENU_ITEMS = [
       { label: 'Mumin Categories', href: '/mumineen/categories' },
     ]
   },
-  { label: 'Thaali', href: '/thaali', icon: 'bi-bowl-hot', module: 'thaali' },
+  {
+    label: 'Thaali', href: '/thaali', icon: 'bi-bowl-hot', module: 'thaali',
+    children: [
+      { label: 'Registrations', href: '/thaali' },
+      { label: 'Thaali Numbers', href: '/thaali/numbers' },
+      { label: 'Types', href: '/thaali/types' },
+      { label: 'Categories', href: '/thaali/categories' },
+    ]
+  },
   { label: 'Distribution', href: '/distribution', icon: 'bi-box-seam', module: 'distribution' },
   { label: 'Distributors', href: '/distributors', icon: 'bi-truck', module: 'distributors' },
   { label: 'Sectors', href: '/sectors', icon: 'bi-map', module: 'sectors' },
@@ -42,7 +50,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   const [permissions, setPermissions] = useState<Permission[]>([])
   const [menuItems, setMenuItems] = useState(ALL_MENU_ITEMS)
   const [showProfileDropdown, setShowProfileDropdown] = useState(false)
-  const [expandedMenus, setExpandedMenus] = useState<string[]>(['/mumineen'])
+  const [expandedMenus, setExpandedMenus] = useState<string[]>(['/mumineen', '/thaali'])
   const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
