@@ -97,16 +97,18 @@ export default function MumineenPage() {
     setLoading(true)
     const [mumineenRes, sectorsRes, niyyatRes, catRes] = await Promise.all([
       supabase.from('mumineen')
-        .select('id, sf_no, its_no, full_name, phone_no, whatsapp_no, full_address, status, is_hof, hof_id, address_sector_id, niyyat_status_id, mumin_category_id')
-        .eq('is_hof', true).order('sf_no'),
+        .select('id, sf_no, its_no, full_name, phone_no, whatsapp_no, full_address, status, is_hof, hof_id, address_sector_id, niyyat_status_id, mumin_category_id'),
       supabase.from('house_sectors').select('id, name').eq('status', 'active').order('name'),
       supabase.from('niyyat_statuses').select('id, name').order('name'),
       supabase.from('mumin_categories').select('id, name, colour').eq('status', 'active').order('name'),
     ])
+    if (mumineenRes.error) console.error('mumineen error:', mumineenRes.error)
+    if (sectorsRes.error) console.error('sectors error:', sectorsRes.error)
     setMumineen((mumineenRes.data as any[]) || [])
     setSectors(sectorsRes.data || [])
     setNiyyatStatuses(niyyatRes.data || [])
     setCategories(catRes.data || [])
+    console.log('mumineen fetched:', mumineenRes.data?.length, 'error:', mumineenRes.error?.message)
     const noShow = (niyyatRes.data || []).find((n: NiyyatStatus) => n.name.toLowerCase() === 'no-show')
     setNoShowId(noShow?.id || null)
     setLoading(false)
@@ -160,8 +162,23 @@ export default function MumineenPage() {
     }
     const res = editing
       ? await supabase.from('mumineen').update(payload).eq('id', editing.id)
-      : await supabase.from('mumineen').insert(payload)
+      : await supabase.from('mumineen').insert(payload).select('id, sf_no, its_no').single()
     if (res.error) { setSaveError(res.error.message); setSaving(false); return }
+
+    // If new mumin added, call Edge Function to create auth user
+    if (!editing && res.data) {
+      const { id, sf_no, its_no } = res.data as any
+      if (its_no) {
+        try {
+          await supabase.functions.invoke('create-mumin-user', {
+            body: { mumin_id: id, sf_no, its_no }
+          })
+        } catch (e) {
+          console.warn('Auth user creation failed:', e)
+        }
+      }
+    }
+
     await fetchAll(); setShowModal(false); setSaving(false)
   }
 
@@ -260,7 +277,7 @@ export default function MumineenPage() {
       <div className="d-flex flex-wrap justify-content-between align-items-start align-items-sm-center gap-2 mb-3">
         <div>
           <h4 className="mb-0" style={{ color: '#212529' }}>Mumineen</h4>
-          <p className="text-muted mb-0" style={{ fontSize: '13px' }}>Heads of Family — {mumineen.length} total</p>
+          <p className="text-muted mb-0" style={{ fontSize: '13px' }}>All Mumineen — {mumineen.length} total</p>
         </div>
         <div className="d-flex gap-2 flex-wrap">
           <button className="btn btn-outline-secondary btn-sm" onClick={handleSample}><i className="bi bi-file-earmark-arrow-down me-1" />Sample</button>
