@@ -165,13 +165,15 @@ export default function MumineenPage() {
       : await supabase.from('mumineen').insert(payload).select('id, sf_no, its_no').single()
     if (res.error) { setSaveError(res.error.message); setSaving(false); return }
 
-    // If new mumin added, call Edge Function to create auth user
+    // If new mumin added, call API route to create auth user
     if (!editing && res.data) {
       const { id, sf_no, its_no } = res.data as any
       if (its_no) {
         try {
-          await supabase.functions.invoke('create-mumin-user', {
-            body: { mumin_id: id, sf_no, its_no }
+          await fetch('/api/admin/create-mumin-user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mumin_id: id, sf_no, its_no })
           })
         } catch (e) {
           console.warn('Auth user creation failed:', e)
