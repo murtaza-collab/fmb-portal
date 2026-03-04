@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <!-- Background circle -->
+  <circle cx="100" cy="100" r="100" fill="#364574"/>
+  
+  <!-- Outer ring -->
+  <circle cx="100" cy="100" r="88" fill="none" stroke="#ffbf69" stroke-width="3" opacity="0.4"/>
+  
+  <!-- Thaali plate (outer) -->
+  <circle cx="100" cy="105" r="62" fill="none" stroke="#ffbf69" stroke-width="5"/>
+  
+  <!-- Thaali plate (inner rim) -->
+  <circle cx="100" cy="105" r="52" fill="none" stroke="#ffbf69" stroke-width="2" opacity="0.5"/>
+  
+  <!-- Center bowl shape -->
+  <ellipse cx="100" cy="105" rx="28" ry="12" fill="#ffbf69" opacity="0.15"/>
+  <ellipse cx="100" cy="105" rx="28" ry="12" fill="none" stroke="#ffbf69" stroke-width="2.5"/>
+  
+  <!-- Steam lines above bowl -->
+  <path d="M88 88 Q90 82 88 76" fill="none" stroke="#ffbf69" stroke-width="2.5" stroke-linecap="round" opacity="0.7"/>
+  <path d="M100 86 Q102 79 100 72" fill="none" stroke="#ffbf69" stroke-width="2.5" stroke-linecap="round" opacity="0.9"/>
+  <path d="M112 88 Q114 82 112 76" fill="none" stroke="#ffbf69" stroke-width="2.5" stroke-linecap="round" opacity="0.7"/>
+  
+  <!-- FMB text -->
+  <text x="100" y="48" font-family="Arial, sans-serif" font-size="18" font-weight="800" fill="#ffbf69" text-anchor="middle" letter-spacing="3">FMB</text>
+</svg>

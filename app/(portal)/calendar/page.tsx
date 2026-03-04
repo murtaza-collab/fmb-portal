@@ -1,779 +1,801 @@
 'use client'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import {
+  gregorianToHijri, hijriToGregorian, formatHijri,
+  HIJRI_MONTHS, HIJRI_MONTHS_SHORT,
+  daysInHijriMonth, todayHijri, hijriMonthStart
+} from '@/lib/hijri'
+
+// ── Static data ──
+const NIYYAT_STATUSES = [
+  { id: 1, name: 'Approved' }, { id: 2, name: 'Niyyat Pending' },
+  { id: 3, name: 'No-Show' }, { id: 4, name: 'Stopped' },
+  { id: 5, name: 'Transferred' }, { id: 6, name: 'Verified' },
+  { id: 7, name: 'Change Address' }, { id: 8, name: 'Distributor Required' },
+  { id: 9, name: 'Not Required' }, { id: 10, name: 'Pending Thaali' },
+  { id: 11, name: 'Pending Approval' },
+]
+
+const THAALI_CATEGORIES = [
+  { id: 1, name: 'Mini' }, { id: 2, name: 'Small' },
+  { id: 3, name: 'Medium' }, { id: 4, name: 'Large' },
+]
 
 interface CalendarEvent {
-  id: number
-  event_date: string
-  menu: string
-  notes: string
-  fiscal_year_id: number
-  status: string
-  calendar_event_statuses?: EventStatus[]
-}
-
-interface EventStatus {
-  id: number
-  event_id: number
-  niyyat_status_id: number
-  thaali_count: number
-  niyyat_statuses?: { name: string }
+  id: number; event_date: string; menu: string; notes?: string
 }
 
 interface DailyMenu {
-  id?: number
-  menu_date: string
-  roti: string
-  tarkari: string
-  chawal: string
-  soup: string
-  mithas: string
-  salad: string
-  extra_items: ExtraItem[]
-  notes: string
+  id: number; menu_date: string
+  roti?: string; tarkari?: string; chawal?: string
+  soup?: string; mithas?: string; salad?: string; notes?: string
 }
 
-interface ExtraItem {
-  name: string
-  description: string
+interface ThaaliSchedule {
+  id: number; event_date: string; event_name?: string
+  thaali_enabled: boolean; niyyat_status_ids: number[]
+  extra_thaali_count: number; thaali_category_ids: number[]; notes?: string
 }
 
-interface NiyyatStatus { id: number; name: string }
-interface FiscalYear { id: number; gregorian_year: number; hijri_year: string; is_active: boolean }
+interface ThaaliCount { approved: number; byCategory: Record<number, number>; total: number }
 
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-const DAYS_SHORT = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December']
+type ViewMode = 'gregorian' | 'hijri'
+type ModalTab = 'menu' | 'event' | 'thaali'
 
-const FIXED_ITEMS = [
-  { key: 'roti', label: 'Roti', placeholder: 'e.g. Chapati, Tandoori Roti' },
-  { key: 'tarkari', label: 'Tarkari', placeholder: 'e.g. Aloo Gobi, Daal' },
-  { key: 'chawal', label: 'Chawal', placeholder: 'e.g. Zeera Rice, Biryani' },
-  { key: 'soup', label: 'Soup', placeholder: 'e.g. Tomato Soup, Lentil Soup' },
-  { key: 'mithas', label: 'Mithas', placeholder: 'e.g. Gulab Jamun, Kheer' },
-  { key: 'salad', label: 'Salad', placeholder: 'e.g. Garden Salad, Raita' },
-]
-
-const emptyMenu = (): DailyMenu => ({
-  menu_date: '',
-  roti: '', tarkari: '', chawal: '',
-  soup: '', mithas: '', salad: '',
-  extra_items: [],
-  notes: '',
-})
+const GREG_MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
+const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 
 export default function CalendarPage() {
   const today = new Date()
-  const [currentYear, setCurrentYear] = useState(today.getFullYear())
-  const [currentMonth, setCurrentMonth] = useState(today.getMonth())
+  const todayH = todayHijri()
+
+  const [viewMode, setViewMode] = useState<ViewMode>('gregorian')
+  const [gYear, setGYear] = useState(today.getFullYear())
+  const [gMonth, setGMonth] = useState(today.getMonth())
+  const [hYear, setHYear] = useState(todayH.year)
+  const [hMonth, setHMonth] = useState(todayH.month)
+
   const [events, setEvents] = useState<CalendarEvent[]>([])
-  const [dailyMenus, setDailyMenus] = useState<DailyMenu[]>([])
-  const [niyyatStatuses, setNiyyatStatuses] = useState<NiyyatStatus[]>([])
-  const [fiscalYears, setFiscalYears] = useState<FiscalYear[]>([])
-  const [activeFY, setActiveFY] = useState<FiscalYear | null>(null)
+  const [menus, setMenus] = useState<DailyMenu[]>([])
+  const [schedules, setSchedules] = useState<ThaaliSchedule[]>([])
+  const [thaaliCounts, setThaaliCounts] = useState<Record<string, ThaaliCount>>({})
+
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
-  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
-  const selectedEventRef = useRef<CalendarEvent | null>(null)
   const [showModal, setShowModal] = useState(false)
+  const [modalTab, setModalTab] = useState<ModalTab>('thaali')
   const [saving, setSaving] = useState(false)
-  const [exporting, setExporting] = useState(false)
-  const [isMobile, setIsMobile] = useState(false)
-  const [activeTab, setActiveTab] = useState<'menu' | 'event'>('menu')
-  const [isPastDate, setIsPastDate] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [success, setSuccess] = useState('')
+  const [error, setError] = useState('')
+
+  // Menu form
+  const [menuForm, setMenuForm] = useState({ mithas: '', tarkari: '', soup: '', chawal: '', roti: '', salad: '', notes: '' })
+  const [editMenu, setEditMenu] = useState<DailyMenu | null>(null)
 
   // Event form
-  const [form, setForm] = useState({ menu: '', notes: '' })
-  const [selectedStatuses, setSelectedStatuses] = useState<number[]>([])
-  const [statusCounts, setStatusCounts] = useState<Record<number, number>>({})
+  const [eventForm, setEventForm] = useState({ menu: '', notes: '' })
+  const [editEvent, setEditEvent] = useState<CalendarEvent | null>(null)
 
-  // Daily menu form
-  const [menuForm, setMenuForm] = useState<DailyMenu>(emptyMenu())
-  const [menuSaving, setMenuSaving] = useState(false)
+  // Thaali schedule form
+  const [scheduleForm, setScheduleForm] = useState({
+    event_name: '',
+    thaali_enabled: true,
+    niyyat_status_ids: [1], // Approved by default
+    extra_thaali_count: 0,
+    thaali_category_ids: [] as number[],
+    notes: '',
+  })
+  const [editSchedule, setEditSchedule] = useState<ThaaliSchedule | null>(null)
 
-  useEffect(() => {
-    fetchLookups()
-    const check = () => setIsMobile(window.innerWidth < 768)
-    check()
-    window.addEventListener('resize', check)
-    return () => window.removeEventListener('resize', check)
-  }, [])
+  useEffect(() => { fetchData() }, [gYear, gMonth, hYear, hMonth, viewMode])
 
-  useEffect(() => {
-    fetchEvents()
-    fetchMonthMenus()
-  }, [currentYear, currentMonth])
+  const fetchData = async () => {
+    setLoading(true)
+    let startDate: string, endDate: string
 
-  const fetchLookups = async () => {
-    const [ns, fy] = await Promise.all([
-      supabase.from('niyyat_statuses').select('id, name').eq('status', 'active').order('name'),
-      supabase.from('fiscal_years').select('*').order('id', { ascending: false }),
-    ])
-    setNiyyatStatuses(ns.data || [])
-    setFiscalYears(fy.data || [])
-    const active = (fy.data || []).find((f: FiscalYear) => f.is_active)
-    if (active) setActiveFY(active)
-  }
-
-  const fetchEvents = async () => {
-    const startDate = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`
-    const endDate = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-31`
-    const { data } = await supabase
-      .from('calendar_events')
-      .select('*, calendar_event_statuses(*, niyyat_statuses(name))')
-      .gte('event_date', startDate)
-      .lte('event_date', endDate)
-    setEvents(data || [])
-  }
-
-  const fetchMonthMenus = async () => {
-    const startDate = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`
-    const endDate = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-31`
-    const { data } = await supabase
-      .from('daily_menu')
-      .select('*')
-      .gte('menu_date', startDate)
-      .lte('menu_date', endDate)
-    setDailyMenus(data || [])
-  }
-
-  const openDayModal = async (dateStr: string) => {
-    setSelectedDate(dateStr)
-    setActiveTab('menu')
-    setIsPastDate(dateStr < todayStr)
-
-    // Load event
-    const { data: freshEvent } = await supabase
-      .from('calendar_events')
-      .select('*, calendar_event_statuses(*, niyyat_statuses(name))')
-      .eq('event_date', dateStr)
-      .maybeSingle()
-
-    setSelectedEvent(freshEvent || null)
-    selectedEventRef.current = freshEvent || null
-
-    if (freshEvent) {
-      setForm({ menu: freshEvent.menu || '', notes: freshEvent.notes || '' })
-      const sel = (freshEvent.calendar_event_statuses || []).map((s: EventStatus) => s.niyyat_status_id)
-      setSelectedStatuses(sel)
-      const counts: Record<number, number> = {}
-      ;(freshEvent.calendar_event_statuses || []).forEach((s: EventStatus) => {
-        counts[s.niyyat_status_id] = s.thaali_count
-      })
-      setStatusCounts(counts)
+    if (viewMode === 'gregorian') {
+      startDate = `${gYear}-${String(gMonth + 1).padStart(2, '0')}-01`
+      const lastDay = new Date(gYear, gMonth + 1, 0).getDate()
+      endDate = `${gYear}-${String(gMonth + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
     } else {
-      setForm({ menu: '', notes: '' })
-      const approvedStatus = niyyatStatuses.find(s => s.name === 'Approved')
-      if (approvedStatus) {
-        setSelectedStatuses([approvedStatus.id])
-        const { count } = await supabase.from('mumineen')
-          .select('*', { count: 'exact', head: true })
-          .eq('is_hof', true).eq('niyyat_status_id', approvedStatus.id)
-        setStatusCounts({ [approvedStatus.id]: count || 0 })
-      } else {
-        setSelectedStatuses([])
-        setStatusCounts({})
+      const firstDay = hijriMonthStart(hYear, hMonth)
+      const days = daysInHijriMonth(hMonth, hYear)
+      const lastDay = new Date(firstDay); lastDay.setDate(lastDay.getDate() + days - 1)
+      startDate = firstDay.toISOString().split('T')[0]
+      endDate = lastDay.toISOString().split('T')[0]
+    }
+
+    const [{ data: evData }, { data: mnData }, { data: schData }] = await Promise.all([
+      supabase.from('calendar_events').select('*').gte('event_date', startDate).lte('event_date', endDate),
+      supabase.from('daily_menu').select('*').gte('menu_date', startDate).lte('menu_date', endDate),
+      supabase.from('thaali_schedule').select('*').gte('event_date', startDate).lte('event_date', endDate),
+    ])
+
+    setEvents(evData || [])
+    setMenus(mnData || [])
+    setSchedules(schData || [])
+
+    // Fetch thaali counts for scheduled days
+    if (schData && schData.length > 0) {
+      await fetchThaaliCounts(schData)
+    }
+    setLoading(false)
+  }
+
+  const fetchThaaliCounts = async (schData: ThaaliSchedule[]) => {
+    const counts: Record<string, ThaaliCount> = {}
+    for (const sch of schData) {
+      if (!sch.thaali_enabled) { counts[sch.event_date] = { approved: 0, byCategory: {}, total: 0 }; continue }
+
+      let query = supabase
+        .from('thaali_registrations')
+        .select('id, thaali_category_id', { count: 'exact' })
+        .eq('status', 'active')
+
+      // Filter by niyyat statuses via mumineen join
+      if (sch.niyyat_status_ids?.length) {
+        const { data: muminIds } = await supabase
+          .from('mumineen')
+          .select('id')
+          .in('niyyat_status_id', sch.niyyat_status_ids)
+          .eq('is_hof', true)
+          .eq('status', 'active')
+        const ids = (muminIds || []).map(m => m.id)
+        if (ids.length === 0) { counts[sch.event_date] = { approved: 0, byCategory: {}, total: 0 }; continue }
+        query = query.in('mumin_id', ids)
+      }
+
+      // Filter by category if specified
+      if (sch.thaali_category_ids?.length) {
+        query = query.in('thaali_category_id', sch.thaali_category_ids)
+      }
+
+      const { data: regs, count } = await query
+      const byCategory: Record<number, number> = {}
+      if (regs) {
+        for (const r of regs) {
+          byCategory[r.thaali_category_id] = (byCategory[r.thaali_category_id] || 0) + 1
+        }
+      }
+      counts[sch.event_date] = {
+        approved: count ?? 0,
+        byCategory,
+        total: (count ?? 0) + (sch.extra_thaali_count || 0),
       }
     }
+    setThaaliCounts(counts)
+  }
 
-    // Load daily menu
-    const { data: existingMenu } = await supabase
-      .from('daily_menu')
-      .select('*')
-      .eq('menu_date', dateStr)
-      .maybeSingle()
+  const showMsg = (msg: string, isErr = false) => {
+    if (isErr) { setError(msg); setTimeout(() => setError(''), 3000) }
+    else { setSuccess(msg); setTimeout(() => setSuccess(''), 2000) }
+  }
 
-    if (existingMenu) {
-      setMenuForm({
-        ...existingMenu,
-        extra_items: existingMenu.extra_items || [],
-      })
-    } else {
-      setMenuForm({ ...emptyMenu(), menu_date: dateStr })
-    }
+  const openDay = (dateStr: string) => {
+    setSelectedDate(dateStr)
 
+    const existingMenu = menus.find(m => m.menu_date === dateStr)
+    setEditMenu(existingMenu || null)
+    setMenuForm(existingMenu
+      ? { mithas: existingMenu.mithas||'', tarkari: existingMenu.tarkari||'', soup: existingMenu.soup||'', chawal: existingMenu.chawal||'', roti: existingMenu.roti||'', salad: existingMenu.salad||'', notes: existingMenu.notes||'' }
+      : { mithas: '', tarkari: '', soup: '', chawal: '', roti: '', salad: '', notes: '' }
+    )
+
+    const existingEvent = events.find(e => e.event_date === dateStr)
+    setEditEvent(existingEvent || null)
+    setEventForm(existingEvent ? { menu: existingEvent.menu, notes: existingEvent.notes||'' } : { menu: '', notes: '' })
+
+    const existingSchedule = schedules.find(s => s.event_date === dateStr)
+    setEditSchedule(existingSchedule || null)
+    setScheduleForm(existingSchedule
+      ? {
+          event_name: existingSchedule.event_name || '',
+          thaali_enabled: existingSchedule.thaali_enabled,
+          niyyat_status_ids: existingSchedule.niyyat_status_ids || [1],
+          extra_thaali_count: existingSchedule.extra_thaali_count || 0,
+          thaali_category_ids: existingSchedule.thaali_category_ids || [],
+          notes: existingSchedule.notes || '',
+        }
+      : { event_name: '', thaali_enabled: true, niyyat_status_ids: [1], extra_thaali_count: 0, thaali_category_ids: [], notes: '' }
+    )
+
+    setModalTab('thaali')
     setShowModal(true)
   }
 
-  const handleMenuSave = async () => {
-    if (!selectedDate || isPastDate) return
-    setMenuSaving(true)
-    try {
-      const payload = {
-        menu_date: selectedDate,
-        roti: menuForm.roti,
-        tarkari: menuForm.tarkari,
-        chawal: menuForm.chawal,
-        soup: menuForm.soup,
-        mithas: menuForm.mithas,
-        salad: menuForm.salad,
-        extra_items: menuForm.extra_items,
-        notes: menuForm.notes,
-      }
-      if (menuForm.id) {
-        await supabase.from('daily_menu').update(payload).eq('id', menuForm.id)
-      } else {
-        const { data } = await supabase.from('daily_menu').insert(payload).select('id').single()
-        if (data) setMenuForm(prev => ({ ...prev, id: data.id }))
-      }
-      await fetchMonthMenus()
-    } catch (err) {
-      console.error('Menu save error:', err)
-    } finally {
-      setMenuSaving(false)
-    }
-  }
-
-  const addExtraItem = () => {
-    setMenuForm(prev => ({
-      ...prev,
-      extra_items: [...prev.extra_items, { name: '', description: '' }]
-    }))
-  }
-
-  const updateExtraItem = (index: number, field: 'name' | 'description', value: string) => {
-    setMenuForm(prev => {
-      const updated = [...prev.extra_items]
-      updated[index] = { ...updated[index], [field]: value }
-      return { ...prev, extra_items: updated }
-    })
-  }
-
-  const removeExtraItem = (index: number) => {
-    setMenuForm(prev => ({
-      ...prev,
-      extra_items: prev.extra_items.filter((_, i) => i !== index)
-    }))
-  }
-
-  const toggleStatus = async (statusId: number) => {
-    if (isPastDate) return
-    const isSelected = selectedStatuses.includes(statusId)
-    if (isSelected) {
-      setSelectedStatuses(prev => prev.filter(s => s !== statusId))
-      setStatusCounts(prev => { const n = { ...prev }; delete n[statusId]; return n })
-    } else {
-      setSelectedStatuses(prev => [...prev, statusId])
-      const { count } = await supabase.from('mumineen')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_hof', true).eq('niyyat_status_id', statusId)
-      setStatusCounts(prev => ({ ...prev, [statusId]: count || 0 }))
-    }
-  }
-
-  const handleSave = async () => {
-    if (!selectedDate || isPastDate) return
-    setSaving(true)
-    const currentEvent = selectedEventRef.current
-    let eventId: number
-
-    if (currentEvent) {
-      await supabase.from('calendar_events').update({
-        menu: form.menu, notes: form.notes, updated_at: new Date().toISOString()
-      }).eq('id', currentEvent.id)
-      eventId = currentEvent.id
-      await supabase.from('calendar_event_statuses').delete().eq('event_id', eventId)
-    } else {
-      const { data, error } = await supabase.from('calendar_events').insert({
-        event_date: selectedDate, menu: form.menu, notes: form.notes,
-        fiscal_year_id: activeFY?.id || null, status: 'active'
-      }).select('id').single()
-      if (error || !data) { setSaving(false); return }
-      eventId = data.id
-    }
-
-    const statusRows = selectedStatuses.map(statusId => ({
-      event_id: eventId, niyyat_status_id: statusId, thaali_count: statusCounts[statusId] || 0
-    }))
-    if (statusRows.length > 0) await supabase.from('calendar_event_statuses').insert(statusRows)
-
-    await fetchEvents()
-    setShowModal(false)
-    setSaving(false)
-  }
-
-  const exportDistributorReport = async () => {
+  const saveMenu = async () => {
     if (!selectedDate) return
-    setExporting(true)
-    const { data: registrations } = await supabase
-      .from('thaali_registrations')
-      .select(`*, mumineen!fk_tr_mumin(sf_no, full_name, its_no, whatsapp_no, full_address, niyyat_status_id, house_sectors(name)), thaalis!fk_tr_thaali(thaali_number), thaali_types!fk_tr_type(name), thaali_categories!fk_tr_category(name), distributors!fk_tr_distributor(full_name)`)
-      .eq('status', 'approved')
-      .in('mumin_id',
-        (await supabase.from('mumineen').select('id').eq('is_hof', true)
-          .in('niyyat_status_id', selectedStatuses)).data?.map((m: any) => m.id) || []
-      )
+    setSaving(true)
+    const payload = { ...menuForm, menu_date: selectedDate }
+    const { error } = editMenu
+      ? await supabase.from('daily_menu').update(payload).eq('id', editMenu.id)
+      : await supabase.from('daily_menu').insert(payload)
+    setSaving(false)
+    if (error) return showMsg(error.message, true)
+    showMsg('Menu saved'); setShowModal(false); fetchData()
+  }
 
-    if (!registrations || registrations.length === 0) {
-      alert('No registrations found for selected statuses.')
-      setExporting(false)
-      return
+  const saveEvent = async () => {
+    if (!selectedDate || !eventForm.menu.trim()) return showMsg('Event name required', true)
+    setSaving(true)
+    const payload = { ...eventForm, event_date: selectedDate }
+    const { error } = editEvent
+      ? await supabase.from('calendar_events').update(payload).eq('id', editEvent.id)
+      : await supabase.from('calendar_events').insert(payload)
+    setSaving(false)
+    if (error) return showMsg(error.message, true)
+    showMsg('Event saved'); setShowModal(false); fetchData()
+  }
+
+  const saveSchedule = async () => {
+    if (!selectedDate) return
+    setSaving(true)
+    const payload = {
+      event_date: selectedDate,
+      event_name: scheduleForm.event_name || null,
+      thaali_enabled: scheduleForm.thaali_enabled,
+      niyyat_status_ids: scheduleForm.thaali_enabled ? scheduleForm.niyyat_status_ids : [],
+      extra_thaali_count: scheduleForm.thaali_enabled ? (scheduleForm.extra_thaali_count || 0) : 0,
+      thaali_category_ids: scheduleForm.thaali_enabled ? scheduleForm.thaali_category_ids : [],
+      notes: scheduleForm.notes || null,
+      updated_at: new Date().toISOString(),
     }
-
-    const sorted = [...registrations].sort((a: any, b: any) =>
-      (a.distributors?.full_name || '').localeCompare(b.distributors?.full_name || ''))
-
-    const headers = ['Distributor', 'Thaali No', 'SF#', 'ITS#', 'Name', 'Sector', 'Address', 'WhatsApp', 'Size', 'Type']
-    const rows = sorted.map((r: any) => [
-      r.distributors?.full_name || '', r.thaalis?.thaali_number || '',
-      r.mumineen?.sf_no || '', r.mumineen?.its_no || '', r.mumineen?.full_name || '',
-      r.mumineen?.house_sectors?.name || '', r.mumineen?.full_address || '',
-      r.mumineen?.whatsapp_no || '', r.thaali_types?.name || '', r.thaali_categories?.name || '',
-    ])
-
-    const csv = [headers, ...rows].map(row =>
-      row.map((v: any) => `"${String(v).replace(/"/g, '""')}"`).join(',')
-    ).join('\n')
-
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
-    a.download = `distribution_report_${selectedDate}.csv`
-    a.click()
-    setExporting(false)
+    const { error } = editSchedule
+      ? await supabase.from('thaali_schedule').update(payload).eq('id', editSchedule.id)
+      : await supabase.from('thaali_schedule').insert(payload)
+    setSaving(false)
+    if (error) return showMsg(error.message, true)
+    showMsg('Thaali schedule saved'); setShowModal(false); fetchData()
   }
 
-  // helpers
-  const firstDay = new Date(currentYear, currentMonth, 1).getDay()
-  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate()
-  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
-  const totalThaalis = Object.values(statusCounts).reduce((a, b) => a + b, 0)
-
-  const prevMonth = () => {
-    if (currentMonth === 0) { setCurrentMonth(11); setCurrentYear(y => y - 1) }
-    else setCurrentMonth(m => m - 1)
-  }
-  const nextMonth = () => {
-    if (currentMonth === 11) { setCurrentMonth(0); setCurrentYear(y => y + 1) }
-    else setCurrentMonth(m => m + 1)
+  const deleteMenu = async () => {
+    if (!editMenu || !confirm('Delete menu for this day?')) return
+    await supabase.from('daily_menu').delete().eq('id', editMenu.id)
+    showMsg('Deleted'); setShowModal(false); fetchData()
   }
 
-  const hasMenu = (dateStr: string) => dailyMenus.some(m => m.menu_date === dateStr)
-
-  const daysWithData = Array.from({ length: daysInMonth }, (_, i) => {
-    const day = i + 1
-    const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-    const event = events.find(e => e.event_date === dateStr)
-    const menu = dailyMenus.find(m => m.menu_date === dateStr)
-    const totalCount = (event?.calendar_event_statuses || []).reduce((a, s) => a + (s.thaali_count || 0), 0)
-    const dayOfWeek = new Date(dateStr + 'T00:00:00').getDay()
-    return { day, dateStr, event, menu, totalCount, dayOfWeek }
-  })
-
-  const menuSummary = (m: DailyMenu) => {
-    const items = [m.roti, m.tarkari, m.chawal, m.soup, m.mithas, m.salad].filter(Boolean)
-    const extras = (m.extra_items || []).map(e => e.name).filter(Boolean)
-    return [...items, ...extras].slice(0, 3).join(', ') + (items.length + extras.length > 3 ? '...' : '')
+  const deleteEvent = async () => {
+    if (!editEvent || !confirm('Delete event?')) return
+    await supabase.from('calendar_events').delete().eq('id', editEvent.id)
+    showMsg('Deleted'); setShowModal(false); fetchData()
   }
+
+  const deleteSchedule = async () => {
+    if (!editSchedule || !confirm('Remove thaali schedule for this day?')) return
+    await supabase.from('thaali_schedule').delete().eq('id', editSchedule.id)
+    showMsg('Deleted'); setShowModal(false); fetchData()
+  }
+
+  const toggleNiyyat = (id: number) => {
+    setScheduleForm(prev => ({
+      ...prev,
+      niyyat_status_ids: prev.niyyat_status_ids.includes(id)
+        ? prev.niyyat_status_ids.filter(x => x !== id)
+        : [...prev.niyyat_status_ids, id]
+    }))
+  }
+
+  const toggleCategory = (id: number) => {
+    setScheduleForm(prev => ({
+      ...prev,
+      thaali_category_ids: prev.thaali_category_ids.includes(id)
+        ? prev.thaali_category_ids.filter(x => x !== id)
+        : [...prev.thaali_category_ids, id]
+    }))
+  }
+
+  const navPrev = () => {
+    if (viewMode === 'gregorian') {
+      if (gMonth === 0) { setGMonth(11); setGYear(y => y - 1) } else setGMonth(m => m - 1)
+    } else {
+      if (hMonth === 1) { setHMonth(12); setHYear(y => y - 1) } else setHMonth(m => m - 1)
+    }
+  }
+
+  const navNext = () => {
+    if (viewMode === 'gregorian') {
+      if (gMonth === 11) { setGMonth(0); setGYear(y => y + 1) } else setGMonth(m => m + 1)
+    } else {
+      if (hMonth === 12) { setHMonth(1); setHYear(y => y + 1) } else setHMonth(m => m + 1)
+    }
+  }
+
+  const goToday = () => {
+    setGYear(today.getFullYear()); setGMonth(today.getMonth())
+    setHYear(todayH.year); setHMonth(todayH.month)
+  }
+
+  const getDateStr = (d: Date) => d.toISOString().split('T')[0]
+  const isToday = (dateStr: string) => dateStr === getDateStr(today)
+  const hasMenu = (dateStr: string) => menus.some(m => m.menu_date === dateStr)
+  const hasEvent = (dateStr: string) => events.some(e => e.event_date === dateStr)
+  const getSchedule = (dateStr: string) => schedules.find(s => s.event_date === dateStr)
+
+  const buildGregorianGrid = () => {
+    const firstDay = new Date(gYear, gMonth, 1).getDay()
+    const daysInMonth = new Date(gYear, gMonth + 1, 0).getDate()
+    const cells: (Date | null)[] = Array(firstDay).fill(null)
+    for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(gYear, gMonth, d))
+    while (cells.length % 7 !== 0) cells.push(null)
+    return cells
+  }
+
+  const buildHijriGrid = () => {
+    const firstGreg = hijriMonthStart(hYear, hMonth)
+    const firstDow = firstGreg.getDay()
+    const days = daysInHijriMonth(hMonth, hYear)
+    const cells: (number | null)[] = Array(firstDow).fill(null)
+    for (let d = 1; d <= days; d++) cells.push(d)
+    while (cells.length % 7 !== 0) cells.push(null)
+    return cells
+  }
+
+  const getHijriOverlay = (date: Date) => {
+    const h = gregorianToHijri(date)
+    return { day: h.day, month: h.month, year: h.year, isFirst: h.day === 1 }
+  }
+
+  const getTitle = () => viewMode === 'gregorian'
+    ? `${GREG_MONTHS[gMonth]} ${gYear}`
+    : `${HIJRI_MONTHS[hMonth - 1]} ${hYear}H`
+
+  const getSubtitle = () => {
+    if (viewMode === 'hijri') {
+      const start = hijriMonthStart(hYear, hMonth)
+      const end = new Date(start); end.setDate(end.getDate() + daysInHijriMonth(hMonth, hYear) - 1)
+      return `${start.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })} – ${end.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}`
+    }
+    const h1 = gregorianToHijri(new Date(gYear, gMonth, 1))
+    const h2 = gregorianToHijri(new Date(gYear, gMonth + 1, 0))
+    return `${formatHijri(h1.year, h1.month, h1.day, true)} – ${formatHijri(h2.year, h2.month, h2.day, true)}`
+  }
+
+  const gregCells = viewMode === 'gregorian' ? buildGregorianGrid() : []
+  const hijriCells = viewMode === 'hijri' ? buildHijriGrid() : []
+
+  const renderCell = (dateStr: string, label: string | number, hijriOverlay?: { day: number; month: number; isFirst: boolean }, gregOverlay?: string) => {
+    const isTod = isToday(dateStr)
+    const hasM = hasMenu(dateStr)
+    const hasE = hasEvent(dateStr)
+    const sch = getSchedule(dateStr)
+    const count = thaaliCounts[dateStr]
+
+    return (
+      <div
+        onClick={() => openDay(dateStr)}
+        style={{
+          minHeight: '88px', padding: '6px 8px', cursor: 'pointer',
+          borderRight: '1px solid #f0f0f0', borderBottom: '1px solid #f0f0f0',
+          background: isTod ? '#364574' : 'white', transition: 'background 0.1s',
+        }}
+        onMouseEnter={e => { if (!isTod) (e.currentTarget as HTMLElement).style.background = '#f8f9ff' }}
+        onMouseLeave={e => { if (!isTod) (e.currentTarget as HTMLElement).style.background = 'white' }}
+      >
+        {/* Primary date number */}
+        <div style={{ fontSize: '14px', fontWeight: 700, color: isTod ? '#fff' : '#212529', marginBottom: '1px' }}>{label}</div>
+
+        {/* Hijri overlay */}
+        {hijriOverlay && (
+          <div style={{ fontSize: '10px', color: isTod ? 'rgba(255,255,255,0.7)' : hijriOverlay.isFirst ? '#364574' : '#bbb', fontWeight: hijriOverlay.isFirst ? 700 : 400, marginBottom: '3px' }}>
+            {hijriOverlay.isFirst ? `1 ${HIJRI_MONTHS_SHORT[hijriOverlay.month - 1]}` : hijriOverlay.day}
+          </div>
+        )}
+
+        {/* Gregorian overlay (hijri view) */}
+        {gregOverlay && (
+          <div style={{ fontSize: '10px', color: isTod ? 'rgba(255,255,255,0.7)' : '#bbb', marginBottom: '3px' }}>{gregOverlay}</div>
+        )}
+
+        {/* Indicators row */}
+        <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap', marginBottom: '2px' }}>
+          {hasM && <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: isTod ? '#ffbf69' : '#0ab39c' }} title="Menu" />}
+          {hasE && <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: isTod ? '#fff' : '#364574' }} title="Event" />}
+          {sch && (
+            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: sch.thaali_enabled ? (isTod ? '#90ee90' : '#28a745') : (isTod ? '#ffaaaa' : '#e63946') }} title={sch.thaali_enabled ? 'Thaali day' : 'No thaali'} />
+          )}
+        </div>
+
+        {/* Thaali count */}
+        {sch?.thaali_enabled && count && (
+          <div style={{ fontSize: '9px', fontWeight: 700, color: isTod ? '#90ee90' : '#28a745' }}>
+            {count.total} thaalis
+          </div>
+        )}
+
+        {/* No thaali label */}
+        {sch && !sch.thaali_enabled && (
+          <div style={{ fontSize: '9px', color: isTod ? '#ffaaaa' : '#e63946', fontWeight: 600 }}>No thaali</div>
+        )}
+
+        {/* Event name */}
+        {hasE && (
+          <div style={{ fontSize: '9px', color: isTod ? '#ffbf69' : '#364574', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {events.find(e => e.event_date === dateStr)?.menu}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Selected day thaali count for modal
+  const selectedCount = selectedDate ? thaaliCounts[selectedDate] : null
 
   return (
-    <div>
-      <div className="d-flex flex-wrap justify-content-between align-items-start align-items-sm-center gap-2 mb-4">
+    <>
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+
+      {/* Header */}
+      <div className="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
         <div>
-          <h4 className="mb-0">Calendar</h4>
-          <p className="text-muted mb-0" style={{ fontSize: '13px' }}>Daily menu planning and thaali distribution</p>
+          <h4 className="mb-0 fw-bold" style={{ color: '#212529' }}>Calendar</h4>
+          <p className="mb-0 text-muted" style={{ fontSize: '13px' }}>{getSubtitle()}</p>
+        </div>
+        <div className="d-flex gap-2 align-items-center flex-wrap">
+          <div style={{ display: 'flex', background: '#f3f3f9', borderRadius: '8px', padding: '3px' }}>
+            {(['gregorian', 'hijri'] as ViewMode[]).map(mode => (
+              <button key={mode} onClick={() => setViewMode(mode)} style={{
+                padding: '5px 14px', borderRadius: '6px', border: 'none', fontSize: '12px',
+                fontWeight: 600, cursor: 'pointer',
+                background: viewMode === mode ? '#364574' : 'transparent',
+                color: viewMode === mode ? '#fff' : '#6c757d',
+              }}>
+                {mode === 'gregorian' ? 'Gregorian' : 'Hijri (Misri)'}
+              </button>
+            ))}
+          </div>
+          <button onClick={goToday} className="btn btn-sm btn-outline-secondary" style={{ borderRadius: '8px', fontSize: '12px' }}>Today</button>
+          <div className="d-flex gap-1">
+            <button onClick={navPrev} className="btn btn-sm" style={{ background: '#f3f3f9', border: 'none', borderRadius: '8px', color: '#364574' }}><i className="bi bi-chevron-left" /></button>
+            <button onClick={navNext} className="btn btn-sm" style={{ background: '#f3f3f9', border: 'none', borderRadius: '8px', color: '#364574' }}><i className="bi bi-chevron-right" /></button>
+          </div>
         </div>
       </div>
 
-      <div className="card" style={{ border: 'none', boxShadow: '0 1px 4px rgba(0,0,0,0.1)', borderRadius: '10px' }}>
-        <div className="card-body">
-          {/* Month navigator */}
-          <div className="d-flex justify-content-between align-items-center mb-3">
-            <button className="btn btn-sm btn-outline-secondary" onClick={prevMonth}>‹ Prev</button>
-            <h5 className="mb-0 fw-semibold" style={{ fontSize: isMobile ? '15px' : '18px' }}>
-              {MONTHS[currentMonth]} {currentYear}
-            </h5>
-            <button className="btn btn-sm btn-outline-secondary" onClick={nextMonth}>Next ›</button>
+      {error && <div className="alert alert-danger py-2 px-3 mb-3" style={{ fontSize: '13px' }}>{error}</div>}
+      {success && <div className="alert alert-success py-2 px-3 mb-3" style={{ fontSize: '13px' }}>{success}</div>}
+
+      {/* Calendar */}
+      <div className="card" style={{ borderRadius: '12px', border: 'none', boxShadow: '0 1px 6px rgba(0,0,0,0.07)' }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid #e9ebec' }}>
+          <h5 className="mb-0 fw-bold" style={{ color: '#364574' }}>{getTitle()}</h5>
+        </div>
+        <div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: '1px solid #e9ebec' }}>
+            {DOW.map(d => (
+              <div key={d} style={{ padding: '10px 0', textAlign: 'center', fontSize: '11px', fontWeight: 700, color: '#6c757d', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{d}</div>
+            ))}
           </div>
 
-          {/* Legend */}
-          <div className="d-flex gap-3 mb-3" style={{ fontSize: '11px', color: '#6c757d' }}>
-            <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#f0f4ff', border: '1px solid #364574', marginRight: 4 }}></span>Has Event</span>
-            <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#fff8e1', border: '1px solid #f59e0b', marginRight: 4 }}></span>Menu Set</span>
-            <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#e8f5e9', border: '1px solid #0ab39c', marginRight: 4 }}></span>Both</span>
-          </div>
-
-          {/* DESKTOP grid */}
-          {!isMobile && (
-            <>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', marginBottom: '4px' }}>
-                {DAYS.map(d => (
-                  <div key={d} style={{ textAlign: 'center', fontSize: '12px', fontWeight: 600, color: '#6c757d', padding: '4px' }}>{d}</div>
-                ))}
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' }}>
-                {Array.from({ length: firstDay }, (_, i) => (
-                  <div key={`empty-${i}`} style={{ minHeight: '90px' }} />
-                ))}
-                {daysWithData.map(({ day, dateStr, event, menu, totalCount }) => {
-                  const isToday = dateStr === todayStr
-                  const isPast = dateStr < todayStr
-                  const hasEvent = !!event
-                  const hasMnu = !!menu
-                  const bg = hasEvent && hasMnu ? '#e8f5e9' : hasMnu ? '#fff8e1' : hasEvent ? '#f0f4ff' : isPast ? '#fafafa' : '#fff'
-                  const borderColor = isToday ? '#364574' : hasEvent && hasMnu ? '#0ab39c' : hasMnu ? '#f59e0b' : hasEvent ? '#364574' : '#e9ecef'
-                  return (
-                    <div key={day}
-                      onClick={() => openDayModal(dateStr)}
-                      style={{
-                        minHeight: '90px', padding: '6px', borderRadius: '8px', cursor: 'pointer',
-                        border: `${isToday ? '2px' : '1px'} solid ${borderColor}`,
-                        background: bg, transition: 'all 0.15s',
-                        opacity: isPast ? 0.7 : 1,
-                      }}
-                      onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
-                      onMouseLeave={e => (e.currentTarget.style.opacity = isPast ? '0.7' : '1')}
-                    >
-                      <div style={{ fontSize: '13px', fontWeight: isToday ? 700 : 500, color: isToday ? '#364574' : isPast ? '#adb5bd' : '#333', marginBottom: '3px' }}>
-                        {day}
-                        {isPast && <i className="bi bi-lock ms-1" style={{ fontSize: '9px', color: '#adb5bd' }}></i>}
-                      </div>
-                      {hasMnu && (
-                        <div style={{ fontSize: '10px', color: '#b45309', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          🍽 {menuSummary(menu!)}
-                        </div>
-                      )}
-                      {totalCount > 0 && (
-                        <div style={{ fontSize: '10px', color: '#0ab39c', fontWeight: 600, marginTop: '2px' }}>
-                          {totalCount} thaalis
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            </>
-          )}
-
-          {/* MOBILE view */}
-          {isMobile && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '3px', marginBottom: '2px' }}>
-                {DAYS_SHORT.map((d, i) => (
-                  <div key={i} style={{ textAlign: 'center', fontSize: '11px', fontWeight: 600, color: '#6c757d' }}>{d}</div>
-                ))}
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '3px', marginBottom: '12px' }}>
-                {Array.from({ length: firstDay }, (_, i) => (
-                  <div key={`empty-${i}`} style={{ minHeight: '40px' }} />
-                ))}
-                {daysWithData.map(({ day, dateStr, event, menu, totalCount }) => {
-                  const isToday = dateStr === todayStr
-                  const isPast = dateStr < todayStr
-                  return (
-                    <div key={day}
-                      onClick={() => openDayModal(dateStr)}
-                      style={{
-                        minHeight: '40px', padding: '3px', borderRadius: '6px', cursor: 'pointer',
-                        border: isToday ? '2px solid #364574' : '1px solid #e9ecef',
-                        background: event && menu ? '#e8f5e9' : menu ? '#fff8e1' : event ? '#f0f4ff' : isPast ? '#fafafa' : '#fff',
-                        display: 'flex', flexDirection: 'column', alignItems: 'center',
-                        opacity: isPast ? 0.7 : 1,
-                      }}
-                    >
-                      <div style={{ fontSize: '12px', fontWeight: isToday ? 700 : 500, color: isToday ? '#364574' : isPast ? '#adb5bd' : '#333' }}>{day}</div>
-                      {(event || menu) && (
-                        <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#364574', marginTop: '2px' }} />
-                      )}
-                      {totalCount > 0 && (
-                        <div style={{ fontSize: '9px', color: '#0ab39c', fontWeight: 700 }}>{totalCount}</div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-
-              <div style={{ borderTop: '1px solid #e9ecef', paddingTop: '12px' }}>
-                <div style={{ fontSize: '12px', fontWeight: 600, color: '#6c757d', marginBottom: '8px' }}>
-                  This month ({events.length} events, {dailyMenus.length} menus)
-                </div>
-                {daysWithData.filter(d => d.event || d.menu).map(({ day, dateStr, event, menu, totalCount, dayOfWeek }) => (
-                  <div key={day}
-                    onClick={() => openDayModal(dateStr)}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: '12px',
-                      padding: '10px 12px', borderRadius: '8px', cursor: 'pointer',
-                      background: '#f8f9fa', marginBottom: '6px', border: '1px solid #e9ecef',
-                    }}
-                  >
-                    <div style={{ textAlign: 'center', minWidth: '36px' }}>
-                      <div style={{ fontSize: '11px', color: '#6c757d' }}>{DAYS[dayOfWeek]}</div>
-                      <div style={{ fontSize: '18px', fontWeight: 700, color: dateStr === todayStr ? '#364574' : '#212529', lineHeight: 1 }}>{day}</div>
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      {menu && (
-                        <div style={{ fontSize: '12px', color: '#b45309', fontWeight: 600 }}>
-                          🍽 {menuSummary(menu)}
-                        </div>
-                      )}
-                      {totalCount > 0 && (
-                        <div style={{ fontSize: '12px', color: '#0ab39c', fontWeight: 500 }}>{totalCount} thaalis</div>
-                      )}
-                    </div>
-                    <i className="bi bi-chevron-right" style={{ fontSize: '12px', color: '#adb5bd' }} />
-                  </div>
-                ))}
-                <button className="btn btn-outline-primary btn-sm w-100 mt-2"
-                  onClick={() => {
-                    const d = new Date()
-                    const ds = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-                    openDayModal(ds)
-                  }}>
-                  + Add Menu / Event for Today
-                </button>
-              </div>
+          {loading ? (
+            <div className="text-center py-5"><div className="spinner-border spinner-border-sm" style={{ color: '#364574' }} /></div>
+          ) : viewMode === 'gregorian' ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
+              {gregCells.map((cell, i) => {
+                if (!cell) return <div key={i} style={{ minHeight: '88px', background: '#fafafa', borderRight: '1px solid #f0f0f0', borderBottom: '1px solid #f0f0f0' }} />
+                const dateStr = getDateStr(cell)
+                const hOverlay = getHijriOverlay(cell)
+                return <div key={i}>{renderCell(dateStr, cell.getDate(), hOverlay)}</div>
+              })}
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
+              {hijriCells.map((cell, i) => {
+                if (!cell) return <div key={i} style={{ minHeight: '88px', background: '#fafafa', borderRight: '1px solid #f0f0f0', borderBottom: '1px solid #f0f0f0' }} />
+                const gDate = hijriToGregorian(hYear, hMonth, cell)
+                const dateStr = getDateStr(gDate)
+                const gregLabel = gDate.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })
+                return <div key={i}>{renderCell(dateStr, cell, undefined, gregLabel)}</div>
+              })}
             </div>
           )}
         </div>
+
+        {/* Legend */}
+        <div style={{ padding: '12px 20px', borderTop: '1px solid #e9ebec', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+          {[
+            { color: '#0ab39c', label: 'Menu set' },
+            { color: '#364574', label: 'Event' },
+            { color: '#28a745', label: 'Thaali day' },
+            { color: '#e63946', label: 'No thaali' },
+          ].map((l, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#6c757d' }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: l.color, display: 'inline-block' }} />{l.label}
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* Day Modal */}
-      {showModal && selectedDate && (
-        <div className="modal show d-block" style={{ background: 'rgba(0,0,0,0.5)' }} onClick={() => setShowModal(false)}>
-          <div className="modal-dialog modal-lg" onClick={e => e.stopPropagation()}>
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title" style={{ fontSize: isMobile ? '14px' : '16px' }}>
-                  {new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', {
-                    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-                  })}
-                  {isPastDate && (
-                    <span className="badge bg-secondary ms-2" style={{ fontSize: '11px' }}>
-                      <i className="bi bi-lock me-1"></i>Past Date — View Only
+      {/* Hijri month strip */}
+      {viewMode === 'gregorian' && (
+        <div className="card mt-3" style={{ borderRadius: '12px', border: 'none', boxShadow: '0 1px 6px rgba(0,0,0,0.07)' }}>
+          <div className="card-body p-3">
+            <p className="mb-2 fw-bold" style={{ fontSize: '13px', color: '#364574' }}>
+              <i className="bi bi-moon-stars me-2" />Hijri months in view
+            </p>
+            <div className="d-flex gap-2 flex-wrap">
+              {(() => {
+                const first = new Date(gYear, gMonth, 1)
+                const last = new Date(gYear, gMonth + 1, 0)
+                const h1 = gregorianToHijri(first)
+                const h2 = gregorianToHijri(last)
+                const months = []
+                let y = h1.year, m = h1.month
+                while (y < h2.year || (y === h2.year && m <= h2.month)) {
+                  const start = hijriMonthStart(y, m)
+                  const days = daysInHijriMonth(m, y)
+                  const end = new Date(start); end.setDate(end.getDate() + days - 1)
+                  months.push({ y, m, start, end, days })
+                  m++; if (m > 12) { m = 1; y++ }
+                }
+                return months.map((mo, i) => (
+                  <div key={i} style={{ background: '#f3f3f9', borderRadius: '8px', padding: '6px 12px', fontSize: '12px' }}>
+                    <span style={{ fontWeight: 700, color: '#364574' }}>{HIJRI_MONTHS[mo.m - 1]}</span>
+                    <span style={{ color: '#6c757d', marginLeft: '6px' }}>
+                      {mo.start.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })} – {mo.end.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
                     </span>
-                  )}
-                </h5>
-                <button className="btn-close" onClick={() => setShowModal(false)} />
+                    <span style={{ color: '#adb5bd', marginLeft: '6px' }}>({mo.days}d)</span>
+                  </div>
+                ))
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Day Modal ── */}
+      {showModal && selectedDate && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '40px 16px', overflowY: 'auto' }}>
+          <div style={{ background: '#fff', borderRadius: '14px', width: '100%', maxWidth: '560px', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }} onClick={e => e.stopPropagation()}>
+
+            {/* Modal header */}
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid #e9ebec' }}>
+              <div className="d-flex align-items-center justify-content-between">
+                <div>
+                  <h6 className="mb-0 fw-bold">
+                    {new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                  </h6>
+                  <p className="mb-0 text-muted" style={{ fontSize: '12px' }}>
+                    {(() => { const h = gregorianToHijri(new Date(selectedDate + 'T00:00:00')); return formatHijri(h.year, h.month, h.day) })()}
+                  </p>
+                </div>
+                <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', fontSize: '22px', cursor: 'pointer', color: '#6c757d' }}>×</button>
               </div>
 
               {/* Tabs */}
-              <div className="modal-header border-0 pt-0 pb-0">
-                <ul className="nav nav-tabs w-100">
-                  <li className="nav-item">
-                    <button
-                      className={`nav-link ${activeTab === 'menu' ? 'active fw-bold' : ''}`}
-                      onClick={() => setActiveTab('menu')}
-                    >
-                      🍽 Daily Menu
-                      {menuForm.roti && <span className="badge bg-success ms-2" style={{ fontSize: '10px' }}>Set</span>}
-                    </button>
-                  </li>
-                  <li className="nav-item">
-                    <button
-                      className={`nav-link ${activeTab === 'event' ? 'active fw-bold' : ''}`}
-                      onClick={() => setActiveTab('event')}
-                    >
-                      📅 Event / Thaali Count
-                      {selectedEvent && <span className="badge bg-primary ms-2" style={{ fontSize: '10px' }}>Set</span>}
-                    </button>
-                  </li>
-                </ul>
+              <div style={{ display: 'flex', gap: '4px', marginTop: '12px', background: '#f3f3f9', borderRadius: '8px', padding: '3px' }}>
+                {([
+                  { key: 'thaali', label: 'Thaali Schedule', icon: 'bi-cup-hot' },
+                  { key: 'menu', label: 'Daily Menu', icon: 'bi-list-ul' },
+                  { key: 'event', label: 'Event', icon: 'bi-calendar-event' },
+                ] as { key: ModalTab; label: string; icon: string }[]).map(tab => (
+                  <button key={tab.key} onClick={() => setModalTab(tab.key)} style={{
+                    flex: 1, padding: '6px 4px', borderRadius: '6px', border: 'none', fontSize: '12px',
+                    fontWeight: 600, cursor: 'pointer',
+                    background: modalTab === tab.key ? '#364574' : 'transparent',
+                    color: modalTab === tab.key ? '#fff' : '#6c757d',
+                  }}>
+                    <i className={`bi ${tab.icon} me-1`} />{tab.label}
+                  </button>
+                ))}
               </div>
+            </div>
 
-              <div className="modal-body" style={{ maxHeight: '65vh', overflowY: 'auto' }}>
+            {/* ── THAALI SCHEDULE TAB ── */}
+            {modalTab === 'thaali' && (
+              <div style={{ padding: '20px' }}>
 
-                {/* ── MENU TAB ── */}
-                {activeTab === 'menu' && (
+                {/* Thaali enabled toggle */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', padding: '12px 14px', background: scheduleForm.thaali_enabled ? '#28a74510' : '#e6394610', borderRadius: '10px', border: `1px solid ${scheduleForm.thaali_enabled ? '#28a74530' : '#e6394630'}` }}>
                   <div>
-                    {isPastDate ? (
-                      <div className="alert alert-secondary py-2 mb-3" style={{ fontSize: '12px' }}>
-                        <i className="bi bi-lock me-2"></i>
-                        Past date — view only. Menu and events cannot be edited.
-                      </div>
-                    ) : (
-                      <p className="text-muted mb-3" style={{ fontSize: '12px' }}>
-                        Fill in today's menu items. Mumin will see this in the app and can customize their quantities.
-                        Cutoff for mumin requests: <strong>4:00 PM the day before</strong>.
-                      </p>
-                    )}
-
-                    {/* Fixed items */}
-                    <div className="row g-3 mb-3">
-                      {FIXED_ITEMS.map(item => (
-                        <div className="col-12 col-md-6" key={item.key}>
-                          <label className="form-label fw-semibold mb-1" style={{ fontSize: '13px' }}>
-                            {item.label}
-                            {!isPastDate && (
-                              <span className="text-muted fw-normal ms-1" style={{ fontSize: '11px' }}>
-                                (leave blank if not serving)
-                              </span>
-                            )}
-                          </label>
-                          <input
-                            type="text"
-                            className="form-control form-control-sm"
-                            placeholder={item.placeholder}
-                            value={(menuForm as any)[item.key] || ''}
-                            onChange={e => setMenuForm(prev => ({ ...prev, [item.key]: e.target.value }))}
-                            disabled={isPastDate}
-                          />
-                        </div>
-                      ))}
+                    <div style={{ fontWeight: 700, fontSize: '14px', color: scheduleForm.thaali_enabled ? '#28a745' : '#e63946' }}>
+                      {scheduleForm.thaali_enabled ? '✓ Thaali day' : '✕ No thaali today'}
                     </div>
-
-                    {/* Extra items */}
-                    <div className="mb-3">
-                      <div className="d-flex justify-content-between align-items-center mb-2">
-                        <label className="form-label fw-semibold mb-0" style={{ fontSize: '13px' }}>
-                          Extra Items
-                          <span className="text-muted fw-normal ms-1" style={{ fontSize: '11px' }}>
-                            (Fruit, Kheer, anything additional)
-                          </span>
-                        </label>
-                        {!isPastDate && (
-                          <button className="btn btn-outline-primary btn-sm" onClick={addExtraItem}>
-                            <i className="bi bi-plus me-1"></i>Add Extra
-                          </button>
-                        )}
-                      </div>
-
-                      {menuForm.extra_items.length === 0 && (
-                        <div className="text-muted text-center py-2" style={{ fontSize: '12px', border: '1px dashed #dee2e6', borderRadius: 6 }}>
-                          {isPastDate ? 'No extras were added for this day.' : 'No extras added. Click "Add Extra" to add items like Fruit, Kheer, etc.'}
-                        </div>
-                      )}
-
-                      {menuForm.extra_items.map((item, index) => (
-                        <div key={index} className="d-flex gap-2 align-items-center mb-2">
-                          <input
-                            type="text"
-                            className="form-control form-control-sm"
-                            placeholder="Item name e.g. Fruit"
-                            value={item.name}
-                            onChange={e => updateExtraItem(index, 'name', e.target.value)}
-                            disabled={isPastDate}
-                          />
-                          <input
-                            type="text"
-                            className="form-control form-control-sm"
-                            placeholder="Description (optional)"
-                            value={item.description}
-                            onChange={e => updateExtraItem(index, 'description', e.target.value)}
-                            disabled={isPastDate}
-                          />
-                          {!isPastDate && (
-                            <button className="btn btn-outline-danger btn-sm" onClick={() => removeExtraItem(index)}>
-                              <i className="bi bi-trash"></i>
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Menu notes */}
-                    <div>
-                      <label className="form-label fw-semibold mb-1" style={{ fontSize: '13px' }}>Kitchen Notes</label>
-                      <textarea
-                        className="form-control form-control-sm"
-                        rows={2}
-                        placeholder="Any notes for the kitchen team..."
-                        value={menuForm.notes}
-                        onChange={e => setMenuForm(prev => ({ ...prev, notes: e.target.value }))}
-                        disabled={isPastDate}
-                      />
+                    <div style={{ fontSize: '12px', color: '#6c757d' }}>
+                      {scheduleForm.thaali_enabled ? 'Thaali will be distributed' : 'No distribution (Urs, off day, etc.)'}
                     </div>
                   </div>
-                )}
+                  <div style={{ position: 'relative' }}>
+                    <input type="checkbox" id="thaali_toggle" checked={scheduleForm.thaali_enabled}
+                      onChange={e => setScheduleForm(p => ({ ...p, thaali_enabled: e.target.checked }))}
+                      style={{ width: '40px', height: '22px', cursor: 'pointer', accentColor: '#364574' }} />
+                  </div>
+                </div>
 
-                {/* ── EVENT TAB ── */}
-                {activeTab === 'event' && (
-                  <div className="row g-3">
-                    <div className="col-12">
-                      <label className="form-label" style={{ fontSize: '13px' }}>Event Note</label>
-                      <input type="text" className="form-control form-control-sm"
-                        placeholder="e.g. Eid, Ashura, special occasion..."
-                        value={form.menu} onChange={(e) => setForm(p => ({ ...p, menu: e.target.value }))}
-                        disabled={isPastDate}
-                      />
-                    </div>
-                    <div className="col-12">
-                      <label className="form-label" style={{ fontSize: '13px' }}>Notes</label>
-                      <textarea className="form-control form-control-sm" rows={2}
-                        placeholder="Any special notes for this day..."
-                        value={form.notes} onChange={(e) => setForm(p => ({ ...p, notes: e.target.value }))}
-                        disabled={isPastDate}
-                      />
-                    </div>
-                    <div className="col-12">
-                      <label className="form-label" style={{ fontSize: '13px' }}>Include Mumineen by Status</label>
-                      {!isPastDate && (
-                        <p className="text-muted mb-2" style={{ fontSize: '12px' }}>Select which statuses receive thaali today.</p>
-                      )}
-                      <div className="row g-2">
-                        {niyyatStatuses.map(s => {
-                          const isSelected = selectedStatuses.includes(s.id)
+                {/* Event name */}
+                <div className="mb-3">
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#495057', display: 'block', marginBottom: '4px' }}>
+                    Day Label / Event Name
+                  </label>
+                  <input type="text" className="form-control form-control-sm"
+                    value={scheduleForm.event_name}
+                    onChange={e => setScheduleForm(p => ({ ...p, event_name: e.target.value }))}
+                    placeholder={scheduleForm.thaali_enabled ? 'e.g. Friday Special, Weekly Thaali...' : 'e.g. Urs Niyaaz, Sunday Off...'}
+                    style={{ borderRadius: '8px', fontSize: '13px' }} />
+                </div>
+
+                {scheduleForm.thaali_enabled && (
+                  <>
+                    {/* Niyyat status selection */}
+                    <div className="mb-3">
+                      <label style={{ fontSize: '12px', fontWeight: 600, color: '#495057', display: 'block', marginBottom: '6px' }}>
+                        Include Niyyat Statuses <span style={{ color: '#6c757d', fontWeight: 400 }}>(who gets thaali)</span>
+                      </label>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                        {NIYYAT_STATUSES.map(ns => {
+                          const selected = scheduleForm.niyyat_status_ids.includes(ns.id)
                           return (
-                            <div key={s.id} className="col-6 col-md-4">
-                              <div
-                                onClick={() => toggleStatus(s.id)}
-                                style={{
-                                  border: `2px solid ${isSelected ? '#364574' : '#dee2e6'}`,
-                                  borderRadius: '8px', padding: '8px 10px',
-                                  cursor: isPastDate ? 'default' : 'pointer',
-                                  background: isSelected ? '#f0f4ff' : '#fff',
-                                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                  opacity: isPastDate ? 0.8 : 1,
-                                }}>
-                                <span style={{ fontSize: '12px', fontWeight: isSelected ? 600 : 400 }}>{s.name}</span>
-                                {isSelected && (
-                                  <span style={{ fontSize: '12px', fontWeight: 700, color: '#364574' }}>
-                                    {statusCounts[s.id] || 0}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
+                            <button key={ns.id} onClick={() => toggleNiyyat(ns.id)} style={{
+                              padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: 'none',
+                              background: selected ? '#364574' : '#f3f3f9',
+                              color: selected ? '#fff' : '#495057',
+                              transition: 'all 0.15s',
+                            }}>
+                              {ns.name}
+                            </button>
                           )
                         })}
                       </div>
                     </div>
 
-                    {selectedStatuses.length > 0 && (
-                      <div className="col-12">
-                        <div className="alert alert-primary py-2 mb-0" style={{ fontSize: '13px' }}>
-                          <strong>Total Thaalis: {totalThaalis}</strong>
-                          {' — '}
-                          {selectedStatuses.map(id => {
-                            const s = niyyatStatuses.find(n => n.id === id)
-                            return `${s?.name}: ${statusCounts[id] || 0}`
-                          }).join(' | ')}
+                    {/* Thaali category filter */}
+                    <div className="mb-3">
+                      <label style={{ fontSize: '12px', fontWeight: 600, color: '#495057', display: 'block', marginBottom: '6px' }}>
+                        Category Filter <span style={{ color: '#6c757d', fontWeight: 400 }}>(leave empty = all categories)</span>
+                      </label>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                        {THAALI_CATEGORIES.map(cat => {
+                          const selected = scheduleForm.thaali_category_ids.includes(cat.id)
+                          return (
+                            <button key={cat.id} onClick={() => toggleCategory(cat.id)} style={{
+                              padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: 'none',
+                              background: selected ? '#0ab39c' : '#f3f3f9',
+                              color: selected ? '#fff' : '#495057',
+                            }}>
+                              {cat.name}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Extra thaalis */}
+                    <div className="mb-3">
+                      <label style={{ fontSize: '12px', fontWeight: 600, color: '#495057', display: 'block', marginBottom: '4px' }}>
+                        Extra Thaalis <span style={{ color: '#6c757d', fontWeight: 400 }}>(added on top of auto count)</span>
+                      </label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <input type="number" min={0} className="form-control form-control-sm"
+                          value={scheduleForm.extra_thaali_count}
+                          onChange={e => setScheduleForm(p => ({ ...p, extra_thaali_count: parseInt(e.target.value) || 0 }))}
+                          style={{ borderRadius: '8px', fontSize: '13px', maxWidth: '120px' }} />
+                        {selectedCount && (
+                          <div style={{ fontSize: '13px', color: '#364574', fontWeight: 700 }}>
+                            = {selectedCount.approved} approved + {scheduleForm.extra_thaali_count} extra
+                            = <span style={{ color: '#28a745' }}>{selectedCount.approved + scheduleForm.extra_thaali_count} total</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Category breakdown */}
+                    {selectedCount && Object.keys(selectedCount.byCategory).length > 0 && (
+                      <div style={{ background: '#f8f9fa', borderRadius: '8px', padding: '10px 12px', marginBottom: '12px' }}>
+                        <div style={{ fontSize: '11px', fontWeight: 700, color: '#6c757d', marginBottom: '6px', textTransform: 'uppercase' }}>Breakdown by Category</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                          {Object.entries(selectedCount.byCategory).map(([catId, count]) => {
+                            const cat = THAALI_CATEGORIES.find(c => c.id === parseInt(catId))
+                            return (
+                              <div key={catId} style={{ background: '#fff', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', border: '1px solid #e9ebec' }}>
+                                <span style={{ color: '#6c757d' }}>{cat?.name || catId}:</span>
+                                <span style={{ fontWeight: 700, color: '#364574', marginLeft: '4px' }}>{count}</span>
+                              </div>
+                            )
+                          })}
                         </div>
                       </div>
                     )}
-                  </div>
+                  </>
                 )}
-              </div>
 
-              {/* Footer */}
-              <div className="modal-footer flex-wrap gap-2">
-                {activeTab === 'event' && (
-                  <button className="btn btn-outline-success btn-sm" onClick={exportDistributorReport}
-                    disabled={exporting || selectedStatuses.length === 0}>
-                    {exporting ? 'Exporting...' : '↓ Distributor Report'}
-                  </button>
-                )}
-                <div className="d-flex gap-2 ms-auto">
-                  <button className="btn btn-light btn-sm" onClick={() => setShowModal(false)}>
-                    {isPastDate ? 'Close' : 'Cancel'}
-                  </button>
-                  {!isPastDate && (
-                    <>
-                      {activeTab === 'menu' ? (
-                        <button className="btn btn-primary btn-sm" onClick={handleMenuSave} disabled={menuSaving}>
-                          {menuSaving ? 'Saving...' : 'Save Menu'}
-                        </button>
-                      ) : (
-                        <button className="btn btn-primary btn-sm" onClick={handleSave} disabled={saving}>
-                          {saving ? 'Saving...' : 'Save Event'}
-                        </button>
-                      )}
-                    </>
-                  )}
+                {/* Notes */}
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#495057', display: 'block', marginBottom: '4px' }}>Notes</label>
+                  <input type="text" className="form-control form-control-sm"
+                    value={scheduleForm.notes}
+                    onChange={e => setScheduleForm(p => ({ ...p, notes: e.target.value }))}
+                    placeholder="Optional notes..."
+                    style={{ borderRadius: '8px', fontSize: '13px' }} />
                 </div>
               </div>
+            )}
 
+            {/* ── MENU TAB ── */}
+            {modalTab === 'menu' && (
+              <div style={{ padding: '20px' }}>
+                <div className="row g-2">
+                  {[
+                    { key: 'mithas', label: 'Mithas', icon: '🍮' },
+                    { key: 'tarkari', label: 'Tarkari', icon: '🥘' },
+                    { key: 'soup', label: 'Soup / Daal', icon: '🍲' },
+                    { key: 'chawal', label: 'Chawal', icon: '🍚' },
+                    { key: 'roti', label: 'Roti', icon: '🫓' },
+                    { key: 'salad', label: 'Salad', icon: '🥗' },
+                  ].map(f => (
+                    <div key={f.key} className="col-6">
+                      <label style={{ fontSize: '12px', fontWeight: 600, color: '#495057', marginBottom: '4px', display: 'block' }}>{f.icon} {f.label}</label>
+                      <input type="text" className="form-control form-control-sm"
+                        value={(menuForm as any)[f.key]}
+                        onChange={e => setMenuForm(p => ({ ...p, [f.key]: e.target.value }))}
+                        style={{ borderRadius: '7px', fontSize: '13px' }} />
+                    </div>
+                  ))}
+                  <div className="col-12">
+                    <label style={{ fontSize: '12px', fontWeight: 600, color: '#495057', marginBottom: '4px', display: 'block' }}>Notes</label>
+                    <input type="text" className="form-control form-control-sm" value={menuForm.notes}
+                      onChange={e => setMenuForm(p => ({ ...p, notes: e.target.value }))}
+                      style={{ borderRadius: '7px', fontSize: '13px' }} />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── EVENT TAB ── */}
+            {modalTab === 'event' && (
+              <div style={{ padding: '20px' }}>
+                <div className="row g-2">
+                  <div className="col-12">
+                    <label style={{ fontSize: '12px', fontWeight: 600, color: '#495057', marginBottom: '4px', display: 'block' }}>Event Name *</label>
+                    <input type="text" className="form-control"
+                      value={eventForm.menu}
+                      onChange={e => setEventForm(p => ({ ...p, menu: e.target.value }))}
+                      placeholder="e.g. 15 mi Ramadan - Naiz, Urs Syedna..."
+                      style={{ borderRadius: '8px', fontSize: '13px' }} />
+                  </div>
+                  <div className="col-12">
+                    <label style={{ fontSize: '12px', fontWeight: 600, color: '#495057', marginBottom: '4px', display: 'block' }}>Notes</label>
+                    <input type="text" className="form-control"
+                      value={eventForm.notes}
+                      onChange={e => setEventForm(p => ({ ...p, notes: e.target.value }))}
+                      style={{ borderRadius: '8px', fontSize: '13px' }} />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Modal footer */}
+            <div style={{ padding: '12px 20px', borderTop: '1px solid #e9ebec', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                {modalTab === 'menu' && editMenu && (
+                  <button onClick={deleteMenu} className="btn btn-sm" style={{ background: '#e6394615', color: '#e63946', border: 'none', borderRadius: '7px', fontSize: '12px' }}>
+                    <i className="bi bi-trash me-1" />Delete
+                  </button>
+                )}
+                {modalTab === 'event' && editEvent && (
+                  <button onClick={deleteEvent} className="btn btn-sm" style={{ background: '#e6394615', color: '#e63946', border: 'none', borderRadius: '7px', fontSize: '12px' }}>
+                    <i className="bi bi-trash me-1" />Delete
+                  </button>
+                )}
+                {modalTab === 'thaali' && editSchedule && (
+                  <button onClick={deleteSchedule} className="btn btn-sm" style={{ background: '#e6394615', color: '#e63946', border: 'none', borderRadius: '7px', fontSize: '12px' }}>
+                    <i className="bi bi-trash me-1" />Remove Schedule
+                  </button>
+                )}
+              </div>
+              <div className="d-flex gap-2">
+                <button onClick={() => setShowModal(false)} className="btn btn-sm btn-outline-secondary" style={{ borderRadius: '8px', fontSize: '13px' }}>Cancel</button>
+                <button
+                  onClick={modalTab === 'menu' ? saveMenu : modalTab === 'event' ? saveEvent : saveSchedule}
+                  disabled={saving}
+                  className="btn btn-sm"
+                  style={{ background: '#364574', color: '#fff', borderRadius: '8px', fontSize: '13px', fontWeight: 600 }}>
+                  {saving ? <span className="spinner-border spinner-border-sm" /> : 'Save'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
-    </div>
+    </>
   )
 }

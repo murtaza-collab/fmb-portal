@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- Background -->
+  <rect width="32" height="32" rx="6" fill="#364574"/>
+  <!-- Thaali plate -->
+  <circle cx="16" cy="17" r="11" fill="none" stroke="#ffbf69" stroke-width="2"/>
+  <circle cx="16" cy="17" r="7" fill="none" stroke="#ffbf69" stroke-width="1.5" opacity="0.6"/>
+  <!-- Steam -->
+  <path d="M12 10 Q13 7 12 4" fill="none" stroke="#ffbf69" stroke-width="1.5" stroke-linecap="round" opacity="0.8"/>
+  <path d="M16 9 Q17 6 16 3" fill="none" stroke="#ffbf69" stroke-width="1.5" stroke-linecap="round"/>
+  <path d="M20 10 Q21 7 20 4" fill="none" stroke="#ffbf69" stroke-width="1.5" stroke-linecap="round" opacity="0.8"/>
+</svg>
