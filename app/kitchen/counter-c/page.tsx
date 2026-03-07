@@ -221,8 +221,8 @@ export default function CounterC() {
   // ─────────────────────────────────────────────
   if (view === 'sessions') {
     return (
-      <div className="min-vh-100 bg-light">
-        <div className="bg-white border-bottom px-4 py-3 mb-4">
+      <div style={{ minHeight: "100vh", background: "var(--bs-tertiary-bg)" }}>
+        <div style={{ background: "var(--bs-body-bg)", borderBottom: "1px solid var(--bs-border-color)", padding: "12px 24px 12px 24px", marginBottom: "1.5rem" }}>
           <div className="d-flex justify-content-between align-items-center">
             <Link href="/kitchen" className="btn btn-outline-secondary">
               <i className="bi bi-arrow-left me-2"></i>Back
@@ -298,7 +298,7 @@ export default function CounterC() {
               <div className="row g-3">
                 {completedSessions.map(s => (
                   <div className="col-12 col-md-6 col-lg-4" key={s.id}>
-                    <div className="card border-0 shadow-sm bg-white opacity-75">
+                    <div className="card border-0 shadow-sm opacity-75" style={{ background: "var(--bs-body-bg)" }}>
                       <div className="card-body p-3 d-flex justify-content-between align-items-center">
                         <div>
                           <div className="fw-semibold">{s.distributor_name}</div>
@@ -324,8 +324,8 @@ export default function CounterC() {
   // ─────────────────────────────────────────────
   if (view === 'filling') {
     return (
-      <div className="min-vh-100 bg-light">
-        <div className="bg-white border-bottom px-4 py-3 mb-4">
+      <div style={{ minHeight: "100vh", background: "var(--bs-tertiary-bg)" }}>
+        <div style={{ background: "var(--bs-body-bg)", borderBottom: "1px solid var(--bs-border-color)", padding: "12px 24px 12px 24px", marginBottom: "1.5rem" }}>
           <div className="d-flex justify-content-between align-items-center">
             <button className="btn btn-outline-secondary" onClick={() => setView('sessions')}>
               <i className="bi bi-arrow-left me-2"></i>Back
@@ -410,7 +410,7 @@ export default function CounterC() {
 
                   {/* Thaali list */}
                   <div className="card border-0 shadow-sm">
-                    <div className="card-header bg-white py-3 d-flex justify-content-between">
+                    <div className="card-header py-3 d-flex justify-content-between" style={{ background: "var(--bs-body-bg)" }}>
                       <h6 className="mb-0 fw-bold">Default Thaalis List</h6>
                       <span className="text-muted small">{thaalis.length} total</span>
                     </div>
@@ -478,8 +478,8 @@ export default function CounterC() {
   // VIEW: TALLY
   // ─────────────────────────────────────────────
   return (
-    <div className="min-vh-100 bg-light">
-      <div className="bg-white border-bottom px-4 py-3 mb-4">
+    <div style={{ minHeight: "100vh", background: "var(--bs-tertiary-bg)" }}>
+      <div style={{ background: "var(--bs-body-bg)", borderBottom: "1px solid var(--bs-border-color)", padding: "12px 24px 12px 24px", marginBottom: "1.5rem" }}>
         <div className="d-flex justify-content-between align-items-center">
           <button className="btn btn-outline-secondary" onClick={() => setView('filling')}>
             <i className="bi bi-arrow-left me-2"></i>Back
@@ -540,7 +540,7 @@ export default function CounterC() {
 
         {/* Tally table */}
         <div className="card border-0 shadow-sm mb-4">
-          <div className="card-header bg-white py-3 d-flex justify-content-between">
+          <div className="card-header py-3 d-flex justify-content-between" style={{ background: "var(--bs-body-bg)" }}>
             <h6 className="mb-0 fw-bold">Default Thaalis — Physical Count</h6>
             <span className="text-muted small">{tallyFilled.length}/{thaalis.length} accounted for</span>
           </div>

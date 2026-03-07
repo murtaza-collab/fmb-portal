@@ -114,7 +114,7 @@ export default function CounterADetail() {
       // 7. Fetch customizations
       const { data: customizations } = await supabase
         .from('thaali_customizations')
-        .select('mumin_id, request_type, notes')
+        .select('mumin_id, roti, tarkari, chawal, soup, mithas, salad, stop_thaali, notes, extra_items')
         .in('mumin_id', muminIds)
         .eq('request_date', today)
         .eq('status', 'active');
@@ -132,6 +132,21 @@ export default function CounterADetail() {
         const mumin = muminMap.get(reg.mumin_id);
         const isStopped = stoppedThaaliIds.has(reg.thaali_id);
         const customization = customizationMap.get(reg.mumin_id);
+        const isStopThaali = customization?.stop_thaali === true;
+
+        // Build customization summary
+        let customSummary: string | undefined;
+        if (customization && !isStopThaali) {
+          const items = ['roti', 'tarkari', 'chawal', 'soup', 'mithas', 'salad']
+            .filter(key => (customization as any)[key] && (customization as any)[key] !== 'full')
+            .map(key => `${key}: ${(customization as any)[key]}`)
+          const extras = (customization.extra_items || [])
+            .filter((e: any) => e.quantity && e.quantity !== 'full')
+            .map((e: any) => `${e.name}: ${e.quantity}`)
+          const all = [...items, ...extras]
+          if (all.length > 0) customSummary = all.join(', ')
+          if (customization.notes) customSummary = (customSummary ? customSummary + ' | ' : '') + customization.notes
+        }
 
         return {
           registration_id: reg.id,
@@ -140,10 +155,8 @@ export default function CounterADetail() {
           mumin_id: reg.mumin_id,
           mumin_name: mumin?.full_name || 'Unknown',
           sf_no: mumin?.sf_no || '',
-          status: isStopped ? 'stopped' : customization ? 'customized' : 'active',
-          customization: customization
-            ? `${customization.request_type}${customization.notes ? ' — ' + customization.notes : ''}`
-            : undefined,
+          status: (isStopped || isStopThaali) ? 'stopped' : customization ? 'customized' : 'active',
+          customization: customSummary,
         };
       });
 
@@ -222,15 +235,16 @@ export default function CounterADetail() {
   }
 
   return (
-    <div className="min-vh-100 bg-light">
+    <div style={{ minHeight: "100vh", background: "var(--bs-tertiary-bg)" }}>
       {/* Header */}
-      <div className="bg-white border-bottom px-4 py-3">
+      <div style={{ background: "var(--bs-body-bg)", borderBottom: "1px solid var(--bs-border-color)", padding: "12px 24px" }}>
         <div className="d-flex justify-content-between align-items-center">
           <Link href="/kitchen" className="btn btn-outline-secondary">
             <i className="bi bi-arrow-left me-2"></i>Back
           </Link>
-          <h1 className="h4 mb-0 text-primary fw-bold">
-            Counter A — {session?.distributor_name}
+          <h1 className="h4 mb-0 fw-bold text-center" style={{ color: 'var(--bs-body-color)' }}>
+            <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--bs-secondary-color)', textTransform: 'uppercase', letterSpacing: 1 }}>Store Counter</div>
+            <div style={{ color: '#364574' }}>{session?.distributor_name || '—'}</div>
           </h1>
           <span className={`badge fs-6 ${confirmed ? 'bg-success' : 'bg-warning text-dark'}`}>
             {confirmed ? '✓ Sent to Counters' : 'Awaiting Confirmation'}
@@ -244,27 +258,92 @@ export default function CounterADetail() {
         {/* Stat Cards */}
         <div className="row g-3 mb-4">
           {[
-            { label: 'Total Thaalis', value: thaalis.length, tab: 'all', color: 'primary' },
-            { label: 'To Dispatch', value: thaalis.length - stopped.length, tab: 'all', color: 'success' },
-            { label: 'Stopped', value: stopped.length, tab: 'stopped', color: 'danger' },
-            { label: 'Customized → B', value: customized.length, tab: 'customized', color: 'info' },
-            { label: 'Default → C', value: defaultThaalis.length, tab: 'default', color: 'secondary' },
-          ].map(stat => (
-            <div className="col-6 col-md-4 col-lg-2" key={stat.label}>
-              <div
-                className={`card text-center p-3 border-2 ${
-                  activeTab === stat.tab && stat.tab !== 'all'
-                    ? `border-${stat.color} bg-${stat.color} bg-opacity-10`
-                    : 'border-light bg-white'
-                }`}
-                style={{ cursor: 'pointer' }}
-                onClick={() => setActiveTab(stat.tab as any)}
-              >
-                <div className={`display-6 fw-bold text-${stat.color}`}>{stat.value}</div>
-                <div className="small text-muted mt-1">{stat.label}</div>
+            { label: 'Total Thaalis', value: thaalis.length,               tab: 'all',        color: 'primary', icon: 'bi-box-seam'      },
+            { label: 'Stopped',       value: stopped.length,                tab: 'stopped',    color: 'danger',  icon: 'bi-x-circle'      },
+            { label: 'Counter B',     value: customized.length,             tab: 'customized', color: 'info',    icon: 'bi-stars'         },
+            { label: 'Counter C',     value: defaultThaalis.length,         tab: 'default',    color: 'success', icon: 'bi-check2-square' },
+            { label: 'To Dispatch',   value: thaalis.length - stopped.length, tab: 'all',      color: 'warning', icon: 'bi-truck'         },
+          ].map(stat => {
+            const isActive = activeTab === stat.tab && stat.tab !== 'all';
+            const isFilterable = stat.tab !== 'all';
+            return (
+              <div className="col-6 col-md-4 col-lg" key={stat.label}>
+                <div
+                  role={isFilterable ? 'button' : undefined}
+                  tabIndex={isFilterable ? 0 : undefined}
+                  onClick={() => isFilterable && setActiveTab(stat.tab as any)}
+                  onKeyDown={e => isFilterable && e.key === 'Enter' && setActiveTab(stat.tab as any)}
+                  style={{
+                    cursor: isFilterable ? 'pointer' : 'default',
+                    userSelect: 'none',
+                    WebkitTapHighlightColor: 'rgba(0,0,0,0.08)',
+                    borderRadius: 16,
+                    padding: '20px 12px 16px',
+                    textAlign: 'center',
+                    border: `2.5px solid ${isActive ? `var(--bs-${stat.color})` : 'var(--bs-border-color)'}`,
+                    background: isActive
+                      ? `rgba(var(--bs-${stat.color}-rgb), 0.12)`
+                      : 'var(--bs-body-bg)',
+                    boxShadow: isActive
+                      ? `0 6px 18px rgba(var(--bs-${stat.color}-rgb), 0.3)`
+                      : '0 2px 8px rgba(0,0,0,0.07)',
+                    transition: 'all 0.15s ease',
+                    transform: isActive ? 'translateY(-2px) scale(1.03)' : 'scale(1)',
+                    minHeight: 110,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 2,
+                    outline: 'none',
+                  }}
+                >
+                  <i
+                    className={`bi ${stat.icon}`}
+                    style={{
+                      fontSize: 22,
+                      color: `var(--bs-${stat.color})`,
+                      opacity: isActive ? 1 : 0.7,
+                      marginBottom: 4,
+                    }}
+                  ></i>
+                  <div
+                    style={{
+                      fontSize: 38,
+                      fontWeight: 800,
+                      lineHeight: 1,
+                      color: `var(--bs-${stat.color})`,
+                    }}
+                  >
+                    {stat.value}
+                  </div>
+                  <div style={{
+                    fontSize: 12,
+                    color: isActive ? `var(--bs-${stat.color})` : 'var(--bs-secondary-color)',
+                    fontWeight: isActive ? 600 : 500,
+                    marginTop: 4,
+                  }}>
+                    {stat.label}
+                  </div>
+                  {isFilterable && (
+                    <div style={{
+                      fontSize: 10,
+                      marginTop: 3,
+                      padding: '2px 8px',
+                      borderRadius: 10,
+                      background: isActive
+                        ? `rgba(var(--bs-${stat.color}-rgb), 0.18)`
+                        : 'var(--bs-tertiary-bg)',
+                      color: isActive ? `var(--bs-${stat.color})` : 'var(--bs-secondary-color)',
+                      fontWeight: 500,
+                    }}>
+                      {isActive ? '▲ filtering' : '⊙ tap to filter'}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Stopped Alert — always visible if any stopped */}
@@ -323,7 +402,7 @@ export default function CounterADetail() {
 
         {/* Tabs */}
         <div className="card border-0 shadow-sm">
-          <div className="card-header bg-white pt-3 pb-0">
+          <div className="card-header pt-3 pb-0" style={{ background: "var(--bs-body-bg)" }}>
             <ul className="nav nav-tabs card-header-tabs">
               {[
                 { key: 'all', label: `All (${thaalis.length})` },
@@ -357,7 +436,7 @@ export default function CounterADetail() {
                       <th>Mumin Name</th>
                       <th>SF#</th>
                       <th>Status</th>
-                      <th>Customization / Note</th>
+                      <th>Customization</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -380,7 +459,9 @@ export default function CounterADetail() {
                              '→ Counter C'}
                           </span>
                         </td>
-                        <td className="text-muted">{t.customization || '—'}</td>
+                        <td className="text-muted" style={{ fontSize: '0.85rem' }}>
+                          {t.customization || '—'}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

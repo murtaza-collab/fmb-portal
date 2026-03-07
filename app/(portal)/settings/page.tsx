@@ -13,7 +13,7 @@ type TabKey =
   | 'mumin_categories' | 'thaali_categories' | 'thaali_types' | 'thaali_numbers' | 'stickers'
 
 const TABS: { key: TabKey; label: string; icon: string; group: string }[] = [
-  { key: 'sectors',          label: 'House Sectors',      icon: 'bi-map',             group: 'Address' },
+  { key: 'sectors',          label: 'Sectors',      icon: 'bi-map',             group: 'Address' },
   { key: 'blocks',           label: 'House Blocks',       icon: 'bi-building',         group: 'Address' },
   { key: 'types',            label: 'House Types',        icon: 'bi-house',            group: 'Address' },
   { key: 'niyyat',           label: 'Niyyat Statuses',    icon: 'bi-check2-circle',    group: 'Mumineen' },

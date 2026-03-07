@@ -14,13 +14,23 @@ export const metadata: Metadata = {
   },
 }
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" data-bs-theme="auto">
+    // data-bs-theme starts as 'light' — portal layout JS immediately overrides
+    // this from localStorage before first paint, preventing flash
+    <html lang="en" data-bs-theme="light" suppressHydrationWarning>
+      <head>
+        {/* Inline script: apply saved theme BEFORE React hydrates to prevent flash */}
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function() {
+            try {
+              var t = localStorage.getItem('fmb-theme') || 'light';
+              var isDark = t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+              document.documentElement.setAttribute('data-bs-theme', isDark ? 'dark' : 'light');
+            } catch(e) {}
+          })();
+        `}} />
+      </head>
       <body>
         <Suspense fallback={null}>
           <NavigationProgress />

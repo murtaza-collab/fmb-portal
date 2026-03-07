@@ -10,7 +10,6 @@ export default function KitchenHome() {
   const [allDistributors, setAllDistributors] = useState<any[]>([]);
   const [yetToArrive, setYetToArrive] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [currentTime, setCurrentTime] = useState(new Date());
   const [today] = useState(new Date().toISOString().split('T')[0]);
 
   // Check-in state
@@ -19,11 +18,6 @@ export default function KitchenHome() {
   const [checkinLoading, setCheckinLoading] = useState(false);
   const [checkinError, setCheckinError] = useState('');
   const [checkinSuccess, setCheckinSuccess] = useState('');
-
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
 
   useEffect(() => {
     loadData();
@@ -73,9 +67,9 @@ export default function KitchenHome() {
 
       setAllDistributors(distributors || []);
 
-      // 3. Compute yet to arrive — active distributors with no session today
-      const arrivedIds = new Set(sessions?.map(s => s.distributor_id) || []);
-      const notArrived = (distributors || []).filter(d => !arrivedIds.has(d.id));
+      // 3. Compute yet to arrive
+      const arrivedIds = new Set(sessions?.map(s => String(s.distributor_id)) || []);
+      const notArrived = (distributors || []).filter(d => !arrivedIds.has(String(d.id)));
       setYetToArrive(notArrived);
 
     } catch (err) {
@@ -121,13 +115,7 @@ export default function KitchenHome() {
     }
   };
 
-  const formatTime = (date: Date) =>
-    date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-
-  const formatDate = (date: Date) =>
-    date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-
-  const arrivedTime = (ts: string) =>
+  const arrivedTimeStr = (ts: string) =>
     new Date(ts).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
   const DistributorCard = ({ session, done = false }: { session: any; done?: boolean }) => {
@@ -137,6 +125,7 @@ export default function KitchenHome() {
       <Link
         href={`/kitchen/counter-a/${session.distributor_id}`}
         className={`card border-0 shadow-sm text-decoration-none d-block dist-card ${done ? 'opacity-75' : ''}`}
+        style={{ background: 'var(--bs-body-bg)' }}
       >
         <div className="card-body p-3">
           <div className="d-flex justify-content-between align-items-start mb-2">
@@ -157,21 +146,21 @@ export default function KitchenHome() {
           </div>
           <div className="row g-1 text-center mb-2">
             <div className="col-4">
-              <div className="fw-bold">{session.total_thaalis || 0}</div>
-              <div className="text-muted" style={{ fontSize: '0.7rem' }}>Total</div>
+              <div className="fw-bold" style={{ color: 'var(--bs-body-color)' }}>{session.total_thaalis || 0}</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--bs-secondary-color)' }}>Total</div>
             </div>
             <div className="col-4">
               <div className="fw-bold text-danger">{session.stopped_thaalis || 0}</div>
-              <div className="text-muted" style={{ fontSize: '0.7rem' }}>Stopped</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--bs-secondary-color)' }}>Stopped</div>
             </div>
             <div className="col-4">
               <div className="fw-bold text-success">{net}</div>
-              <div className="text-muted" style={{ fontSize: '0.7rem' }}>To Dispatch</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--bs-secondary-color)' }}>To Dispatch</div>
             </div>
           </div>
           {session.arrived_at && (
-            <div className="text-muted" style={{ fontSize: '0.75rem' }}>
-              <i className="bi bi-clock me-1"></i>{arrivedTime(session.arrived_at)}
+            <div style={{ fontSize: '0.75rem', color: 'var(--bs-secondary-color)' }}>
+              <i className="bi bi-clock me-1"></i>{arrivedTimeStr(session.arrived_at)}
               {!done && <span className="text-primary ms-2">→ Tap to open</span>}
             </div>
           )}
@@ -181,19 +170,17 @@ export default function KitchenHome() {
   };
 
   return (
-    <div className="min-vh-100 bg-light">
-      {/* Header */}
-      <div className="bg-white border-bottom px-4 py-3">
-        <div className="d-flex justify-content-between align-items-center">
-          <h1 className="h4 mb-0">
-            <i className="bi bi-truck me-2 text-primary"></i>
-            Kitchen — Arrival
-          </h1>
-          <div className="text-end">
-            <div className="text-muted" style={{ fontSize: '0.8rem' }}>{formatDate(currentTime)}</div>
-            <div className="fw-bold fs-5">{formatTime(currentTime)}</div>
-          </div>
-        </div>
+    <div style={{ minHeight: '100vh', background: 'var(--bs-tertiary-bg)' }}>
+      {/* Page title bar */}
+      <div style={{
+        background: 'var(--bs-body-bg)',
+        borderBottom: '1px solid var(--bs-border-color)',
+        padding: '12px 24px',
+      }}>
+        <h1 className="h4 mb-0" style={{ color: 'var(--bs-body-color)' }}>
+          <i className="bi bi-truck me-2 text-primary"></i>
+          Kitchen — Arrival
+        </h1>
       </div>
 
       <div className="container-fluid p-4">
@@ -237,17 +224,17 @@ export default function KitchenHome() {
                         <option disabled>All distributors have arrived</option>
                       )}
                     </select>
-                    <div className="text-muted mt-1" style={{ fontSize: '0.8rem' }}>
-                      Or type ID directly:
-                      <input
-                        type="number"
-                        className="form-control form-control-sm mt-1"
-                        placeholder="Enter distributor ID manually"
-                        value={checkinId}
-                        onChange={e => setCheckinId(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && handleManualCheckin()}
-                      />
+                    <div className="text-muted mt-2" style={{ fontSize: '0.8rem' }}>
+                      Or enter ID manually:
                     </div>
+                    <input
+                      type="number"
+                      className="form-control form-control-sm mt-1"
+                      placeholder="Enter distributor ID"
+                      value={checkinId}
+                      onChange={e => setCheckinId(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleManualCheckin()}
+                    />
                   </div>
                   <div className="col-6 col-md-3">
                     <button
@@ -298,7 +285,7 @@ export default function KitchenHome() {
           <>
             {/* Section 1 — Arrived / In Progress */}
             <div className="d-flex justify-content-between align-items-center mb-3">
-              <h2 className="h5 mb-0 fw-bold">
+              <h2 className="h5 mb-0 fw-bold" style={{ color: 'var(--bs-body-color)' }}>
                 <i className="bi bi-person-walking me-2 text-warning"></i>
                 Arrived — Awaiting Counter A
                 <span className="badge bg-primary ms-2">{arrivedSessions.length}</span>
@@ -326,18 +313,18 @@ export default function KitchenHome() {
             {/* Section 2 — Yet to Arrive */}
             {yetToArrive.length > 0 && (
               <>
-                <h2 className="h5 mb-3 fw-bold">
-                  <i className="bi bi-hourglass me-2 text-secondary"></i>
+                <h2 className="h5 mb-3 fw-bold" style={{ color: 'var(--bs-body-color)' }}>
+                  <i className="bi bi-hourglass me-2" style={{ color: 'var(--bs-secondary-color)' }}></i>
                   Yet to Arrive
                   <span className="badge bg-secondary ms-2">{yetToArrive.length}</span>
                 </h2>
                 <div className="row g-2 mb-4">
                   {yetToArrive.map(d => (
                     <div className="col-12 col-md-6 col-lg-4" key={d.id}>
-                      <div className="card border-0 bg-white shadow-sm">
+                      <div className="card border-0 shadow-sm" style={{ background: 'var(--bs-body-bg)' }}>
                         <div className="card-body py-2 px-3 d-flex justify-content-between align-items-center">
-                          <span className="fw-semibold text-muted">{d.full_name}</span>
-                          <span className="badge bg-light text-secondary border">Not arrived</span>
+                          <span className="fw-semibold" style={{ color: 'var(--bs-body-color)' }}>{d.full_name}</span>
+                          <span className="badge border" style={{ background: 'var(--bs-secondary-bg)', color: 'var(--bs-secondary-color)' }}>Not arrived</span>
                         </div>
                       </div>
                     </div>
@@ -349,7 +336,7 @@ export default function KitchenHome() {
             {/* Section 3 — Done Today */}
             {completedSessions.length > 0 && (
               <>
-                <h2 className="h5 mb-3 fw-bold">
+                <h2 className="h5 mb-3 fw-bold" style={{ color: 'var(--bs-body-color)' }}>
                   <i className="bi bi-check-circle me-2 text-success"></i>
                   Done Today
                   <span className="badge bg-success ms-2">{completedSessions.length}</span>
