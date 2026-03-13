@@ -6,9 +6,17 @@ import { supabase } from '@/lib/supabase'
 type Theme = 'light' | 'dark' | 'system'
 
 const ALL_MENU_ITEMS = [
-  { label: 'Dashboard',     href: '/dashboard',    icon: 'bi-speedometer2',     module: 'dashboard' },
-  { label: 'Mumineen',      href: '/mumineen',     icon: 'bi-people',           module: 'mumineen' },
-  { label: 'Thaali',        href: '/thaali',       icon: 'bi-cup-hot',          module: 'thaali' },
+  { label: 'Dashboard',          href: '/dashboard',         icon: 'bi-speedometer2',    module: 'dashboard' },
+  { label: 'Mumineen',           href: '/mumineen',          icon: 'bi-people',          module: 'mumineen' },
+  { label: 'Address Requests',   href: '/address-requests',  icon: 'bi-geo-alt-fill',    module: 'address_requests' },
+  {
+    label: 'Thaali', href: '/thaali', icon: 'bi-cup-hot', module: 'thaali',
+    children: [
+      { label: 'Registrations',  href: '/thaali',                  icon: 'bi-list-ul'      },
+      { label: 'Customizations', href: '/thaali/customizations',   icon: 'bi-sliders'      },
+      { label: 'Stop Requests',  href: '/thaali/stop-requests',    icon: 'bi-slash-circle' },
+    ],
+  },
   { label: 'Distribution',  href: '/distribution', icon: 'bi-box-seam',         module: 'distribution' },
   { label: 'Distributors',  href: '/distributors', icon: 'bi-truck',            module: 'distributors' },
   { label: 'Takhmeem',      href: '/takhmeen',     icon: 'bi-clipboard-check',  module: 'takhmeem' },
@@ -53,6 +61,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   const [theme, setThemeState] = useState<Theme>('system')
   const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [pendingAddressCount, setPendingAddressCount] = useState(0)
 
   // Init theme from localStorage on mount
   useEffect(() => {
@@ -119,10 +128,19 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       const perms = permsData || []
       setPermissions(perms)
       const allowed = perms.filter(p => p.can_view).map(p => p.module)
-      setMenuItems(ALL_MENU_ITEMS.filter(m => allowed.includes(m.module) || m.module === 'settings'))
+      setMenuItems(ALL_MENU_ITEMS.filter(m =>
+        allowed.includes(m.module) || m.module === 'settings' || m.module === 'address_requests'
+      ))
     } else {
       setMenuItems(ALL_MENU_ITEMS.filter(m => m.module === 'dashboard'))
     }
+
+    // Fetch pending address request count
+    const { count } = await supabase
+      .from('address_change_requests')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'pending')
+    setPendingAddressCount(count || 0)
 
     setLoading(false)
   }
@@ -172,6 +190,63 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       {/* Menu items */}
       <nav style={{ padding: '12px 0', flex: 1, overflowY: 'auto' }}>
         {menuItems.map((item) => {
+          const hasChildren = !!(item as any).children
+          const children = (item as any).children as { label: string; href: string; icon: string }[] | undefined
+
+          // Is this group or item active?
+          const isGroupActive = hasChildren
+            ? children!.some(c => pathname === c.href || pathname.startsWith(c.href + '/'))
+            : (item.href === '/dashboard' ? pathname === item.href : pathname.startsWith(item.href))
+
+          if (hasChildren) {
+            return (
+              <div key={item.href}>
+                {/* Group header — click to navigate to parent href */}
+                <div
+                  onClick={() => router.push(item.href)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '10px',
+                    padding: '11px 16px', cursor: 'pointer',
+                    background: isGroupActive ? 'rgba(255,191,105,0.15)' : 'transparent',
+                    borderLeft: isGroupActive ? '3px solid #ffbf69' : '3px solid transparent',
+                    color: isGroupActive ? '#ffbf69' : 'rgba(255,255,255,0.65)',
+                    fontSize: '14px', transition: 'all 0.2s',
+                  }}
+                  onMouseEnter={e => { if (!isGroupActive) e.currentTarget.style.background = 'rgba(255,255,255,0.07)' }}
+                  onMouseLeave={e => { if (!isGroupActive) e.currentTarget.style.background = 'transparent' }}
+                >
+                  <i className={`bi ${item.icon}`} style={{ fontSize: '16px', width: '18px' }} />
+                  <span style={{ flex: 1 }}>{item.label}</span>
+                  <i className={`bi bi-chevron-${isGroupActive ? 'down' : 'right'}`} style={{ fontSize: '11px', opacity: 0.6 }} />
+                </div>
+                {/* Sub-items — always visible when group is active */}
+                {isGroupActive && children!.map(child => {
+                  const isChildActive = pathname === child.href || pathname.startsWith(child.href + '/')
+                  return (
+                    <div
+                      key={child.href}
+                      onClick={() => router.push(child.href)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '10px',
+                        padding: '9px 16px 9px 40px', cursor: 'pointer',
+                        background: isChildActive ? 'rgba(255,191,105,0.1)' : 'transparent',
+                        borderLeft: isChildActive ? '3px solid rgba(255,191,105,0.6)' : '3px solid transparent',
+                        color: isChildActive ? '#ffbf69' : 'rgba(255,255,255,0.5)',
+                        fontSize: '13px', transition: 'all 0.15s',
+                      }}
+                      onMouseEnter={e => { if (!isChildActive) e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
+                      onMouseLeave={e => { if (!isChildActive) e.currentTarget.style.background = 'transparent' }}
+                    >
+                      <i className={`bi ${child.icon}`} style={{ fontSize: '14px', width: '16px' }} />
+                      <span>{child.label}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          }
+
+          // Regular flat item
           const isActive = item.href === '/dashboard'
             ? pathname === '/dashboard'
             : pathname.startsWith(item.href)
@@ -192,6 +267,16 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
             >
               <i className={`bi ${item.icon}`} style={{ fontSize: '16px', width: '18px' }} />
               <span style={{ flex: 1 }}>{item.label}</span>
+              {item.href === '/address-requests' && pendingAddressCount > 0 && (
+                <span style={{
+                  background: '#e63946', color: '#fff',
+                  fontSize: '10px', fontWeight: 700,
+                  borderRadius: '10px', padding: '1px 6px',
+                  lineHeight: '16px', minWidth: '18px', textAlign: 'center',
+                }}>
+                  {pendingAddressCount}
+                </span>
+              )}
             </div>
           )
         })}

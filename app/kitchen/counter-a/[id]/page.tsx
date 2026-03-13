@@ -182,18 +182,55 @@ export default function CounterADetail() {
     setConfirming(true);
     setError('');
     try {
+      const today = new Date().toISOString().split('T')[0];
+
+      const stoppedCount    = thaalis.filter(t => t.status === 'stopped').length;
+      const customizedCount = thaalis.filter(t => t.status === 'customized').length;
+      const defaultCount    = thaalis.filter(t => t.status === 'active').length;
+      const dispatchCount   = thaalis.length - stoppedCount;
+
+      // 1. Update session: counts + status
       const { error: updateError } = await supabase
         .from('distribution_sessions')
-        .update({ status: 'in_progress' })
+        .update({
+          status:              'in_progress',
+          stopped_thaalis:     stoppedCount,
+          customized_thaalis:  customizedCount,
+          default_thaalis:     defaultCount,
+          total_thaalis:       dispatchCount,  // excludes stopped
+        })
         .eq('id', session.id);
 
       if (updateError) throw updateError;
 
+      // 2. Seed thaali_daily_status rows for every thaali in this session
+      //    Stopped → 'stopped'   Customized → 'counter_b_pending'   Default → 'counter_c_pending'
+      if (thaalis.length > 0) {
+        const statusRows = thaalis.map(t => ({
+          session_id:    session.id,
+          thaali_id:     t.thaali_id,
+          thaali_number: t.thaali_number,
+          mumin_id:      t.mumin_id,
+          date:          today,
+          status:        t.status === 'stopped'
+                           ? 'stopped'
+                           : t.status === 'customized'
+                             ? 'counter_b_pending'
+                             : 'counter_c_pending',
+        }));
+
+        const { error: seedError } = await supabase
+          .from('thaali_daily_status')
+          .upsert(statusRows, { onConflict: 'session_id,thaali_id' });
+
+        if (seedError) throw seedError;
+      }
+
       setConfirmed(true);
       setSession(prev => prev ? { ...prev, status: 'in_progress' } : prev);
 
-      // Go back to kitchen main after short delay
-      setTimeout(() => router.push('/kitchen'), 1500);
+      // Return to kitchen main after short delay
+      setTimeout(() => router.push('/kitchen'), 1800);
 
     } catch (err: any) {
       setError(err.message || 'Failed to confirm');
@@ -395,8 +432,11 @@ export default function CounterADetail() {
         ) : (
           <div className="alert alert-success mb-4">
             <i className="bi bi-check-circle me-2"></i>
-            <strong>Done.</strong> Counter B has {customized.length} customized thaalis.
-            Counter C has {defaultThaalis.length} default thaalis. Returning to arrival page...
+            <strong>Sent!</strong>{' '}
+            {customized.length > 0 && <><span className="fw-bold text-info">{customized.length} customized</span> → Counter B &nbsp;|&nbsp;</>}
+            <span className="fw-bold text-success">{defaultThaalis.length} default</span> → Counter C
+            {stopped.length > 0 && <> &nbsp;|&nbsp; <span className="fw-bold text-danger">{stopped.length} stopped</span> → back to store</>}
+            <span className="text-muted ms-2">— Returning...</span>
           </div>
         )}
 
