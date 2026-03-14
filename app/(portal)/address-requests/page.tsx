@@ -21,7 +21,7 @@ interface Sector      { id: number; name: string }
 interface HouseBlock  { id: number; name: string }
 interface HouseType   { id: number; name: string }
 interface Distributor { id: number; full_name: string }
-interface DistributorSector { sector_id: number; distributor_id: number; distributors: Distributor }
+interface DistributorSector { sector_id: number; distributor_id: number; distributors: Distributor[] }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -153,7 +153,7 @@ export default function AddressRequestsPage() {
 
   const getDistributorsForSector = (sectorId: number | null): Distributor[] => {
     if (!sectorId) return []
-    return distributorSectors.filter(ds => ds.sector_id === sectorId).map(ds => ds.distributors)
+    return distributorSectors.filter(ds => ds.sector_id === sectorId).flatMap(ds => ds.distributors)
   }
 
   const sectorName = (() => {
