@@ -1,41 +1,33 @@
 'use client'
-
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 
-// ── Types ────────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface AddressRequest {
   id: number
   mumin_id: number
   old_address: string | null
-  new_address_type_id: number | null
-  new_address_block_id: number | null
-  new_address_sector_id: number | null
-  new_address_number: string | null
-  new_address_category: string | null
-  new_address_floor: string | null
-  new_full_address: string | null
+  new_address: string | null
   status: 'pending' | 'approved' | 'rejected'
+  admin_notes: string | null
   requested_at: string
   reviewed_at: string | null
-  reviewed_by: number | null
-  admin_notes: string | null
   created_at: string
-  // joined
   mumin?: { id: number; full_name: string; sf_no: string; its_no: string }
 }
 
 interface Sector      { id: number; name: string }
 interface HouseBlock  { id: number; name: string }
 interface HouseType   { id: number; name: string }
-interface Distributor { id: number; full_name: string; sector_id: number | null }
+interface Distributor { id: number; full_name: string }
+interface DistributorSector { sector_id: number; distributor_id: number; distributors: Distributor }
 
-// ── Constants ────────────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const PAGE_SIZE = 20
 
-const STATUS_CONFIG = {
+const STATUS_META = {
   pending:  { label: 'Pending',  bg: '#fff3cd', color: '#856404', dot: '#ffc107' },
   approved: { label: 'Approved', bg: '#d1e7dd', color: '#0a3622', dot: '#0ab39c' },
   rejected: { label: 'Rejected', bg: '#f8d7da', color: '#58151c', dot: '#dc3545' },
@@ -57,65 +49,71 @@ const labelStyle: React.CSSProperties = {
   marginBottom: 4, display: 'block', textTransform: 'uppercase', letterSpacing: 0.5,
 }
 
-// ── Address builder (same logic as HOF form) ─────────────────────────────────
-
 function buildAddress(typeName: string, number: string, cat: string, floor: string, blockName: string, sectorName: string) {
   const parts: string[] = []
   const unit = `${typeName ? typeName + ' ' : ''}${number}${cat}`.trim()
   if (unit) parts.push(unit)
   if (floor) {
-    const floorLabel = FLOOR_OPTIONS.find(f => f.value === floor)?.label || `${floor} Floor`
-    parts.push(floorLabel)
+    const lbl = FLOOR_OPTIONS.find(f => f.value === floor)?.label || `${floor} Floor`
+    parts.push(lbl)
   }
   if (blockName) parts.push(`Block ${blockName}`)
   if (sectorName) parts.push(sectorName)
   return parts.join(', ')
 }
 
-// ── Approval form state type ──────────────────────────────────────────────────
-
 interface ApprovalForm {
-  address_type_id: string | number
-  address_block_id: string | number
-  address_sector_id: string | number
+  address_type_id: string
+  address_block_id: string
+  address_sector_id: string
   address_number: string
   address_category: string
   address_floor: string
+  distributor_id: string
 }
 
-// ── Component ────────────────────────────────────────────────────────────────
+const formatDate = (s: string | null) => {
+  if (!s) return '—'
+  return new Date(s).toLocaleDateString('en-PK', {
+    day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  })
+}
 
-export default function AddressChangeRequestsPage() {
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
-  const [requests, setRequests]       = useState<AddressRequest[]>([])
-  const [sectors, setSectors]         = useState<Sector[]>([])
-  const [blocks, setBlocks]           = useState<HouseBlock[]>([])
-  const [houseTypes, setHouseTypes]   = useState<HouseType[]>([])
+export default function AddressRequestsPage() {
+  const [requests, setRequests]     = useState<AddressRequest[]>([])
+  const [sectors, setSectors]       = useState<Sector[]>([])
+  const [blocks, setBlocks]         = useState<HouseBlock[]>([])
+  const [houseTypes, setHouseTypes] = useState<HouseType[]>([])
   const [distributors, setDistributors] = useState<Distributor[]>([])
-  const [loading, setLoading]         = useState(true)
+  const [distributorSectors, setDistributorSectors] = useState<DistributorSector[]>([])
+  const [loading, setLoading]       = useState(true)
   const [statusFilter, setStatusFilter] = useState<'pending' | 'approved' | 'rejected'>('pending')
-  const [search, setSearch]           = useState('')
-  const [page, setPage]               = useState(1)
+  const [search, setSearch]         = useState('')
+  const [page, setPage]             = useState(1)
 
-  // Modals
-  const [viewing, setViewing]         = useState<AddressRequest | null>(null)
-  const [approving, setApproving]     = useState<AddressRequest | null>(null)
+  // View modal
+  const [viewing, setViewing]       = useState<AddressRequest | null>(null)
+
+  // Approve modal
+  const [approving, setApproving]   = useState<AddressRequest | null>(null)
   const [approvalForm, setApprovalForm] = useState<ApprovalForm>({
     address_type_id: '', address_block_id: '', address_sector_id: '',
-    address_number: '', address_category: '', address_floor: '',
+    address_number: '', address_category: '', address_floor: '', distributor_id: '',
   })
-  const [adminNotes, setAdminNotes]   = useState('')
-  const [saving, setSaving]           = useState(false)
-  const [saveError, setSaveError]     = useState('')
+  const [adminNotes, setAdminNotes] = useState('')
+  const [saving, setSaving]         = useState(false)
+  const [saveError, setSaveError]   = useState('')
 
   // Reject modal
-  const [rejecting, setRejecting]     = useState<AddressRequest | null>(null)
+  const [rejecting, setRejecting]   = useState<AddressRequest | null>(null)
   const [rejectNotes, setRejectNotes] = useState('')
 
   useEffect(() => { fetchAll() }, [])
   useEffect(() => { setPage(1) }, [search, statusFilter])
 
-  // ── Fetch ────────────────────────────────────────────────────────────────
+  // ── Fetch ──────────────────────────────────────────────────────────────────
 
   const fetchAll = async () => {
     setLoading(true)
@@ -125,70 +123,74 @@ export default function AddressChangeRequestsPage() {
       { data: blks },
       { data: hts },
       { data: dists },
+      { data: distSectors },
     ] = await Promise.all([
-      supabase
-        .from('address_change_requests')
-        .select(`*, mumin:mumineen(id, full_name, sf_no, its_no)`)
+      supabase.from('address_change_requests')
+        .select('*, mumin:mumineen(id, full_name, sf_no, its_no)')
         .order('requested_at', { ascending: false }),
       supabase.from('house_sectors').select('id, name').order('name'),
       supabase.from('house_blocks').select('id, name').order('name'),
       supabase.from('house_types').select('id, name').order('name'),
-      supabase.from('distributors').select('id, full_name, sector_id').order('full_name'),
+      supabase.from('distributors').select('id, full_name').order('full_name'),
+      supabase.from('distributor_sectors')
+        .select('sector_id, distributor_id, distributors(id, full_name)')
+        .order('sector_id'),
     ])
     setRequests((reqs || []) as AddressRequest[])
     setSectors(secs || [])
     setBlocks(blks || [])
     setHouseTypes(hts || [])
     setDistributors(dists || [])
+    setDistributorSectors(distSectors || [])
     setLoading(false)
   }
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
+  // ── Helpers ────────────────────────────────────────────────────────────────
 
-  const getSector      = (id: number | null) => sectors.find(s => s.id === id)?.name || '—'
-  const getBlock       = (id: number | null) => blocks.find(b => b.id === id)?.name || ''
-  const getType        = (id: number | null) => houseTypes.find(t => t.id === id)?.name || ''
-  const getDistributor = (sectorId: number | null) => {
-    if (!sectorId) return null
-    return distributors.find(d => d.sector_id === sectorId) || null
+  const getSector = (id: number | null) => sectors.find(s => s.id === id)?.name || '—'
+  const getBlock  = (id: number | null) => blocks.find(b => b.id === id)?.name || ''
+  const getType   = (id: number | null) => houseTypes.find(t => t.id === id)?.name || ''
+
+  const getDistributorsForSector = (sectorId: number | null): Distributor[] => {
+    if (!sectorId) return []
+    return distributorSectors.filter(ds => ds.sector_id === sectorId).map(ds => ds.distributors)
   }
 
-  const getFloor = (v: string | null) => {
-    if (!v) return '—'
-    return FLOOR_OPTIONS.find(f => f.value === v)?.label || `${v} Floor`
-  }
+  const sectorName = (() => {
+    const n = getSector(Number(approvalForm.address_sector_id) || null)
+    return n === '—' ? '' : n
+  })()
 
-  const formatDate = (s: string | null) => {
-    if (!s) return '—'
-    return new Date(s).toLocaleDateString('en-PK', {
-      day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
-    })
-  }
-
-  // Live address preview in approval form
   const approvalPreview = buildAddress(
     getType(Number(approvalForm.address_type_id) || null),
     approvalForm.address_number,
     approvalForm.address_category,
     approvalForm.address_floor,
     getBlock(Number(approvalForm.address_block_id) || null),
-    getSector(Number(approvalForm.address_sector_id) || null) === '—' ? '' : getSector(Number(approvalForm.address_sector_id) || null),
+    sectorName,
   )
+
+  const effectiveDistributorId = (() => {
+    if (approvalForm.distributor_id) return Number(approvalForm.distributor_id)
+    const sds = getDistributorsForSector(Number(approvalForm.address_sector_id) || null)
+    return sds.length === 1 ? sds[0].id : null
+  })()
 
   const af = (field: keyof ApprovalForm, value: string) =>
     setApprovalForm(prev => ({ ...prev, [field]: value }))
 
-  // ── Filter & Paginate ─────────────────────────────────────────────────────
+  // ── Filter & Paginate ──────────────────────────────────────────────────────
 
   const filtered = requests.filter(r => {
     const q = search.toLowerCase()
-    const matchStatus = r.status === statusFilter
-    const matchSearch = !search
-      || r.mumin?.full_name?.toLowerCase().includes(q)
-      || r.mumin?.sf_no?.toLowerCase().includes(q)
-      || r.mumin?.its_no?.toLowerCase().includes(q)
-      || r.new_full_address?.toLowerCase().includes(q)
-    return matchStatus && matchSearch
+    return r.status === statusFilter && (
+      !search ||
+      r.mumin?.full_name?.toLowerCase().includes(q) ||
+      r.mumin?.sf_no?.toLowerCase().includes(q) ||
+      r.mumin?.its_no?.toLowerCase().includes(q) ||
+      r.new_address?.toLowerCase().includes(q) ||
+      r.old_address?.toLowerCase().includes(q)
+    )
   })
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
@@ -200,79 +202,78 @@ export default function AddressChangeRequestsPage() {
     rejected: requests.filter(r => r.status === 'rejected').length,
   }
 
-  // ── Open approve modal ────────────────────────────────────────────────────
+  // ── Approve ────────────────────────────────────────────────────────────────
 
   const openApprove = (r: AddressRequest) => {
     setApproving(r)
-    setApprovalForm({
-      address_type_id:   r.new_address_type_id   || '',
-      address_block_id:  r.new_address_block_id  || '',
-      address_sector_id: r.new_address_sector_id || '',
-      address_number:    r.new_address_number    || '',
-      address_category:  r.new_address_category  || '',
-      address_floor:     r.new_address_floor     || '',
-    })
+    setApprovalForm({ address_type_id: '', address_block_id: '', address_sector_id: '', address_number: '', address_category: '', address_floor: '', distributor_id: '' })
     setAdminNotes('')
     setSaveError('')
   }
 
-  // ── Approve & Apply ───────────────────────────────────────────────────────
-
   const handleApprove = async () => {
     if (!approving) return
+    if (!approvalPreview.trim()) { setSaveError('Fill in at least address number and sector.'); return }
+    const sds = getDistributorsForSector(Number(approvalForm.address_sector_id) || null)
+    if (sds.length > 1 && !approvalForm.distributor_id) { setSaveError('This sector has multiple distributors — select one.'); return }
+
     setSaving(true); setSaveError('')
     try {
-      const fullAddress = approvalPreview
+      // Step 1 — update mumineen address
+      const addressPayload: Record<string, any> = {
+        full_address:     approvalPreview,
+        address_number:   approvalForm.address_number   || null,
+        address_category: approvalForm.address_category || null,
+        address_floor:    approvalForm.address_floor    || null,
+        change_address:   false,
+      }
+      if (approvalForm.address_type_id)   addressPayload.address_type_id   = Number(approvalForm.address_type_id)
+      if (approvalForm.address_block_id)  addressPayload.address_block_id  = Number(approvalForm.address_block_id)
+      if (approvalForm.address_sector_id) addressPayload.address_sector_id = Number(approvalForm.address_sector_id)
 
-      // 1. Update request to approved
+      const { data: muminRows, error: muminErr } = await supabase
+        .from('mumineen')
+        .update(addressPayload)
+        .eq('id', approving.mumin_id)
+        .select('id')
+
+      if (muminErr) throw new Error(`Could not update address: ${muminErr.message}`)
+      if (!muminRows || muminRows.length === 0) throw new Error(`Address update blocked — check RLS on mumineen (admin UPDATE).`)
+
+      // Step 2 — update distributor in thaali_registrations
+      if (effectiveDistributorId) {
+        const { error: distErr } = await supabase
+          .from('thaali_registrations')
+          .update({ distributor_id: effectiveDistributorId })
+          .eq('mumin_id', approving.mumin_id)
+        if (distErr) console.warn('distributor update failed:', distErr.message)
+      }
+
+      // Step 3 — mark request approved
       const { error: reqErr } = await supabase
         .from('address_change_requests')
-        .update({
-          status: 'approved',
-          reviewed_at: new Date().toISOString(),
-          admin_notes: adminNotes || null,
-        })
+        .update({ status: 'approved', reviewed_at: new Date().toISOString(), admin_notes: adminNotes || null })
         .eq('id', approving.id)
-      if (reqErr) throw reqErr
-
-      // 2. Apply updated address fields to mumineen row
-      const updatePayload: Record<string, any> = {
-        updated_at: new Date().toISOString(),
-        full_address: fullAddress || null,
-      }
-      if (approvalForm.address_type_id)   updatePayload.address_type_id   = Number(approvalForm.address_type_id)
-      if (approvalForm.address_block_id)  updatePayload.address_block_id  = Number(approvalForm.address_block_id)
-      if (approvalForm.address_sector_id) updatePayload.address_sector_id = Number(approvalForm.address_sector_id)
-      updatePayload.address_number   = approvalForm.address_number   || null
-      updatePayload.address_category = approvalForm.address_category || null
-      updatePayload.address_floor    = approvalForm.address_floor    || null
-
-      const { error: muminErr } = await supabase
-        .from('mumineen')
-        .update(updatePayload)
-        .eq('id', approving.mumin_id)
-      if (muminErr) throw muminErr
+      if (reqErr) throw new Error(`Address saved but request status failed: ${reqErr.message}`)
 
       setApproving(null)
       fetchAll()
     } catch (e: any) {
-      setSaveError(e.message)
+      setSaveError(e.message || 'Unexpected error.')
+      console.error('[handleApprove]', e)
+    } finally {
+      setSaving(false)
     }
-    setSaving(false)
   }
 
-  // ── Reject ────────────────────────────────────────────────────────────────
+  // ── Reject ─────────────────────────────────────────────────────────────────
 
   const handleReject = async () => {
     if (!rejecting) return
     setSaving(true); setSaveError('')
     const { error } = await supabase
       .from('address_change_requests')
-      .update({
-        status: 'rejected',
-        reviewed_at: new Date().toISOString(),
-        admin_notes: rejectNotes || null,
-      })
+      .update({ status: 'rejected', reviewed_at: new Date().toISOString(), admin_notes: rejectNotes || null })
       .eq('id', rejecting.id)
     if (error) { setSaveError(error.message); setSaving(false); return }
     setRejecting(null)
@@ -280,96 +281,99 @@ export default function AddressChangeRequestsPage() {
     setSaving(false)
   }
 
-  // ── Sub-tabs ──────────────────────────────────────────────────────────────
-
-  const subTabs: Array<['pending' | 'approved' | 'rejected', string, number]> = [
-    ['pending',  'Pending',  counts.pending],
-    ['approved', 'Approved', counts.approved],
-    ['rejected', 'Rejected', counts.rejected],
-  ]
-
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <>
+    <div>
       {/* Header */}
-      <div className="d-flex justify-content-between align-items-start mb-3">
+      <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
         <div>
-          <h4 className="fw-bold mb-0" style={{ color: 'var(--bs-body-color)' }}>Address Change Requests</h4>
-          <small style={{ color: 'var(--bs-secondary-color)' }}>
-            {counts.pending} pending · {counts.approved} approved · {counts.rejected} rejected
-          </small>
+          <h4 className="mb-0" style={{ color: 'var(--bs-body-color)' }}>Address Change Requests</h4>
+          <p className="mb-0" style={{ fontSize: '13px', color: 'var(--bs-secondary-color)' }}>
+            Review and approve address change requests from mumineen
+          </p>
         </div>
       </div>
 
-      {/* Sub-tabs */}
-      <div style={{ borderBottom: '1px solid var(--bs-border-color)' }}>
-        <div className="d-flex">
-          {subTabs.map(([key, label, count]) => (
-            <button key={key}
-              onClick={() => { setStatusFilter(key); setPage(1) }}
-              style={{
-                border: 'none', background: 'none', padding: '10px 20px', fontSize: 14,
-                cursor: 'pointer',
-                color: statusFilter === key ? '#364574' : 'var(--bs-secondary-color)',
-                fontWeight: statusFilter === key ? 700 : 400,
-                borderBottom: statusFilter === key ? '2px solid #364574' : '2px solid transparent',
-                marginBottom: -1,
-              }}>
-              {label}
-              {count > 0 && (
-                <span className="ms-2 badge" style={{
-                  background: statusFilter === key ? '#364574' : 'var(--bs-tertiary-bg)',
-                  color: statusFilter === key ? '#fff' : 'var(--bs-secondary-color)',
-                  fontSize: 11, fontWeight: 600,
-                }}>
-                  {count}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
+      {/* Stats */}
+      <div className="row g-3 mb-4">
+        {[
+          { label: 'Pending',  value: counts.pending,  color: '#856404' },
+          { label: 'Approved', value: counts.approved, color: '#0ab39c' },
+          { label: 'Rejected', value: counts.rejected, color: '#dc3545' },
+          { label: 'Total',    value: requests.length, color: '#364574' },
+        ].map((s, i) => (
+          <div key={i} className="col-6 col-md-3">
+            <div className="card" style={{ border: 'none', boxShadow: '0 1px 4px rgba(0,0,0,0.08)', borderRadius: '10px', background: 'var(--bs-body-bg)' }}>
+              <div className="card-body p-3">
+                <p className="mb-1" style={{ fontSize: '13px', color: 'var(--bs-secondary-color)' }}>{s.label}</p>
+                <h4 className="mb-0" style={{ color: s.color }}>{s.value}</h4>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
 
-      <div className="card border-0 shadow-sm" style={{ borderRadius: '0 0 10px 10px' }}>
-        <div className="card-body">
-
-          {/* Search */}
-          <div className="mb-3">
+      {/* Toolbar */}
+      <div className="card mb-3" style={{ border: 'none', boxShadow: '0 1px 4px rgba(0,0,0,0.08)', borderRadius: '10px', background: 'var(--bs-body-bg)' }}>
+        <div className="card-body p-3">
+          <div className="d-flex flex-wrap gap-2 align-items-center">
             <input
               type="text"
               className="form-control form-control-sm"
-              placeholder="Search by name, SF#, ITS#, or address..."
+              placeholder="Search name, SF#, ITS#, address…"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              style={{ maxWidth: 300 }}
+              style={{ maxWidth: 280 }}
             />
+            {/* Status filter pills */}
+            <div className="d-flex gap-1 ms-1">
+              {(['pending', 'approved', 'rejected'] as const).map(s => (
+                <button
+                  key={s}
+                  onClick={() => setStatusFilter(s)}
+                  className="btn btn-sm"
+                  style={{
+                    borderRadius: 20, fontSize: '12px', padding: '3px 12px',
+                    border: `1.5px solid ${statusFilter === s ? '#364574' : 'var(--bs-border-color)'}`,
+                    background: statusFilter === s ? '#364574' : 'transparent',
+                    color: statusFilter === s ? '#fff' : 'var(--bs-secondary-color)',
+                    fontWeight: statusFilter === s ? 600 : 400,
+                  }}
+                >
+                  {STATUS_META[s].label}
+                  <span className="ms-1" style={{ opacity: 0.7 }}>({counts[s]})</span>
+                </button>
+              ))}
+            </div>
           </div>
+        </div>
+      </div>
 
+      {/* Table */}
+      <div className="card" style={{ border: 'none', boxShadow: '0 1px 4px rgba(0,0,0,0.08)', borderRadius: '10px', background: 'var(--bs-body-bg)' }}>
+        <div className="card-body p-0">
           {loading ? (
             <div className="text-center py-5">
               <div className="spinner-border spinner-border-sm text-primary" />
             </div>
           ) : paginated.length === 0 ? (
             <div className="text-center py-5" style={{ color: 'var(--bs-secondary-color)' }}>
-              <i className="bi bi-inbox fs-2 d-block mb-2" />
+              <i className="bi bi-inbox fs-3 d-block mb-2" />
               No {statusFilter} requests
             </div>
           ) : (
             <>
               <div className="table-responsive">
-                <table className="table table-hover mb-0" style={{ fontSize: 13 }}>
-                  <thead style={{ background: 'var(--bs-tertiary-bg)', borderBottom: '2px solid var(--bs-border-color)' }}>
+                <table className="table table-hover mb-0" style={{ fontSize: '13px', minWidth: '700px' }}>
+                  <thead style={{ background: 'var(--bs-tertiary-bg)' }}>
                     <tr>
-                      <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--bs-secondary-color)', fontSize: 12 }}>Mumin</th>
-                      <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--bs-secondary-color)', fontSize: 12 }}>SF# / ITS#</th>
-                      <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--bs-secondary-color)', fontSize: 12 }}>Current Address</th>
-                      <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--bs-secondary-color)', fontSize: 12 }}>Requested Address</th>
-                      <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--bs-secondary-color)', fontSize: 12 }}>Requested On</th>
-                      {statusFilter !== 'pending' && (
-                        <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--bs-secondary-color)', fontSize: 12 }}>Reviewed On</th>
-                      )}
-                      <th style={{ width: 120 }}></th>
+                      {['Mumin', 'SF# / ITS#', 'Current Address', 'Requested Address', 'Requested On',
+                        ...(statusFilter !== 'pending' ? ['Reviewed On'] : []),
+                        ''
+                      ].map(h => (
+                        <th key={h} style={{ fontSize: '11px', color: 'var(--bs-secondary-color)', fontWeight: 600, padding: '10px 12px', whiteSpace: 'nowrap' }}>{h}</th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
@@ -382,25 +386,15 @@ export default function AddressChangeRequestsPage() {
                           <div style={{ color: '#364574', fontWeight: 600, fontSize: 12 }}>{r.mumin?.sf_no || '—'}</div>
                           <div style={{ color: 'var(--bs-secondary-color)', fontSize: 11 }}>{r.mumin?.its_no || '—'}</div>
                         </td>
-                        <td style={{ padding: '10px 12px', verticalAlign: 'middle', maxWidth: 180 }}>
+                        <td style={{ padding: '10px 12px', verticalAlign: 'middle', maxWidth: 160 }}>
                           <span style={{ color: 'var(--bs-secondary-color)', fontSize: 12 }} title={r.old_address || ''}>
-                            {r.old_address
-                              ? r.old_address.length > 45 ? r.old_address.slice(0, 45) + '…' : r.old_address
-                              : '—'}
+                            {r.old_address ? (r.old_address.length > 40 ? r.old_address.slice(0, 40) + '…' : r.old_address) : '—'}
                           </span>
                         </td>
-                        <td style={{ padding: '10px 12px', verticalAlign: 'middle', maxWidth: 200 }}>
-                          <span style={{ color: 'var(--bs-body-color)', fontSize: 12, fontWeight: 500 }} title={r.new_full_address || ''}>
-                            {r.new_full_address
-                              ? r.new_full_address.length > 50 ? r.new_full_address.slice(0, 50) + '…' : r.new_full_address
-                              : '—'}
+                        <td style={{ padding: '10px 12px', verticalAlign: 'middle', maxWidth: 180 }}>
+                          <span style={{ color: 'var(--bs-body-color)', fontSize: 12, fontWeight: 500 }} title={r.new_address || ''}>
+                            {r.new_address ? (r.new_address.length > 45 ? r.new_address.slice(0, 45) + '…' : r.new_address) : '—'}
                           </span>
-                          {r.new_address_sector_id && (
-                            <div style={{ color: '#364574', fontSize: 11, marginTop: 2 }}>
-                              <i className="bi bi-geo-alt me-1" />
-                              {getSector(r.new_address_sector_id)}
-                            </div>
-                          )}
                         </td>
                         <td style={{ padding: '10px 12px', verticalAlign: 'middle', color: 'var(--bs-secondary-color)', fontSize: 12, whiteSpace: 'nowrap' }}>
                           {formatDate(r.requested_at)}
@@ -414,7 +408,7 @@ export default function AddressChangeRequestsPage() {
                           <div className="d-flex gap-1 justify-content-end">
                             <button
                               className="btn btn-sm"
-                              title="View details"
+                              title="View"
                               style={{ padding: '2px 8px', color: '#299cdb', fontSize: 13 }}
                               onClick={() => setViewing(r)}
                             >
@@ -424,7 +418,6 @@ export default function AddressChangeRequestsPage() {
                               <>
                                 <button
                                   className="btn btn-sm"
-                                  title="Approve"
                                   style={{ padding: '2px 8px', background: '#0ab39c', color: '#fff', fontSize: 12, borderRadius: 6 }}
                                   onClick={() => openApprove(r)}
                                 >
@@ -432,7 +425,6 @@ export default function AddressChangeRequestsPage() {
                                 </button>
                                 <button
                                   className="btn btn-sm"
-                                  title="Reject"
                                   style={{ padding: '2px 8px', background: '#dc3545', color: '#fff', fontSize: 12, borderRadius: 6 }}
                                   onClick={() => { setRejecting(r); setRejectNotes(''); setSaveError('') }}
                                 >
@@ -449,39 +441,27 @@ export default function AddressChangeRequestsPage() {
               </div>
 
               {/* Pagination */}
-              <div className="d-flex justify-content-between align-items-center mt-3">
+              <div className="d-flex justify-content-between align-items-center px-3 py-2" style={{ borderTop: '1px solid var(--bs-border-color)' }}>
                 <small style={{ color: 'var(--bs-secondary-color)' }}>
-                  Showing {paginated.length ? (page - 1) * PAGE_SIZE + 1 : 0}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length} records
+                  Showing {paginated.length ? (page - 1) * PAGE_SIZE + 1 : 0}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}
                 </small>
                 {totalPages > 1 && (
-                  <nav>
-                    <ul className="pagination pagination-sm mb-0">
-                      <li className={`page-item ${page === 1 ? 'disabled' : ''}`}>
-                        <button className="page-link" onClick={() => setPage(1)}>«</button>
-                      </li>
-                      <li className={`page-item ${page === 1 ? 'disabled' : ''}`}>
-                        <button className="page-link" onClick={() => setPage(p => p - 1)}>‹</button>
-                      </li>
-                      {Array.from({ length: totalPages }, (_, i) => i + 1)
-                        .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 2)
-                        .reduce<(number | string)[]>((acc, p, i, arr) => {
-                          if (i > 0 && (p as number) - (arr[i - 1] as number) > 1) acc.push('...')
-                          acc.push(p); return acc
-                        }, [])
-                        .map((p, i) => p === '...'
-                          ? <li key={`e${i}`} className="page-item disabled"><span className="page-link">…</span></li>
-                          : <li key={p} className={`page-item ${page === p ? 'active' : ''}`}>
-                              <button className="page-link" onClick={() => setPage(p as number)}>{p}</button>
-                            </li>
-                        )}
-                      <li className={`page-item ${page === totalPages ? 'disabled' : ''}`}>
-                        <button className="page-link" onClick={() => setPage(p => p + 1)}>›</button>
-                      </li>
-                      <li className={`page-item ${page === totalPages ? 'disabled' : ''}`}>
-                        <button className="page-link" onClick={() => setPage(totalPages)}>»</button>
-                      </li>
-                    </ul>
-                  </nav>
+                  <div className="d-flex gap-1">
+                    <button className="btn btn-sm btn-outline-secondary" disabled={page === 1} onClick={() => setPage(1)}>«</button>
+                    <button className="btn btn-sm btn-outline-secondary" disabled={page === 1} onClick={() => setPage(p => p - 1)}>‹</button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                      .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 2)
+                      .reduce<(number | string)[]>((acc, p, i, arr) => {
+                        if (i > 0 && (p as number) - (arr[i - 1] as number) > 1) acc.push('…')
+                        acc.push(p); return acc
+                      }, [])
+                      .map((p, i) => p === '…'
+                        ? <span key={`e${i}`} className="btn btn-sm btn-outline-secondary disabled">…</span>
+                        : <button key={p} className={`btn btn-sm ${page === p ? 'btn-primary' : 'btn-outline-secondary'}`} onClick={() => setPage(p as number)}>{p}</button>
+                      )}
+                    <button className="btn btn-sm btn-outline-secondary" disabled={page === totalPages} onClick={() => setPage(p => p + 1)}>›</button>
+                    <button className="btn btn-sm btn-outline-secondary" disabled={page === totalPages} onClick={() => setPage(totalPages)}>»</button>
+                  </div>
                 )}
               </div>
             </>
@@ -489,104 +469,50 @@ export default function AddressChangeRequestsPage() {
         </div>
       </div>
 
-      {/* ── View Detail Modal ──────────────────────────────────────────────── */}
+      {/* ── View Modal ────────────────────────────────────────────────────────── */}
       {viewing && (
-        <div className="modal d-block" style={{ background: 'rgba(0,0,0,0.5)', zIndex: 1055 }}>
-          <div className="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-            <div className="modal-content" style={{ borderRadius: 12, border: 'none' }}>
+        <div className="modal show d-block" style={{ background: 'rgba(0,0,0,0.5)', zIndex: 1055 }} onClick={() => setViewing(null)}>
+          <div className="modal-dialog modal-lg modal-dialog-centered" onClick={e => e.stopPropagation()}>
+            <div className="modal-content" style={{ background: 'var(--bs-body-bg)', border: '1px solid var(--bs-border-color)', borderRadius: 12 }}>
               <div className="modal-header" style={{ borderBottom: '1px solid var(--bs-border-color)' }}>
                 <div>
-                  <h5 className="modal-title fw-bold mb-0" style={{ color: 'var(--bs-body-color)' }}>
-                    Address Change Request
-                  </h5>
-                  <small style={{ color: 'var(--bs-secondary-color)' }}>
-                    {viewing.mumin?.full_name} · SF# {viewing.mumin?.sf_no}
-                  </small>
+                  <h5 className="modal-title fw-bold mb-0" style={{ color: 'var(--bs-body-color)' }}>Address Change Request</h5>
+                  <small style={{ color: 'var(--bs-secondary-color)' }}>{viewing.mumin?.full_name} · SF# {viewing.mumin?.sf_no}</small>
                 </div>
                 <button className="btn-close" onClick={() => setViewing(null)} />
               </div>
               <div className="modal-body">
-
-                {/* Status */}
+                {/* Status badge */}
                 <div className="mb-3">
                   {(() => {
-                    const cfg = STATUS_CONFIG[viewing.status]
+                    const m = STATUS_META[viewing.status]
                     return (
-                      <span className="badge" style={{ background: cfg.bg, color: cfg.color, fontSize: 13, padding: '6px 14px', borderRadius: 20 }}>
-                        <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: cfg.dot, marginRight: 6 }} />
-                        {cfg.label}
+                      <span className="badge" style={{ background: m.bg, color: m.color, fontSize: 13, padding: '6px 14px', borderRadius: 20 }}>
+                        <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: m.dot, marginRight: 6 }} />
+                        {m.label}
                       </span>
                     )
                   })()}
                 </div>
-
                 <div className="row g-3">
-                  {/* Current vs Requested */}
                   <div className="col-md-6">
                     <div className="p-3 rounded" style={{ background: 'var(--bs-tertiary-bg)', border: '1px solid var(--bs-border-color)' }}>
-                      <div className="fw-semibold mb-2" style={{ color: 'var(--bs-secondary-color)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>Current Address</div>
-                      <div style={{ color: 'var(--bs-body-color)', fontSize: 14 }}>{viewing.old_address || <span style={{ color: 'var(--bs-secondary-color)' }}>Not recorded</span>}</div>
+                      <div style={{ fontSize: 11, color: 'var(--bs-secondary-color)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>Current Address</div>
+                      <div style={{ fontSize: 14, color: 'var(--bs-body-color)' }}>{viewing.old_address || <span style={{ color: 'var(--bs-secondary-color)' }}>Not recorded</span>}</div>
                     </div>
                   </div>
                   <div className="col-md-6">
                     <div className="p-3 rounded" style={{ background: '#e8f4fd', border: '1px solid #b8d9f4' }}>
-                      <div className="fw-semibold mb-2" style={{ color: '#1a6898', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>Requested New Address</div>
-                      <div style={{ color: 'var(--bs-body-color)', fontSize: 14, fontWeight: 500 }}>{viewing.new_full_address || '—'}</div>
-                      {viewing.new_address_sector_id && (
-                        <div className="mt-1" style={{ fontSize: 12, color: '#364574' }}>
-                          <i className="bi bi-geo-alt me-1" />{getSector(viewing.new_address_sector_id)}
-                        </div>
-                      )}
+                      <div style={{ fontSize: 11, color: '#1a6898', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>Requested New Address</div>
+                      <div style={{ fontSize: 14, color: 'var(--bs-body-color)', fontWeight: 500 }}>{viewing.new_address || '—'}</div>
                     </div>
                   </div>
-
-                  {/* Breakdown */}
-                  <div className="col-12">
-                    <div className="p-3 rounded" style={{ background: 'var(--bs-secondary-bg)', border: '1px solid var(--bs-border-color)' }}>
-                      <div className="fw-semibold mb-3" style={{ color: 'var(--bs-secondary-color)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>Requested Address Details</div>
-                      <div className="row g-2" style={{ fontSize: 13 }}>
-                        {[
-                          ['House Type',   getType(viewing.new_address_type_id)   || '—'],
-                          ['Block',        getBlock(viewing.new_address_block_id) || '—'],
-                          ['Sector',       getSector(viewing.new_address_sector_id)],
-                          ['Flat/House #', viewing.new_address_number   || '—'],
-                          ['Category',     viewing.new_address_category || '—'],
-                          ['Floor',        getFloor(viewing.new_address_floor)],
-                        ].map(([label, value]) => (
-                          <div key={label} className="col-6 col-md-4">
-                            <div style={{ color: 'var(--bs-secondary-color)', fontSize: 11 }}>{label}</div>
-                            <div style={{ color: 'var(--bs-body-color)', fontWeight: 500 }}>{value}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Distributor info */}
-                  {viewing.new_address_sector_id && (() => {
-                    const dist = getDistributor(viewing.new_address_sector_id)
-                    return (
-                      <div className="col-12">
-                        <div className="p-3 rounded d-flex align-items-center gap-3" style={{ background: 'var(--bs-tertiary-bg)', border: '1px solid var(--bs-border-color)' }}>
-                          <i className="bi bi-truck" style={{ fontSize: 18, color: '#364574' }} />
-                          <div>
-                            <div style={{ fontSize: 11, color: 'var(--bs-secondary-color)', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600 }}>Distributor for {getSector(viewing.new_address_sector_id)}</div>
-                            <div style={{ fontSize: 14, color: 'var(--bs-body-color)', fontWeight: 600 }}>{dist ? dist.full_name : <span style={{ color: 'var(--bs-secondary-color)' }}>None assigned</span>}</div>
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })()}
-
-                  {/* Admin notes */}
                   {viewing.admin_notes && (
                     <div className="col-12">
                       <div style={{ fontSize: 12, color: 'var(--bs-secondary-color)' }}>Admin Notes</div>
                       <div style={{ fontSize: 13, color: 'var(--bs-body-color)' }}>{viewing.admin_notes}</div>
                     </div>
                   )}
-
-                  {/* Timestamps */}
                   <div className="col-12">
                     <div className="d-flex gap-4" style={{ fontSize: 12, color: 'var(--bs-secondary-color)' }}>
                       <div>Requested: <strong>{formatDate(viewing.requested_at)}</strong></div>
@@ -597,15 +523,12 @@ export default function AddressChangeRequestsPage() {
               </div>
               <div className="modal-footer" style={{ borderTop: '1px solid var(--bs-border-color)' }}>
                 {viewing.status === 'pending' ? (
-                  <button
-                    className="btn btn-sm"
-                    style={{ background: '#0ab39c', color: '#fff' }}
-                    onClick={() => { openApprove(viewing); setViewing(null) }}
-                  >
+                  <button className="btn btn-sm" style={{ background: '#0ab39c', color: '#fff' }}
+                    onClick={() => { openApprove(viewing); setViewing(null) }}>
                     <i className="bi bi-check-circle me-1" />Review & Approve
                   </button>
                 ) : (
-                  <button className="btn btn-sm btn-secondary" onClick={() => setViewing(null)}>Close</button>
+                  <button className="btn btn-sm btn-outline-secondary" onClick={() => setViewing(null)}>Close</button>
                 )}
               </div>
             </div>
@@ -613,31 +536,40 @@ export default function AddressChangeRequestsPage() {
         </div>
       )}
 
-      {/* ── Approve Modal ──────────────────────────────────────────────────── */}
+      {/* ── Approve Modal ─────────────────────────────────────────────────────── */}
       {approving && (
-        <div className="modal d-block" style={{ background: 'rgba(0,0,0,0.5)', zIndex: 1055 }}>
-          <div className="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-            <div className="modal-content" style={{ borderRadius: 12, border: 'none' }}>
+        <div className="modal show d-block" style={{ background: 'rgba(0,0,0,0.5)', zIndex: 1055 }} onClick={() => !saving && setApproving(null)}>
+          <div className="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable" onClick={e => e.stopPropagation()}>
+            <div className="modal-content" style={{ background: 'var(--bs-body-bg)', border: '1px solid var(--bs-border-color)', borderRadius: 12 }}>
               <div className="modal-header" style={{ borderBottom: '1px solid var(--bs-border-color)' }}>
                 <div>
-                  <h5 className="modal-title fw-bold mb-0" style={{ color: 'var(--bs-body-color)' }}>
-                    Approve Address Change
-                  </h5>
-                  <small style={{ color: 'var(--bs-secondary-color)' }}>
-                    {approving.mumin?.full_name} · SF# {approving.mumin?.sf_no}
-                  </small>
+                  <h5 className="modal-title fw-bold mb-0" style={{ color: 'var(--bs-body-color)' }}>Approve Address Change</h5>
+                  <small style={{ color: 'var(--bs-secondary-color)' }}>{approving.mumin?.full_name} · SF# {approving.mumin?.sf_no}</small>
                 </div>
                 <button className="btn-close" onClick={() => setApproving(null)} disabled={saving} />
               </div>
 
               <div className="modal-body">
-                {/* Current address strip */}
-                <div className="mb-4 p-3 rounded" style={{ background: 'var(--bs-tertiary-bg)', border: '1px solid var(--bs-border-color)' }}>
-                  <div style={{ fontSize: 11, color: 'var(--bs-secondary-color)', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600, marginBottom: 4 }}>Current Address on Record</div>
+                {/* Error at top */}
+                {saveError && (
+                  <div className="alert alert-danger d-flex align-items-start gap-2 mb-3 py-2" style={{ fontSize: 13, borderRadius: 8 }}>
+                    <i className="bi bi-exclamation-triangle-fill mt-1" style={{ flexShrink: 0 }} />
+                    <span>{saveError}</span>
+                  </div>
+                )}
+
+                {/* Current address */}
+                <div className="mb-3 p-3 rounded" style={{ background: 'var(--bs-tertiary-bg)', border: '1px solid var(--bs-border-color)' }}>
+                  <div style={{ fontSize: 11, color: 'var(--bs-secondary-color)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Current Address on Record</div>
                   <div style={{ fontSize: 13, color: 'var(--bs-body-color)' }}>{approving.old_address || <span style={{ color: 'var(--bs-secondary-color)' }}>Not recorded</span>}</div>
                 </div>
 
-                {/* Editable address form — same layout as HOF form */}
+                {/* Requested address */}
+                <div className="mb-4 p-3 rounded" style={{ background: '#e8f4fd', border: '1px solid #b8d9f4' }}>
+                  <div style={{ fontSize: 11, color: '#1a6898', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Requested Address (From App)</div>
+                  <div style={{ fontSize: 13, color: 'var(--bs-body-color)' }}>{approving.new_address || '—'}</div>
+                </div>
+
                 <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--bs-secondary-color)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>
                   New Address — Review & Confirm
                 </p>
@@ -645,36 +577,48 @@ export default function AddressChangeRequestsPage() {
                 <div className="row g-3">
                   <div className="col-4">
                     <label style={labelStyle}>House Type</label>
-                    <select className="form-select form-select-sm" value={approvalForm.address_type_id} onChange={e => af('address_type_id', e.target.value)}>
+                    <select className="form-select form-select-sm" value={approvalForm.address_type_id}
+                      onChange={e => af('address_type_id', e.target.value)}
+                      style={{ background: 'var(--bs-body-bg)', color: 'var(--bs-body-color)', border: '1px solid var(--bs-border-color)' }}>
                       <option value="">— Select —</option>
                       {houseTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                     </select>
                   </div>
                   <div className="col-4">
                     <label style={labelStyle}>Number</label>
-                    <input className="form-control form-control-sm" placeholder="e.g. 4" value={approvalForm.address_number} onChange={e => af('address_number', e.target.value)} />
+                    <input className="form-control form-control-sm" placeholder="e.g. 4" value={approvalForm.address_number}
+                      onChange={e => af('address_number', e.target.value)}
+                      style={{ background: 'var(--bs-body-bg)', color: 'var(--bs-body-color)', border: '1px solid var(--bs-border-color)' }} />
                   </div>
                   <div className="col-4">
                     <label style={labelStyle}>Category (A–Z)</label>
-                    <input className="form-control form-control-sm" placeholder="e.g. A or 2" value={approvalForm.address_category} onChange={e => af('address_category', e.target.value)} maxLength={5} />
+                    <input className="form-control form-control-sm" placeholder="e.g. A or 2" value={approvalForm.address_category}
+                      onChange={e => af('address_category', e.target.value)} maxLength={5}
+                      style={{ background: 'var(--bs-body-bg)', color: 'var(--bs-body-color)', border: '1px solid var(--bs-border-color)' }} />
                   </div>
                   <div className="col-4">
                     <label style={labelStyle}>Floor</label>
-                    <select className="form-select form-select-sm" value={approvalForm.address_floor} onChange={e => af('address_floor', e.target.value)}>
+                    <select className="form-select form-select-sm" value={approvalForm.address_floor}
+                      onChange={e => af('address_floor', e.target.value)}
+                      style={{ background: 'var(--bs-body-bg)', color: 'var(--bs-body-color)', border: '1px solid var(--bs-border-color)' }}>
                       <option value="">— Select —</option>
                       {FLOOR_OPTIONS.map(fl => <option key={fl.value} value={fl.value}>{fl.label}</option>)}
                     </select>
                   </div>
                   <div className="col-4">
                     <label style={labelStyle}>Block</label>
-                    <select className="form-select form-select-sm" value={approvalForm.address_block_id} onChange={e => af('address_block_id', e.target.value)}>
+                    <select className="form-select form-select-sm" value={approvalForm.address_block_id}
+                      onChange={e => af('address_block_id', e.target.value)}
+                      style={{ background: 'var(--bs-body-bg)', color: 'var(--bs-body-color)', border: '1px solid var(--bs-border-color)' }}>
                       <option value="">— Select —</option>
                       {blocks.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                     </select>
                   </div>
                   <div className="col-4">
                     <label style={labelStyle}>Sector</label>
-                    <select className="form-select form-select-sm" value={approvalForm.address_sector_id} onChange={e => af('address_sector_id', e.target.value)}>
+                    <select className="form-select form-select-sm" value={approvalForm.address_sector_id}
+                      onChange={e => { af('address_sector_id', e.target.value); af('distributor_id', '') }}
+                      style={{ background: 'var(--bs-body-bg)', color: 'var(--bs-body-color)', border: '1px solid var(--bs-border-color)' }}>
                       <option value="">— Select Sector —</option>
                       {sectors.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                     </select>
@@ -693,74 +637,62 @@ export default function AddressChangeRequestsPage() {
                     </div>
                   </div>
 
-                  {/* Sector + Distributor info */}
+                  {/* Distributor */}
                   {approvalForm.address_sector_id && (() => {
-                    const sectorId = Number(approvalForm.address_sector_id)
-                    const dist = getDistributor(sectorId)
+                    const sds = getDistributorsForSector(Number(approvalForm.address_sector_id))
                     return (
                       <div className="col-12">
-                        <div className="p-3 rounded d-flex align-items-center gap-3" style={{ background: 'var(--bs-tertiary-bg)', border: '1px solid var(--bs-border-color)' }}>
-                          <i className="bi bi-truck" style={{ fontSize: 20, color: '#364574', flexShrink: 0 }} />
-                          <div>
-                            <div style={{ fontSize: 11, color: 'var(--bs-secondary-color)', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600 }}>
-                              Distributor for {getSector(sectorId)}
-                            </div>
-                            <div style={{ fontSize: 14, color: 'var(--bs-body-color)', fontWeight: 600 }}>
-                              {dist ? dist.full_name : <span style={{ color: 'var(--bs-secondary-color)' }}>None assigned to this sector</span>}
-                            </div>
+                        <div className="p-3 rounded" style={{ background: 'var(--bs-tertiary-bg)', border: '1px solid var(--bs-border-color)' }}>
+                          <div style={{ fontSize: 11, color: 'var(--bs-secondary-color)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 }}>
+                            <i className="bi bi-truck me-2" style={{ color: '#364574' }} />
+                            Distributor — {getSector(Number(approvalForm.address_sector_id))}
                           </div>
+                          {sds.length === 0 ? (
+                            <div style={{ fontSize: 13, color: 'var(--bs-secondary-color)' }}>
+                              <i className="bi bi-exclamation-circle me-2" />No distributors for this sector
+                            </div>
+                          ) : sds.length === 1 ? (
+                            <div style={{ fontSize: 14, color: 'var(--bs-body-color)', fontWeight: 600 }}>
+                              <i className="bi bi-check-circle me-2" style={{ color: '#0ab39c' }} />
+                              {sds[0].full_name}
+                              <span style={{ fontSize: 11, color: 'var(--bs-secondary-color)', fontWeight: 400, marginLeft: 8 }}>(auto-assigned)</span>
+                            </div>
+                          ) : (
+                            <div>
+                              <label style={{ ...labelStyle, marginBottom: 6 }}>Select Distributor <span className="text-danger">*</span></label>
+                              <select className="form-select form-select-sm" value={approvalForm.distributor_id}
+                                onChange={e => af('distributor_id', e.target.value)}
+                                style={{ maxWidth: 300, background: 'var(--bs-body-bg)', color: 'var(--bs-body-color)', border: '1px solid var(--bs-border-color)' }}>
+                                <option value="">— Select Distributor —</option>
+                                {sds.map(d => <option key={d.id} value={d.id}>{d.full_name}</option>)}
+                              </select>
+                              <div style={{ fontSize: 12, color: 'var(--bs-secondary-color)', marginTop: 4 }}>
+                                {sds.length} distributors available
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     )
                   })()}
 
-                  {/* Sector change warning if different from current */}
-                  {approvalForm.address_sector_id && approving.mumin_id && (() => {
-                    const newSectorId = Number(approvalForm.address_sector_id)
-                    const origSectorId = approving.new_address_sector_id
-                    return newSectorId !== origSectorId ? (
-                      <div className="col-12">
-                        <div className="alert alert-warning py-2 mb-0" style={{ fontSize: 13 }}>
-                          <i className="bi bi-exclamation-triangle me-2" />
-                          You changed the sector from <strong>{getSector(origSectorId)}</strong> to <strong>{getSector(newSectorId)}</strong>. Please reassign the distributor if needed after saving.
-                        </div>
-                      </div>
-                    ) : null
-                  })()}
-
                   {/* Admin notes */}
                   <div className="col-12">
                     <label style={labelStyle}>Admin Notes <span style={{ textTransform: 'none', fontWeight: 400 }}>(optional)</span></label>
-                    <textarea
-                      className="form-control form-control-sm"
-                      rows={2}
-                      placeholder="Notes for this approval..."
+                    <textarea className="form-control form-control-sm" rows={2}
+                      placeholder="Notes for this approval…"
                       value={adminNotes}
                       onChange={e => setAdminNotes(e.target.value)}
-                    />
+                      style={{ background: 'var(--bs-body-bg)', color: 'var(--bs-body-color)', border: '1px solid var(--bs-border-color)' }} />
                   </div>
-
-                  {saveError && (
-                    <div className="col-12">
-                      <div className="alert alert-danger py-2 mb-0" style={{ fontSize: 13 }}>{saveError}</div>
-                    </div>
-                  )}
                 </div>
               </div>
 
               <div className="modal-footer" style={{ borderTop: '1px solid var(--bs-border-color)', gap: 8 }}>
-                <button className="btn btn-sm btn-outline-secondary" onClick={() => setApproving(null)} disabled={saving}>
-                  Cancel
-                </button>
-                <button
-                  className="btn btn-sm"
-                  style={{ background: '#0ab39c', color: '#fff', minWidth: 130 }}
-                  onClick={handleApprove}
-                  disabled={saving || !approvalPreview}
-                >
-                  {saving
-                    ? <span className="spinner-border spinner-border-sm" />
-                    : <><i className="bi bi-check-circle me-1" />Save & Approve</>}
+                <button className="btn btn-sm btn-outline-secondary" onClick={() => setApproving(null)} disabled={saving}>Cancel</button>
+                <button className="btn btn-sm" style={{ background: '#0ab39c', color: '#fff', minWidth: 130 }}
+                  onClick={handleApprove} disabled={saving}>
+                  {saving ? <span className="spinner-border spinner-border-sm" /> : <><i className="bi bi-check-circle me-1" />Save & Approve</>}
                 </button>
               </div>
             </div>
@@ -768,11 +700,11 @@ export default function AddressChangeRequestsPage() {
         </div>
       )}
 
-      {/* ── Reject Modal ───────────────────────────────────────────────────── */}
+      {/* ── Reject Modal ──────────────────────────────────────────────────────── */}
       {rejecting && (
-        <div className="modal d-block" style={{ background: 'rgba(0,0,0,0.5)', zIndex: 1055 }}>
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content" style={{ borderRadius: 12, border: 'none' }}>
+        <div className="modal show d-block" style={{ background: 'rgba(0,0,0,0.5)', zIndex: 1055 }} onClick={() => !saving && setRejecting(null)}>
+          <div className="modal-dialog modal-dialog-centered" onClick={e => e.stopPropagation()}>
+            <div className="modal-content" style={{ background: 'var(--bs-body-bg)', border: '1px solid var(--bs-border-color)', borderRadius: 12 }}>
               <div className="modal-header" style={{ borderBottom: '1px solid var(--bs-border-color)' }}>
                 <h5 className="modal-title fw-bold mb-0" style={{ color: 'var(--bs-body-color)' }}>Reject Request</h5>
                 <button className="btn-close" onClick={() => setRejecting(null)} disabled={saving} />
@@ -782,25 +714,17 @@ export default function AddressChangeRequestsPage() {
                   Reject address change request for <strong>{rejecting.mumin?.full_name}</strong>?
                 </p>
                 <label style={labelStyle}>Reason <span style={{ textTransform: 'none', fontWeight: 400 }}>(optional)</span></label>
-                <textarea
-                  className="form-control form-control-sm"
-                  rows={3}
-                  placeholder="Reason for rejection..."
+                <textarea className="form-control form-control-sm" rows={3}
+                  placeholder="Reason for rejection…"
                   value={rejectNotes}
                   onChange={e => setRejectNotes(e.target.value)}
-                />
-                {saveError && (
-                  <div className="alert alert-danger py-2 mt-2 mb-0" style={{ fontSize: 13 }}>{saveError}</div>
-                )}
+                  style={{ background: 'var(--bs-body-bg)', color: 'var(--bs-body-color)', border: '1px solid var(--bs-border-color)' }} />
+                {saveError && <div className="alert alert-danger py-2 mt-2 mb-0" style={{ fontSize: 13 }}>{saveError}</div>}
               </div>
               <div className="modal-footer" style={{ borderTop: '1px solid var(--bs-border-color)', gap: 8 }}>
                 <button className="btn btn-sm btn-outline-secondary" onClick={() => setRejecting(null)} disabled={saving}>Cancel</button>
-                <button
-                  className="btn btn-sm"
-                  style={{ background: '#dc3545', color: '#fff', minWidth: 100 }}
-                  onClick={handleReject}
-                  disabled={saving}
-                >
+                <button className="btn btn-sm" style={{ background: '#dc3545', color: '#fff', minWidth: 100 }}
+                  onClick={handleReject} disabled={saving}>
                   {saving ? <span className="spinner-border spinner-border-sm" /> : <><i className="bi bi-x-circle me-1" />Reject</>}
                 </button>
               </div>
@@ -808,6 +732,6 @@ export default function AddressChangeRequestsPage() {
           </div>
         </div>
       )}
-    </>
+    </div>
   )
 }

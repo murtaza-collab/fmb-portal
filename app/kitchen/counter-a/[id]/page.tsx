@@ -4,284 +4,198 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { loadKitchenDayData, todayISO, type TodaySchedule, type EligibleRegistration } from '@/lib/kitchen-eligible';
 
-type ThaaliRecord = {
-  registration_id: number;
-  thaali_id: number;
-  thaali_number: string;
-  mumin_id: number;
-  mumin_name: string;
-  sf_no: string;
-  status: 'active' | 'stopped' | 'customized';
-  customization?: string;
-};
+type Override = 'customized' | 'stopped';
+type FilterView = 'all' | 'stopped' | 'counter_b' | 'counter_c';
 
-type SessionData = {
+type Session = {
   id: number;
   distributor_id: number;
   distributor_name: string;
-  total_thaalis: number;
-  stopped_thaalis: number;
-  customized_thaalis: number;
-  default_thaalis: number;
+  total_thaalis: number | null;
+  stopped_thaalis: number | null;
+  customized_thaalis: number | null;
+  default_thaalis: number | null;
   status: string;
+  confirmed_at: string | null;
 };
 
 export default function CounterADetail() {
   const params = useParams();
   const router = useRouter();
-  const distributorId = params.id as string;
+  const distributorId = parseInt(params.id as string, 10);
 
-  const [session, setSession] = useState<SessionData | null>(null);
-  const [thaalis, setThaalis] = useState<ThaaliRecord[]>([]);
+  const [session, setSession] = useState<Session | null>(null);
+  const [schedule, setSchedule] = useState<TodaySchedule | null>(null);
+  const [eligible, setEligible] = useState<EligibleRegistration[]>([]);
+  const [noThaaliDay, setNoThaaliDay] = useState(false);
+
+  // per-mumin overrides: only staff can mark customized/stopped at the counter
+  const [overrides, setOverrides] = useState<Record<number, Override>>({});
+  const [filter, setFilter] = useState<FilterView>('all');
+
+  const [distributorName, setDistributorName] = useState('');
   const [loading, setLoading] = useState(true);
   const [confirming, setConfirming] = useState(false);
-  const [error, setError] = useState('');
   const [confirmed, setConfirmed] = useState(false);
-  const [activeTab, setActiveTab] = useState<'stopped' | 'customized' | 'default' | 'all'>('all');
+  const [error, setError] = useState('');
 
-  useEffect(() => {
-    if (distributorId) loadSessionData();
-  }, [distributorId]);
+  useEffect(() => { if (distributorId) init(); }, [distributorId]);
 
-  const loadSessionData = async () => {
+  const init = async () => {
     setLoading(true);
     setError('');
-    try {
-      const distId = parseInt(distributorId, 10);
-      const today = new Date().toISOString().split('T')[0];
+    const today = todayISO();
 
-      // 1. Fetch session
-      const { data: sessionRow, error: sessionError } = await supabase
-        .from('distribution_sessions')
-        .select('*')
-        .eq('distributor_id', distId)
-        .eq('session_date', today)
-        .single();
+    const [distRes, sessionRes, dayData] = await Promise.all([
+      supabase.from('distributors').select('id, full_name').eq('id', distributorId).single(),
+      supabase.from('distribution_sessions').select('*').eq('distributor_id', distributorId).eq('session_date', today).maybeSingle(),
+      loadKitchenDayData({ distributorId }),
+    ]);
 
-      if (sessionError || !sessionRow) {
-        setError('No session found for today. Go back and check in this distributor first.');
-        setLoading(false);
-        return;
-      }
-
-      // 2. Fetch distributor name
-      const { data: distributor } = await supabase
-        .from('distributors')
-        .select('full_name')
-        .eq('id', distId)
-        .single();
-
-      // 3. Fetch approved registrations
-      const { data: registrations, error: regError } = await supabase
-        .from('thaali_registrations')
-        .select('id, thaali_id, mumin_id')
-        .eq('distributor_id', distId)
-        .eq('status', 'approved');
-
-      if (regError || !registrations || registrations.length === 0) {
-        setSession({ ...sessionRow, distributor_name: distributor?.full_name || 'Unknown' });
-        setThaalis([]);
-        setLoading(false);
-        return;
-      }
-
-      const thaaliIds = registrations.map(r => r.thaali_id);
-      const muminIds = registrations.map(r => r.mumin_id);
-
-      // 4. Fetch thaali numbers
-      const { data: thaaliRows } = await supabase
-        .from('thaalis')
-        .select('id, thaali_number')
-        .in('id', thaaliIds);
-
-      // 5. Fetch mumin details
-      const { data: muminRows } = await supabase
-        .from('mumineen')
-        .select('id, full_name, sf_no')
-        .in('id', muminIds);
-
-      // 6. Fetch stopped thaalis
-      const { data: stoppedRows } = await supabase
-        .from('stop_thaalis')
-        .select('thaali_id')
-        .in('thaali_id', thaaliIds)
-        .lte('stop_date', today)
-        .or(`resume_date.is.null,resume_date.gt.${today}`);
-
-      const stoppedThaaliIds = new Set(stoppedRows?.map(s => s.thaali_id) || []);
-
-      // 7. Fetch customizations
-      const { data: customizations } = await supabase
-        .from('thaali_customizations')
-        .select('mumin_id, roti, tarkari, chawal, soup, mithas, salad, stop_thaali, notes, extra_items')
-        .in('mumin_id', muminIds)
-        .eq('request_date', today)
-        .eq('status', 'active');
-
-      const customizationMap = new Map(
-        customizations?.map(c => [c.mumin_id, c]) || []
-      );
-
-      // 8. Build records
-      const thaaliMap = new Map(thaaliRows?.map(t => [t.id, t]) || []);
-      const muminMap = new Map(muminRows?.map(m => [m.id, m]) || []);
-
-      const records: ThaaliRecord[] = registrations.map(reg => {
-        const thaali = thaaliMap.get(reg.thaali_id);
-        const mumin = muminMap.get(reg.mumin_id);
-        const isStopped = stoppedThaaliIds.has(reg.thaali_id);
-        const customization = customizationMap.get(reg.mumin_id);
-        const isStopThaali = customization?.stop_thaali === true;
-
-        // Build customization summary
-        let customSummary: string | undefined;
-        if (customization && !isStopThaali) {
-          const items = ['roti', 'tarkari', 'chawal', 'soup', 'mithas', 'salad']
-            .filter(key => (customization as any)[key] && (customization as any)[key] !== 'full')
-            .map(key => `${key}: ${(customization as any)[key]}`)
-          const extras = (customization.extra_items || [])
-            .filter((e: any) => e.quantity && e.quantity !== 'full')
-            .map((e: any) => `${e.name}: ${e.quantity}`)
-          const all = [...items, ...extras]
-          if (all.length > 0) customSummary = all.join(', ')
-          if (customization.notes) customSummary = (customSummary ? customSummary + ' | ' : '') + customization.notes
-        }
-
-        return {
-          registration_id: reg.id,
-          thaali_id: reg.thaali_id,
-          thaali_number: thaali?.thaali_number || String(reg.thaali_id),
-          mumin_id: reg.mumin_id,
-          mumin_name: mumin?.full_name || 'Unknown',
-          sf_no: mumin?.sf_no || '',
-          status: (isStopped || isStopThaali) ? 'stopped' : customization ? 'customized' : 'active',
-          customization: customSummary,
-        };
-      });
-
-      // Sort: stopped first, then customized, then default
-      records.sort((a, b) => {
-        const order = { stopped: 0, customized: 1, active: 2 };
-        return order[a.status] - order[b.status];
-      });
-
-      setSession({ ...sessionRow, distributor_name: distributor?.full_name || 'Unknown' });
-      setThaalis(records);
-      setConfirmed(['in_progress', 'completed', 'dispatched'].includes(sessionRow.status));
-
-    } catch (err: any) {
-      setError(err.message || 'Failed to load session');
-    } finally {
+    if (distRes.error || !distRes.data) {
+      setError(`Distributor not found. (id=${distributorId})`);
       setLoading(false);
+      return;
     }
+
+    setDistributorName(distRes.data.full_name);
+    setSchedule(dayData.schedule);
+    setNoThaaliDay(dayData.noThaaliDay);
+    setEligible(dayData.eligible);
+
+    if (sessionRes.data) {
+      setSession({ ...sessionRes.data, distributor_name: distRes.data.full_name });
+      if (sessionRes.data.confirmed_at) setConfirmed(true);
+    } else {
+      setSession(null);
+    }
+
+    setLoading(false);
+  };
+
+  // ── Derived lists — all computed from schedule-filtered eligible list ──────
+  const stoppedList    = eligible.filter(r => overrides[r.mumin_id] === 'stopped');
+  const customizedList = eligible.filter(r => overrides[r.mumin_id] === 'customized');
+  const defaultList    = eligible.filter(r => !overrides[r.mumin_id]);
+
+  const extraCount   = schedule?.extra_thaali_count || 0;
+  const totalCount   = eligible.length + extraCount;
+  const stoppedCount = stoppedList.length;
+  const counterBCount = customizedList.length;
+  const counterCCount = defaultList.length;
+  const toDispatch   = counterBCount + counterCCount;
+
+  const displayList =
+    filter === 'stopped'   ? stoppedList :
+    filter === 'counter_b' ? customizedList :
+    filter === 'counter_c' ? defaultList :
+    eligible;
+
+  const toggleOverride = (muminId: number, type: Override) => {
+    if (confirmed) return;
+    setOverrides(prev => {
+      if (prev[muminId] === type) { const n = { ...prev }; delete n[muminId]; return n; }
+      return { ...prev, [muminId]: type };
+    });
   };
 
   const handleConfirmAndSend = async () => {
-    if (!session) return;
+    if (confirmed || eligible.length === 0) return;
     setConfirming(true);
     setError('');
+    const today = todayISO();
+
     try {
-      const today = new Date().toISOString().split('T')[0];
+      // 1. Create session if not exists
+      let sessionId = session?.id;
+      if (!sessionId) {
+        const { data: newSession, error: sessionError } = await supabase
+          .from('distribution_sessions')
+          .insert({ distributor_id: distributorId, session_date: today, status: 'active' })
+          .select('id').single();
+        if (sessionError) throw sessionError;
+        sessionId = newSession.id;
+      }
 
-      const stoppedCount    = thaalis.filter(t => t.status === 'stopped').length;
-      const customizedCount = thaalis.filter(t => t.status === 'customized').length;
-      const defaultCount    = thaalis.filter(t => t.status === 'active').length;
-      const dispatchCount   = thaalis.length - stoppedCount;
-
-      // 1. Update session: counts + status
+      // 2. Write counts
       const { error: updateError } = await supabase
         .from('distribution_sessions')
         .update({
-          status:              'in_progress',
-          stopped_thaalis:     stoppedCount,
-          customized_thaalis:  customizedCount,
-          default_thaalis:     defaultCount,
-          total_thaalis:       dispatchCount,  // excludes stopped
+          total_thaalis: totalCount,
+          stopped_thaalis: stoppedCount,
+          customized_thaalis: counterBCount,
+          default_thaalis: counterCCount,
+          confirmed_at: new Date().toISOString(),
+          status: 'in_progress',
         })
-        .eq('id', session.id);
-
+        .eq('id', sessionId);
       if (updateError) throw updateError;
 
-      // 2. Seed thaali_daily_status rows for every thaali in this session
-      //    Stopped → 'stopped'   Customized → 'counter_b_pending'   Default → 'counter_c_pending'
-      if (thaalis.length > 0) {
-        const statusRows = thaalis.map(t => ({
-          session_id:    session.id,
-          thaali_id:     t.thaali_id,
-          thaali_number: t.thaali_number,
-          mumin_id:      t.mumin_id,
-          date:          today,
-          status:        t.status === 'stopped'
-                           ? 'stopped'
-                           : t.status === 'customized'
-                             ? 'counter_b_pending'
-                             : 'counter_c_pending',
-        }));
+      // 3. Seed thaali_daily_status — one row per eligible thaali
+      //    status driven by override OR default → counter_c_pending
+      const seedRows = eligible.map(r => ({
+        session_id: sessionId,
+        thaali_id: r.thaali_id,
+        thaali_number: r.thaali_number,
+        mumin_id: r.mumin_id,
+        date: today,
+        status:
+          overrides[r.mumin_id] === 'stopped'    ? 'stopped' :
+          overrides[r.mumin_id] === 'customized' ? 'counter_b_pending' :
+          'counter_c_pending',
+      }));
 
-        const { error: seedError } = await supabase
-          .from('thaali_daily_status')
-          .upsert(statusRows, { onConflict: 'session_id,thaali_id' });
-
-        if (seedError) throw seedError;
-      }
+      const { error: seedError } = await supabase
+        .from('thaali_daily_status')
+        .upsert(seedRows, { onConflict: 'session_id,thaali_id' });
+      if (seedError) throw seedError;
 
       setConfirmed(true);
-      setSession(prev => prev ? { ...prev, status: 'in_progress' } : prev);
-
-      // Return to kitchen main after short delay
-      setTimeout(() => router.push('/kitchen'), 1800);
-
     } catch (err: any) {
-      setError(err.message || 'Failed to confirm');
+      setError(err.message || 'Confirm failed');
     } finally {
       setConfirming(false);
     }
   };
 
-  const stopped = thaalis.filter(t => t.status === 'stopped');
-  const customized = thaalis.filter(t => t.status === 'customized');
-  const defaultThaalis = thaalis.filter(t => t.status === 'active');
+  // ── Stat cards ─────────────────────────────────────────────────────────────
+  const CARDS = [
+    { key: 'all',       label: 'Total Thaalis', value: totalCount,    color: '#364574', filterable: false, icon: 'bi-box-seam'      },
+    { key: 'stopped',   label: 'Stopped',       value: stoppedCount,  color: '#f06548', filterable: true,  icon: 'bi-x-circle'      },
+    { key: 'counter_b', label: 'Counter B',     value: counterBCount, color: '#405189', filterable: true,  icon: 'bi-stars',      hint: 'Customized' },
+    { key: 'counter_c', label: 'Counter C',     value: counterCCount, color: '#0ab39c', filterable: true,  icon: 'bi-check2-square', hint: 'Default' },
+    { key: 'dispatch',  label: 'To Dispatch',   value: toDispatch,    color: '#ffbf69', filterable: false, icon: 'bi-truck'         },
+  ] as const;
 
-  const tabThaalis =
-    activeTab === 'stopped' ? stopped :
-    activeTab === 'customized' ? customized :
-    activeTab === 'default' ? defaultThaalis :
-    thaalis;
+  if (loading) return (
+    <div className="min-vh-100 d-flex align-items-center justify-content-center">
+      <div className="spinner-border text-primary" style={{ width: '3rem', height: '3rem' }} />
+    </div>
+  );
 
-  if (loading) {
-    return (
-      <div className="min-vh-100 d-flex align-items-center justify-content-center">
-        <div className="text-center">
-          <div className="spinner-border text-primary" style={{ width: '3rem', height: '3rem' }}></div>
-          <div className="mt-3 fs-5 text-muted">Loading...</div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error && !session) {
-    return (
-      <div className="min-vh-100 p-4">
-        <Link href="/kitchen" className="btn btn-outline-secondary mb-4">
-          <i className="bi bi-arrow-left me-2"></i>Back
-        </Link>
-        <div className="alert alert-danger fs-5">{error}</div>
-      </div>
-    );
-  }
+  if (error && !session && !eligible.length) return (
+    <div className="min-vh-100 p-4">
+      <Link href="/kitchen" className="btn btn-outline-secondary mb-4">
+        <i className="bi bi-arrow-left me-2" />Back
+      </Link>
+      <div className="alert alert-danger">{error}</div>
+    </div>
+  );
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--bs-tertiary-bg)" }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bs-tertiary-bg)' }}>
+
       {/* Header */}
-      <div style={{ background: "var(--bs-body-bg)", borderBottom: "1px solid var(--bs-border-color)", padding: "12px 24px" }}>
+      <div style={{ background: 'var(--bs-body-bg)', borderBottom: '1px solid var(--bs-border-color)', padding: '12px 24px' }}>
         <div className="d-flex justify-content-between align-items-center">
           <Link href="/kitchen" className="btn btn-outline-secondary">
-            <i className="bi bi-arrow-left me-2"></i>Back
+            <i className="bi bi-arrow-left me-2" />Back
           </Link>
-          <h1 className="h4 mb-0 fw-bold text-center" style={{ color: 'var(--bs-body-color)' }}>
+          <h1 className="h4 mb-0 fw-bold text-center">
             <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--bs-secondary-color)', textTransform: 'uppercase', letterSpacing: 1 }}>Store Counter</div>
-            <div style={{ color: '#364574' }}>{session?.distributor_name || '—'}</div>
+            <div style={{ color: '#364574' }}>{distributorName || '—'}</div>
           </h1>
           <span className={`badge fs-6 ${confirmed ? 'bg-success' : 'bg-warning text-dark'}`}>
             {confirmed ? '✓ Sent to Counters' : 'Awaiting Confirmation'}
@@ -292,225 +206,203 @@ export default function CounterADetail() {
       <div className="container-fluid p-4">
         {error && <div className="alert alert-warning mb-3">{error}</div>}
 
-        {/* Stat Cards */}
-        <div className="row g-3 mb-4">
-          {[
-            { label: 'Total Thaalis', value: thaalis.length,               tab: 'all',        color: 'primary', icon: 'bi-box-seam'      },
-            { label: 'Stopped',       value: stopped.length,                tab: 'stopped',    color: 'danger',  icon: 'bi-x-circle'      },
-            { label: 'Counter B',     value: customized.length,             tab: 'customized', color: 'info',    icon: 'bi-stars'         },
-            { label: 'Counter C',     value: defaultThaalis.length,         tab: 'default',    color: 'success', icon: 'bi-check2-square' },
-            { label: 'To Dispatch',   value: thaalis.length - stopped.length, tab: 'all',      color: 'warning', icon: 'bi-truck'         },
-          ].map(stat => {
-            const isActive = activeTab === stat.tab && stat.tab !== 'all';
-            const isFilterable = stat.tab !== 'all';
-            return (
-              <div className="col-6 col-md-4 col-lg" key={stat.label}>
-                <div
-                  role={isFilterable ? 'button' : undefined}
-                  tabIndex={isFilterable ? 0 : undefined}
-                  onClick={() => isFilterable && setActiveTab(stat.tab as any)}
-                  onKeyDown={e => isFilterable && e.key === 'Enter' && setActiveTab(stat.tab as any)}
-                  style={{
-                    cursor: isFilterable ? 'pointer' : 'default',
-                    userSelect: 'none',
-                    WebkitTapHighlightColor: 'rgba(0,0,0,0.08)',
-                    borderRadius: 16,
-                    padding: '20px 12px 16px',
-                    textAlign: 'center',
-                    border: `2.5px solid ${isActive ? `var(--bs-${stat.color})` : 'var(--bs-border-color)'}`,
-                    background: isActive
-                      ? `rgba(var(--bs-${stat.color}-rgb), 0.12)`
-                      : 'var(--bs-body-bg)',
-                    boxShadow: isActive
-                      ? `0 6px 18px rgba(var(--bs-${stat.color}-rgb), 0.3)`
-                      : '0 2px 8px rgba(0,0,0,0.07)',
-                    transition: 'all 0.15s ease',
-                    transform: isActive ? 'translateY(-2px) scale(1.03)' : 'scale(1)',
-                    minHeight: 110,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 2,
-                    outline: 'none',
-                  }}
-                >
-                  <i
-                    className={`bi ${stat.icon}`}
-                    style={{
-                      fontSize: 22,
-                      color: `var(--bs-${stat.color})`,
-                      opacity: isActive ? 1 : 0.7,
-                      marginBottom: 4,
-                    }}
-                  ></i>
+        {/* No thaali day */}
+        {noThaaliDay && (
+          <div className="alert alert-danger d-flex align-items-center gap-2">
+            <i className="bi bi-calendar-x fs-4" />
+            <div>
+              <strong>No Thaali Today</strong>
+              {schedule?.event_name && <span className="ms-2">— {schedule.event_name}</span>}
+              <div className="small">This date is marked as a no-thaali day in the calendar.</div>
+            </div>
+          </div>
+        )}
+
+        {/* Schedule banner */}
+        {!noThaaliDay && schedule && (
+          <div className="alert alert-info py-2 mb-3 d-flex flex-wrap gap-3 align-items-center" style={{ fontSize: 13 }}>
+            <span><i className="bi bi-calendar-check me-1 text-success" />Thaali day</span>
+            <span>Eligible niyyat status IDs: <strong>{schedule.niyyat_status_ids.join(', ')}</strong></span>
+            {extraCount > 0 && <span>Extra thaalis: <strong className="text-success">+{extraCount}</strong></span>}
+            {(schedule.thaali_category_ids?.length || 0) > 0 && <span>Category filter: <strong>active</strong></span>}
+          </div>
+        )}
+
+        {/* Stat cards */}
+        {!noThaaliDay && (
+          <div className="row g-3 mb-4">
+            {CARDS.map(card => {
+              const isActive = filter === card.key;
+              return (
+                <div className="col-6 col-md-4 col-lg" key={card.key}>
                   <div
+                    role={card.filterable ? 'button' : undefined}
+                    tabIndex={card.filterable ? 0 : undefined}
+                    onClick={() => card.filterable && !confirmed && setFilter(f => f === card.key ? 'all' : card.key as FilterView)}
+                    onKeyDown={e => card.filterable && e.key === 'Enter' && !confirmed && setFilter(f => f === card.key ? 'all' : card.key as FilterView)}
                     style={{
-                      fontSize: 38,
-                      fontWeight: 800,
-                      lineHeight: 1,
-                      color: `var(--bs-${stat.color})`,
+                      background: 'var(--bs-body-bg)',
+                      border: isActive ? `2.5px solid ${card.color}` : '1px solid var(--bs-border-color)',
+                      borderRadius: 16, padding: '20px 12px 16px', textAlign: 'center',
+                      cursor: card.filterable && !confirmed ? 'pointer' : 'default',
+                      transform: isActive ? 'translateY(-2px) scale(1.03)' : 'scale(1)',
+                      boxShadow: isActive ? `0 6px 18px ${card.color}44` : '0 2px 8px rgba(0,0,0,0.07)',
+                      transition: 'all 0.15s ease', minHeight: 110,
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
                     }}
                   >
-                    {stat.value}
-                  </div>
-                  <div style={{
-                    fontSize: 12,
-                    color: isActive ? `var(--bs-${stat.color})` : 'var(--bs-secondary-color)',
-                    fontWeight: isActive ? 600 : 500,
-                    marginTop: 4,
-                  }}>
-                    {stat.label}
-                  </div>
-                  {isFilterable && (
-                    <div style={{
-                      fontSize: 10,
-                      marginTop: 3,
-                      padding: '2px 8px',
-                      borderRadius: 10,
-                      background: isActive
-                        ? `rgba(var(--bs-${stat.color}-rgb), 0.18)`
-                        : 'var(--bs-tertiary-bg)',
-                      color: isActive ? `var(--bs-${stat.color})` : 'var(--bs-secondary-color)',
-                      fontWeight: 500,
-                    }}>
-                      {isActive ? '▲ filtering' : '⊙ tap to filter'}
+                    <i className={`bi ${card.icon}`} style={{ fontSize: 22, color: card.color, opacity: isActive ? 1 : 0.7, marginBottom: 4 }} />
+                    <div style={{ fontSize: 38, fontWeight: 800, lineHeight: 1, color: card.color }}>{card.value}</div>
+                    <div style={{ fontSize: 12, color: isActive ? card.color : 'var(--bs-secondary-color)', fontWeight: isActive ? 600 : 500, marginTop: 4 }}>
+                      {card.label}
                     </div>
-                  )}
+                    {'hint' in card && card.hint && (
+                      <div style={{ fontSize: 10, marginTop: 3, padding: '2px 8px', borderRadius: 10,
+                        background: isActive ? `${card.color}22` : 'var(--bs-tertiary-bg)',
+                        color: isActive ? card.color : 'var(--bs-secondary-color)', fontWeight: 500 }}>
+                        {isActive ? '▲ filtering' : `⊙ ${card.hint}`}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
 
-        {/* Stopped Alert — always visible if any stopped */}
-        {stopped.length > 0 && (
+        {/* Stopped alert */}
+        {stoppedList.length > 0 && (
           <div className="alert alert-danger mb-4">
             <h6 className="fw-bold mb-2">
-              <i className="bi bi-exclamation-triangle me-2"></i>
-              {stopped.length} Thaali{stopped.length > 1 ? 's' : ''} STOPPED — Put back to store:
+              <i className="bi bi-exclamation-triangle me-2" />
+              {stoppedList.length} Thaali{stoppedList.length > 1 ? 's' : ''} marked STOPPED — Put back to store:
             </h6>
             <div className="d-flex flex-wrap gap-2">
-              {stopped.map(t => (
-                <span key={t.thaali_id} className="badge bg-danger fs-6 px-3 py-2">
-                  #{t.thaali_number} — {t.mumin_name}
-                </span>
+              {stoppedList.map(r => (
+                <span key={r.mumin_id} className="badge bg-danger fs-6 px-3 py-2">#{r.thaali_number} — {r.full_name}</span>
               ))}
             </div>
           </div>
         )}
 
         {/* Confirm & Send */}
-        {!confirmed ? (
+        {!noThaaliDay && !confirmed && eligible.length > 0 && (
           <div className="card border-0 shadow-sm mb-4">
             <div className="card-body p-4">
               <div className="row align-items-center">
                 <div className="col-md-8">
                   <h5 className="mb-1 fw-bold">Ready to start filling?</h5>
                   <p className="text-muted mb-0">
-                    <span className="text-danger fw-bold">{stopped.length} stopped</span> → back to store &nbsp;|&nbsp;
-                    <span className="text-info fw-bold">{customized.length} customized</span> → Counter B &nbsp;|&nbsp;
-                    <span className="text-secondary fw-bold">{defaultThaalis.length} default</span> → Counter C
+                    <span className="text-danger fw-bold">{stoppedCount} stopped</span> → back to store &nbsp;|&nbsp;
+                    <span className="fw-bold" style={{ color: '#405189' }}>{counterBCount} customized</span> → Counter B &nbsp;|&nbsp;
+                    <span className="text-success fw-bold">{counterCCount} default</span> → Counter C
+                    {extraCount > 0 && <> &nbsp;|&nbsp; <span className="text-success">+{extraCount} extra</span></>}
                   </p>
                 </div>
                 <div className="col-md-4 mt-3 mt-md-0">
-                  <button
-                    className="btn btn-success btn-lg w-100"
-                    onClick={handleConfirmAndSend}
-                    disabled={confirming || thaalis.length === 0}
-                  >
-                    {confirming ? (
-                      <><span className="spinner-border spinner-border-sm me-2"></span>Confirming...</>
-                    ) : (
-                      <><i className="bi bi-check-circle me-2"></i>Confirm &amp; Send</>
-                    )}
+                  <button className="btn btn-success btn-lg w-100 fw-bold"
+                    onClick={handleConfirmAndSend} disabled={confirming || eligible.length === 0}>
+                    {confirming
+                      ? <><span className="spinner-border spinner-border-sm me-2" />Confirming...</>
+                      : <><i className="bi bi-check-circle me-2" />Confirm &amp; Send</>}
                   </button>
                 </div>
               </div>
             </div>
           </div>
-        ) : (
+        )}
+
+        {confirmed && (
           <div className="alert alert-success mb-4">
-            <i className="bi bi-check-circle me-2"></i>
+            <i className="bi bi-check-circle me-2" />
             <strong>Sent!</strong>{' '}
-            {customized.length > 0 && <><span className="fw-bold text-info">{customized.length} customized</span> → Counter B &nbsp;|&nbsp;</>}
-            <span className="fw-bold text-success">{defaultThaalis.length} default</span> → Counter C
-            {stopped.length > 0 && <> &nbsp;|&nbsp; <span className="fw-bold text-danger">{stopped.length} stopped</span> → back to store</>}
-            <span className="text-muted ms-2">— Returning...</span>
+            {counterBCount > 0 && <><span className="fw-bold">{counterBCount} customized</span> → Counter B &nbsp;|&nbsp;</>}
+            <span className="fw-bold text-success">{counterCCount} default</span> → Counter C
+            {stoppedCount > 0 && <> &nbsp;|&nbsp; <span className="text-danger fw-bold">{stoppedCount} stopped</span> → back to store</>}
           </div>
         )}
 
-        {/* Tabs */}
-        <div className="card border-0 shadow-sm">
-          <div className="card-header pt-3 pb-0" style={{ background: "var(--bs-body-bg)" }}>
-            <ul className="nav nav-tabs card-header-tabs">
-              {[
-                { key: 'all', label: `All (${thaalis.length})` },
-                { key: 'stopped', label: `Stopped (${stopped.length})`, danger: true },
-                { key: 'customized', label: `Customized (${customized.length})` },
-                { key: 'default', label: `Default (${defaultThaalis.length})` },
-              ].map(tab => (
-                <li className="nav-item" key={tab.key}>
-                  <button
-                    className={`nav-link ${activeTab === tab.key ? 'active fw-bold' : ''} ${tab.danger && stopped.length > 0 ? 'text-danger' : ''}`}
-                    onClick={() => setActiveTab(tab.key as any)}
-                  >
-                    {tab.label}
-                  </button>
-                </li>
-              ))}
-            </ul>
+        {/* Empty state */}
+        {!noThaaliDay && eligible.length === 0 && (
+          <div className="text-center py-5" style={{ color: 'var(--bs-secondary-color)' }}>
+            <i className="bi bi-inbox fs-2 d-block mb-2" />
+            <div className="fw-semibold">No eligible thaalis for this distributor today</div>
+            <div className="small mt-1">Check niyyat approvals or thaali assignments for this distributor.</div>
           </div>
-          <div className="card-body p-0">
-            {tabThaalis.length === 0 ? (
-              <div className="text-center py-4 text-muted">
-                <i className="bi bi-inbox fs-3"></i>
-                <div className="mt-2">No thaalis in this category</div>
-              </div>
-            ) : (
-              <div className="table-responsive">
-                <table className="table table-hover mb-0">
-                  <thead className="table-light">
-                    <tr>
-                      <th>Thaali #</th>
-                      <th>Mumin Name</th>
-                      <th>SF#</th>
-                      <th>Status</th>
-                      <th>Customization</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tabThaalis.map(t => (
-                      <tr key={t.registration_id} className={
-                        t.status === 'stopped' ? 'table-danger' :
-                        t.status === 'customized' ? 'table-info' : ''
-                      }>
-                        <td className="fw-bold fs-5">{t.thaali_number}</td>
-                        <td>{t.mumin_name}</td>
-                        <td className="text-muted">{t.sf_no}</td>
-                        <td>
-                          <span className={`badge ${
-                            t.status === 'stopped' ? 'bg-danger' :
-                            t.status === 'customized' ? 'bg-info text-dark' :
-                            'bg-success'
-                          }`}>
-                            {t.status === 'stopped' ? '✕ Stopped — Back to Store' :
-                             t.status === 'customized' ? '→ Counter B' :
-                             '→ Counter C'}
-                          </span>
-                        </td>
-                        <td className="text-muted" style={{ fontSize: '0.85rem' }}>
-                          {t.customization || '—'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
+        )}
 
+        {/* Tabs + thaali list */}
+        {!noThaaliDay && eligible.length > 0 && (
+          <div className="card border-0 shadow-sm">
+            <div className="card-header pt-3 pb-0" style={{ background: 'var(--bs-body-bg)' }}>
+              <ul className="nav nav-tabs card-header-tabs">
+                {[
+                  { key: 'all',       label: `All (${eligible.length})` },
+                  { key: 'stopped',   label: `Stopped (${stoppedCount})`,    danger: stoppedCount > 0 },
+                  { key: 'counter_b', label: `Counter B (${counterBCount})` },
+                  { key: 'counter_c', label: `Counter C (${counterCCount})` },
+                ].map(tab => (
+                  <li className="nav-item" key={tab.key}>
+                    <button
+                      className={`nav-link ${filter === tab.key ? 'active fw-bold' : ''} ${tab.danger ? 'text-danger' : ''}`}
+                      onClick={() => setFilter(tab.key as FilterView)}
+                    >{tab.label}</button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="card-body p-0">
+              {displayList.length === 0 ? (
+                <div className="text-center py-4 text-muted">
+                  <i className="bi bi-inbox fs-3" /><div className="mt-2">None in this category</div>
+                </div>
+              ) : (
+                <div className="table-responsive">
+                  <table className="table table-hover mb-0">
+                    <thead className="table-light">
+                      <tr>
+                        <th>Thaali #</th><th>Mumin Name</th><th>SF#</th><th>Route</th>
+                        {!confirmed && <th>Override</th>}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {displayList.map(r => {
+                        const ov = overrides[r.mumin_id];
+                        return (
+                          <tr key={r.mumin_id}
+                            className={ov === 'stopped' ? 'table-danger' : ov === 'customized' ? 'table-info' : ''}>
+                            <td className="fw-bold fs-5">#{r.thaali_number}</td>
+                            <td>{r.full_name}</td>
+                            <td className="text-muted">{r.sf_no}</td>
+                            <td>
+                              {ov === 'stopped'    && <span className="badge bg-danger">✕ Stopped — Back to Store</span>}
+                              {ov === 'customized' && <span className="badge bg-info text-dark">→ Counter B</span>}
+                              {!ov               && <span className="badge bg-success">→ Counter C</span>}
+                            </td>
+                            {!confirmed && (
+                              <td>
+                                <button
+                                  className={`btn btn-sm me-1 ${ov === 'customized' ? 'btn-info' : 'btn-outline-info'}`}
+                                  style={{ fontSize: 11 }}
+                                  onClick={() => toggleOverride(r.mumin_id, 'customized')}
+                                >Custom</button>
+                                <button
+                                  className={`btn btn-sm ${ov === 'stopped' ? 'btn-danger' : 'btn-outline-danger'}`}
+                                  style={{ fontSize: 11 }}
+                                  onClick={() => toggleOverride(r.mumin_id, 'stopped')}
+                                >Stop</button>
+                              </td>
+                            )}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

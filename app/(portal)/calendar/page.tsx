@@ -7,7 +7,6 @@ import {
   daysInHijriMonth, todayHijri, hijriMonthStart
 } from '@/lib/hijri'
 
-// ── Static data ──
 const NIYYAT_STATUSES = [
   { id: 1, name: 'Approved' }, { id: 2, name: 'Niyyat Pending' },
   { id: 3, name: 'No-Show' }, { id: 4, name: 'Stopped' },
@@ -21,10 +20,6 @@ const THAALI_CATEGORIES = [
   { id: 1, name: 'Mini' }, { id: 2, name: 'Small' },
   { id: 3, name: 'Medium' }, { id: 4, name: 'Large' },
 ]
-
-interface CalendarEvent {
-  id: number; event_date: string; menu: string; notes?: string
-}
 
 interface DailyMenu {
   id: number; menu_date: string
@@ -41,13 +36,21 @@ interface ThaaliSchedule {
 interface ThaaliCount { approved: number; byCategory: Record<number, number>; total: number }
 
 type ViewMode = 'gregorian' | 'hijri'
-type ModalTab = 'menu' | 'event' | 'thaali'
+type ModalTab = 'thaali' | 'menu'
 
 const GREG_MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 
+function localDateStr(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 export default function CalendarPage() {
   const today = new Date()
+  const todayStr = localDateStr(today)
   const todayH = todayHijri()
 
   const [viewMode, setViewMode] = useState<ViewMode>('gregorian')
@@ -56,7 +59,6 @@ export default function CalendarPage() {
   const [hYear, setHYear] = useState(todayH.year)
   const [hMonth, setHMonth] = useState(todayH.month)
 
-  const [events, setEvents] = useState<CalendarEvent[]>([])
   const [menus, setMenus] = useState<DailyMenu[]>([])
   const [schedules, setSchedules] = useState<ThaaliSchedule[]>([])
   const [thaaliCounts, setThaaliCounts] = useState<Record<string, ThaaliCount>>({})
@@ -70,18 +72,14 @@ export default function CalendarPage() {
   const [error, setError] = useState('')
 
   // Menu form
-  const [menuForm, setMenuForm] = useState({ mithas: '', tarkari: '', soup: '', chawal: '', roti: '', salad: '', notes: '' })
+  const [menuForm, setMenuForm] = useState({ mithas: '', tarkari: '', soup: '', chawal: '', roti: '', salad: '', extra: '', notes: '' })
   const [editMenu, setEditMenu] = useState<DailyMenu | null>(null)
-
-  // Event form
-  const [eventForm, setEventForm] = useState({ menu: '', notes: '' })
-  const [editEvent, setEditEvent] = useState<CalendarEvent | null>(null)
 
   // Thaali schedule form
   const [scheduleForm, setScheduleForm] = useState({
     event_name: '',
     thaali_enabled: true,
-    niyyat_status_ids: [1], // Approved by default
+    niyyat_status_ids: [1],
     extra_thaali_count: 0,
     thaali_category_ids: [] as number[],
     notes: '',
@@ -102,24 +100,19 @@ export default function CalendarPage() {
       const firstDay = hijriMonthStart(hYear, hMonth)
       const days = daysInHijriMonth(hMonth, hYear)
       const lastDay = new Date(firstDay); lastDay.setDate(lastDay.getDate() + days - 1)
-      startDate = firstDay.toISOString().split('T')[0]
-      endDate = lastDay.toISOString().split('T')[0]
+      startDate = localDateStr(firstDay)
+      endDate = localDateStr(lastDay)
     }
 
-    const [{ data: evData }, { data: mnData }, { data: schData }] = await Promise.all([
-      supabase.from('calendar_events').select('*').gte('event_date', startDate).lte('event_date', endDate),
+    const [{ data: mnData }, { data: schData }] = await Promise.all([
       supabase.from('daily_menu').select('*').gte('menu_date', startDate).lte('menu_date', endDate),
       supabase.from('thaali_schedule').select('*').gte('event_date', startDate).lte('event_date', endDate),
     ])
 
-    setEvents(evData || [])
     setMenus(mnData || [])
     setSchedules(schData || [])
 
-    // Fetch thaali counts for scheduled days
-    if (schData && schData.length > 0) {
-      await fetchThaaliCounts(schData)
-    }
+    if (schData && schData.length > 0) await fetchThaaliCounts(schData)
     setLoading(false)
   }
 
@@ -133,38 +126,34 @@ export default function CalendarPage() {
         .select('id, thaali_category_id', { count: 'exact' })
         .eq('status', 'active')
 
-      // Filter by niyyat statuses via mumineen join
       if (sch.niyyat_status_ids?.length) {
         const { data: muminIds } = await supabase
-          .from('mumineen')
-          .select('id')
+          .from('mumineen').select('id')
           .in('niyyat_status_id', sch.niyyat_status_ids)
-          .eq('is_hof', true)
-          .eq('status', 'active')
+          .eq('is_hof', true).eq('status', 'active')
         const ids = (muminIds || []).map(m => m.id)
         if (ids.length === 0) { counts[sch.event_date] = { approved: 0, byCategory: {}, total: 0 }; continue }
         query = query.in('mumin_id', ids)
       }
 
-      // Filter by category if specified
-      if (sch.thaali_category_ids?.length) {
-        query = query.in('thaali_category_id', sch.thaali_category_ids)
-      }
+      if (sch.thaali_category_ids?.length) query = query.in('thaali_category_id', sch.thaali_category_ids)
 
       const { data: regs, count } = await query
       const byCategory: Record<number, number> = {}
-      if (regs) {
-        for (const r of regs) {
-          byCategory[r.thaali_category_id] = (byCategory[r.thaali_category_id] || 0) + 1
-        }
-      }
-      counts[sch.event_date] = {
-        approved: count ?? 0,
-        byCategory,
-        total: (count ?? 0) + (sch.extra_thaali_count || 0),
-      }
+      if (regs) { for (const r of regs) byCategory[r.thaali_category_id] = (byCategory[r.thaali_category_id] || 0) + 1 }
+      counts[sch.event_date] = { approved: count ?? 0, byCategory, total: (count ?? 0) + (sch.extra_thaali_count || 0) }
     }
     setThaaliCounts(counts)
+  }
+
+  // Get the next thaali day number (count of all thaali-enabled days before this date + 1)
+  const getNextThaaliDayNumber = async (dateStr: string): Promise<number> => {
+    const { count } = await supabase
+      .from('thaali_schedule')
+      .select('*', { count: 'exact', head: true })
+      .eq('thaali_enabled', true)
+      .lt('event_date', dateStr)
+    return (count ?? 0) + 1
   }
 
   const showMsg = (msg: string, isErr = false) => {
@@ -172,36 +161,57 @@ export default function CalendarPage() {
     else { setSuccess(msg); setTimeout(() => setSuccess(''), 2000) }
   }
 
-  const openDay = (dateStr: string) => {
+  const openDay = async (dateStr: string) => {
     setSelectedDate(dateStr)
 
     const existingMenu = menus.find(m => m.menu_date === dateStr)
     setEditMenu(existingMenu || null)
     setMenuForm(existingMenu
-      ? { mithas: existingMenu.mithas||'', tarkari: existingMenu.tarkari||'', soup: existingMenu.soup||'', chawal: existingMenu.chawal||'', roti: existingMenu.roti||'', salad: existingMenu.salad||'', notes: existingMenu.notes||'' }
-      : { mithas: '', tarkari: '', soup: '', chawal: '', roti: '', salad: '', notes: '' }
+      ? { mithas: existingMenu.mithas||'', tarkari: existingMenu.tarkari||'', soup: existingMenu.soup||'', chawal: existingMenu.chawal||'', roti: existingMenu.roti||'', salad: existingMenu.salad||'', extra: (existingMenu as any).extra||'', notes: existingMenu.notes||'' }
+      : { mithas: '', tarkari: '', soup: '', chawal: '', roti: '', salad: '', extra: '', notes: '' }
     )
-
-    const existingEvent = events.find(e => e.event_date === dateStr)
-    setEditEvent(existingEvent || null)
-    setEventForm(existingEvent ? { menu: existingEvent.menu, notes: existingEvent.notes||'' } : { menu: '', notes: '' })
 
     const existingSchedule = schedules.find(s => s.event_date === dateStr)
     setEditSchedule(existingSchedule || null)
-    setScheduleForm(existingSchedule
-      ? {
-          event_name: existingSchedule.event_name || '',
-          thaali_enabled: existingSchedule.thaali_enabled,
-          niyyat_status_ids: existingSchedule.niyyat_status_ids || [1],
-          extra_thaali_count: existingSchedule.extra_thaali_count || 0,
-          thaali_category_ids: existingSchedule.thaali_category_ids || [],
-          notes: existingSchedule.notes || '',
-        }
-      : { event_name: '', thaali_enabled: true, niyyat_status_ids: [1], extra_thaali_count: 0, thaali_category_ids: [], notes: '' }
-    )
+
+    if (existingSchedule) {
+      setScheduleForm({
+        event_name: existingSchedule.event_name || '',
+        thaali_enabled: existingSchedule.thaali_enabled,
+        niyyat_status_ids: existingSchedule.niyyat_status_ids || [1],
+        extra_thaali_count: existingSchedule.extra_thaali_count || 0,
+        thaali_category_ids: existingSchedule.thaali_category_ids || [],
+        notes: existingSchedule.notes || '',
+      })
+    } else {
+      // Auto-fill thaali day number for new schedule
+      const dayNum = await getNextThaaliDayNumber(dateStr)
+      setScheduleForm({
+        event_name: `Day ${dayNum}`,
+        thaali_enabled: true,
+        niyyat_status_ids: [1],
+        extra_thaali_count: 0,
+        thaali_category_ids: [],
+        notes: '',
+      })
+    }
 
     setModalTab('thaali')
     setShowModal(true)
+  }
+
+  // When toggling thaali_enabled, update the label accordingly
+  const handleThaaliToggle = async (enabled: boolean) => {
+    if (enabled && !editSchedule) {
+      // Switching to thaali day on a new entry → re-compute day number
+      const dayNum = selectedDate ? await getNextThaaliDayNumber(selectedDate) : 1
+      setScheduleForm(p => ({ ...p, thaali_enabled: true, event_name: `Day ${dayNum}` }))
+    } else if (!enabled) {
+      // Switching to no-thaali → clear label so user can type reason
+      setScheduleForm(p => ({ ...p, thaali_enabled: false, event_name: '' }))
+    } else {
+      setScheduleForm(p => ({ ...p, thaali_enabled: enabled }))
+    }
   }
 
   const saveMenu = async () => {
@@ -214,18 +224,6 @@ export default function CalendarPage() {
     setSaving(false)
     if (error) return showMsg(error.message, true)
     showMsg('Menu saved'); setShowModal(false); fetchData()
-  }
-
-  const saveEvent = async () => {
-    if (!selectedDate || !eventForm.menu.trim()) return showMsg('Event name required', true)
-    setSaving(true)
-    const payload = { ...eventForm, event_date: selectedDate }
-    const { error } = editEvent
-      ? await supabase.from('calendar_events').update(payload).eq('id', editEvent.id)
-      : await supabase.from('calendar_events').insert(payload)
-    setSaving(false)
-    if (error) return showMsg(error.message, true)
-    showMsg('Event saved'); setShowModal(false); fetchData()
   }
 
   const saveSchedule = async () => {
@@ -246,18 +244,12 @@ export default function CalendarPage() {
       : await supabase.from('thaali_schedule').insert(payload)
     setSaving(false)
     if (error) return showMsg(error.message, true)
-    showMsg('Thaali schedule saved'); setShowModal(false); fetchData()
+    showMsg('Saved'); setShowModal(false); fetchData()
   }
 
   const deleteMenu = async () => {
     if (!editMenu || !confirm('Delete menu for this day?')) return
     await supabase.from('daily_menu').delete().eq('id', editMenu.id)
-    showMsg('Deleted'); setShowModal(false); fetchData()
-  }
-
-  const deleteEvent = async () => {
-    if (!editEvent || !confirm('Delete event?')) return
-    await supabase.from('calendar_events').delete().eq('id', editEvent.id)
     showMsg('Deleted'); setShowModal(false); fetchData()
   }
 
@@ -267,23 +259,19 @@ export default function CalendarPage() {
     showMsg('Deleted'); setShowModal(false); fetchData()
   }
 
-  const toggleNiyyat = (id: number) => {
-    setScheduleForm(prev => ({
-      ...prev,
-      niyyat_status_ids: prev.niyyat_status_ids.includes(id)
-        ? prev.niyyat_status_ids.filter(x => x !== id)
-        : [...prev.niyyat_status_ids, id]
-    }))
-  }
+  const toggleNiyyat = (id: number) => setScheduleForm(prev => ({
+    ...prev,
+    niyyat_status_ids: prev.niyyat_status_ids.includes(id)
+      ? prev.niyyat_status_ids.filter(x => x !== id)
+      : [...prev.niyyat_status_ids, id]
+  }))
 
-  const toggleCategory = (id: number) => {
-    setScheduleForm(prev => ({
-      ...prev,
-      thaali_category_ids: prev.thaali_category_ids.includes(id)
-        ? prev.thaali_category_ids.filter(x => x !== id)
-        : [...prev.thaali_category_ids, id]
-    }))
-  }
+  const toggleCategory = (id: number) => setScheduleForm(prev => ({
+    ...prev,
+    thaali_category_ids: prev.thaali_category_ids.includes(id)
+      ? prev.thaali_category_ids.filter(x => x !== id)
+      : [...prev.thaali_category_ids, id]
+  }))
 
   const navPrev = () => {
     if (viewMode === 'gregorian') {
@@ -306,11 +294,16 @@ export default function CalendarPage() {
     setHYear(todayH.year); setHMonth(todayH.month)
   }
 
-  const getDateStr = (d: Date) => d.toISOString().split('T')[0]
-  const isToday = (dateStr: string) => dateStr === getDateStr(today)
+  const isToday = (dateStr: string) => dateStr === todayStr
   const hasMenu = (dateStr: string) => menus.some(m => m.menu_date === dateStr)
-  const hasEvent = (dateStr: string) => events.some(e => e.event_date === dateStr)
   const getSchedule = (dateStr: string) => schedules.find(s => s.event_date === dateStr)
+
+  // Lock editing if date is past, or today after 6:00 AM local
+  const isLocked = (dateStr: string): boolean => {
+    if (dateStr < todayStr) return true
+    if (dateStr > todayStr) return false
+    return today.getHours() >= 6
+  }
 
   const buildGregorianGrid = () => {
     const firstDay = new Date(gYear, gMonth, 1).getDay()
@@ -333,7 +326,7 @@ export default function CalendarPage() {
 
   const getHijriOverlay = (date: Date) => {
     const h = gregorianToHijri(date)
-    return { day: h.day, month: h.month, year: h.year, isFirst: h.day === 1 }
+    return { day: h.day, month: h.month, isFirst: h.day === 1 }
   }
 
   const getTitle = () => viewMode === 'gregorian'
@@ -357,7 +350,6 @@ export default function CalendarPage() {
   const renderCell = (dateStr: string, label: string | number, hijriOverlay?: { day: number; month: number; isFirst: boolean }, gregOverlay?: string) => {
     const isTod = isToday(dateStr)
     const hasM = hasMenu(dateStr)
-    const hasE = hasEvent(dateStr)
     const sch = getSchedule(dateStr)
     const count = thaaliCounts[dateStr]
 
@@ -366,59 +358,48 @@ export default function CalendarPage() {
         onClick={() => openDay(dateStr)}
         style={{
           minHeight: '88px', padding: '6px 8px', cursor: 'pointer',
-          borderRight: '1px solid #f0f0f0', borderBottom: '1px solid #f0f0f0',
-          background: isTod ? '#364574' : 'white', transition: 'background 0.1s',
+          borderRight: '1px solid var(--bs-border-color)',
+          borderBottom: '1px solid var(--bs-border-color)',
+          background: isTod ? '#364574' : 'var(--bs-body-bg)',
+          transition: 'background 0.1s',
         }}
-        onMouseEnter={e => { if (!isTod) (e.currentTarget as HTMLElement).style.background = '#f8f9ff' }}
-        onMouseLeave={e => { if (!isTod) (e.currentTarget as HTMLElement).style.background = 'white' }}
+        onMouseEnter={e => { if (!isTod) (e.currentTarget as HTMLElement).style.background = 'var(--bs-tertiary-bg)' }}
+        onMouseLeave={e => { if (!isTod) (e.currentTarget as HTMLElement).style.background = 'var(--bs-body-bg)' }}
       >
-        {/* Primary date number */}
-        <div style={{ fontSize: '14px', fontWeight: 700, color: isTod ? '#fff' : '#212529', marginBottom: '1px' }}>{label}</div>
+        <div style={{ fontSize: '14px', fontWeight: 700, color: isTod ? '#fff' : 'var(--bs-body-color)', marginBottom: '1px' }}>{label}</div>
 
-        {/* Hijri overlay */}
         {hijriOverlay && (
-          <div style={{ fontSize: '10px', color: isTod ? 'rgba(255,255,255,0.7)' : hijriOverlay.isFirst ? '#364574' : '#bbb', fontWeight: hijriOverlay.isFirst ? 700 : 400, marginBottom: '3px' }}>
+          <div style={{ fontSize: '10px', color: isTod ? 'rgba(255,255,255,0.7)' : hijriOverlay.isFirst ? '#364574' : 'var(--bs-secondary-color)', fontWeight: hijriOverlay.isFirst ? 700 : 400, marginBottom: '3px' }}>
             {hijriOverlay.isFirst ? `1 ${HIJRI_MONTHS_SHORT[hijriOverlay.month - 1]}` : hijriOverlay.day}
           </div>
         )}
 
-        {/* Gregorian overlay (hijri view) */}
         {gregOverlay && (
-          <div style={{ fontSize: '10px', color: isTod ? 'rgba(255,255,255,0.7)' : '#bbb', marginBottom: '3px' }}>{gregOverlay}</div>
+          <div style={{ fontSize: '10px', color: isTod ? 'rgba(255,255,255,0.7)' : 'var(--bs-secondary-color)', marginBottom: '3px' }}>{gregOverlay}</div>
         )}
 
-        {/* Indicators row */}
+        {/* Indicators */}
         <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap', marginBottom: '2px' }}>
-          {hasM && <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: isTod ? '#ffbf69' : '#0ab39c' }} title="Menu" />}
-          {hasE && <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: isTod ? '#fff' : '#364574' }} title="Event" />}
-          {sch && (
-            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: sch.thaali_enabled ? (isTod ? '#90ee90' : '#28a745') : (isTod ? '#ffaaaa' : '#e63946') }} title={sch.thaali_enabled ? 'Thaali day' : 'No thaali'} />
-          )}
+          {hasM && <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: isTod ? '#ffbf69' : '#0ab39c' }} title="Menu set" />}
+          {sch && <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: sch.thaali_enabled ? (isTod ? '#90ee90' : '#28a745') : (isTod ? '#ffaaaa' : '#e63946') }} title={sch.thaali_enabled ? 'Thaali day' : 'No thaali'} />}
         </div>
 
-        {/* Thaali count */}
+        {/* Thaali count or label */}
         {sch?.thaali_enabled && count && (
           <div style={{ fontSize: '9px', fontWeight: 700, color: isTod ? '#90ee90' : '#28a745' }}>
+            {sch.event_name && <span style={{ marginRight: '3px', opacity: 0.8 }}>{sch.event_name} · </span>}
             {count.total} thaalis
           </div>
         )}
-
-        {/* No thaali label */}
         {sch && !sch.thaali_enabled && (
-          <div style={{ fontSize: '9px', color: isTod ? '#ffaaaa' : '#e63946', fontWeight: 600 }}>No thaali</div>
-        )}
-
-        {/* Event name */}
-        {hasE && (
-          <div style={{ fontSize: '9px', color: isTod ? '#ffbf69' : '#364574', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {events.find(e => e.event_date === dateStr)?.menu}
+          <div style={{ fontSize: '9px', color: isTod ? '#ffaaaa' : '#e63946', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {sch.event_name || 'No thaali'}
           </div>
         )}
       </div>
     )
   }
 
-  // Selected day thaali count for modal
   const selectedCount = selectedDate ? thaaliCounts[selectedDate] : null
 
   return (
@@ -428,17 +409,17 @@ export default function CalendarPage() {
       {/* Header */}
       <div className="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
         <div>
-          <h4 className="mb-0 fw-bold" style={{ color: '#212529' }}>Calendar</h4>
-          <p className="mb-0 text-muted" style={{ fontSize: '13px' }}>{getSubtitle()}</p>
+          <h4 className="mb-0 fw-bold" style={{ color: 'var(--bs-body-color)' }}>Calendar</h4>
+          <p className="mb-0" style={{ fontSize: '13px', color: 'var(--bs-secondary-color)' }}>{getSubtitle()}</p>
         </div>
         <div className="d-flex gap-2 align-items-center flex-wrap">
-          <div style={{ display: 'flex', background: '#f3f3f9', borderRadius: '8px', padding: '3px' }}>
+          <div style={{ display: 'flex', background: 'var(--bs-secondary-bg)', borderRadius: '8px', padding: '3px' }}>
             {(['gregorian', 'hijri'] as ViewMode[]).map(mode => (
               <button key={mode} onClick={() => setViewMode(mode)} style={{
                 padding: '5px 14px', borderRadius: '6px', border: 'none', fontSize: '12px',
                 fontWeight: 600, cursor: 'pointer',
                 background: viewMode === mode ? '#364574' : 'transparent',
-                color: viewMode === mode ? '#fff' : '#6c757d',
+                color: viewMode === mode ? '#fff' : 'var(--bs-secondary-color)',
               }}>
                 {mode === 'gregorian' ? 'Gregorian' : 'Hijri (Misri)'}
               </button>
@@ -446,8 +427,8 @@ export default function CalendarPage() {
           </div>
           <button onClick={goToday} className="btn btn-sm btn-outline-secondary" style={{ borderRadius: '8px', fontSize: '12px' }}>Today</button>
           <div className="d-flex gap-1">
-            <button onClick={navPrev} className="btn btn-sm" style={{ background: '#f3f3f9', border: 'none', borderRadius: '8px', color: '#364574' }}><i className="bi bi-chevron-left" /></button>
-            <button onClick={navNext} className="btn btn-sm" style={{ background: '#f3f3f9', border: 'none', borderRadius: '8px', color: '#364574' }}><i className="bi bi-chevron-right" /></button>
+            <button onClick={navPrev} className="btn btn-sm" style={{ background: 'var(--bs-secondary-bg)', border: 'none', borderRadius: '8px', color: '#364574' }}><i className="bi bi-chevron-left" /></button>
+            <button onClick={navNext} className="btn btn-sm" style={{ background: 'var(--bs-secondary-bg)', border: 'none', borderRadius: '8px', color: '#364574' }}><i className="bi bi-chevron-right" /></button>
           </div>
         </div>
       </div>
@@ -457,13 +438,13 @@ export default function CalendarPage() {
 
       {/* Calendar */}
       <div className="card" style={{ borderRadius: '12px', border: 'none', boxShadow: '0 1px 6px rgba(0,0,0,0.07)' }}>
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid #e9ebec' }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--bs-border-color)' }}>
           <h5 className="mb-0 fw-bold" style={{ color: '#364574' }}>{getTitle()}</h5>
         </div>
         <div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: '1px solid #e9ebec' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: '1px solid var(--bs-border-color)' }}>
             {DOW.map(d => (
-              <div key={d} style={{ padding: '10px 0', textAlign: 'center', fontSize: '11px', fontWeight: 700, color: '#6c757d', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{d}</div>
+              <div key={d} style={{ padding: '10px 0', textAlign: 'center', fontSize: '11px', fontWeight: 700, color: 'var(--bs-secondary-color)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{d}</div>
             ))}
           </div>
 
@@ -472,18 +453,17 @@ export default function CalendarPage() {
           ) : viewMode === 'gregorian' ? (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
               {gregCells.map((cell, i) => {
-                if (!cell) return <div key={i} style={{ minHeight: '88px', background: '#fafafa', borderRight: '1px solid #f0f0f0', borderBottom: '1px solid #f0f0f0' }} />
-                const dateStr = getDateStr(cell)
-                const hOverlay = getHijriOverlay(cell)
-                return <div key={i}>{renderCell(dateStr, cell.getDate(), hOverlay)}</div>
+                if (!cell) return <div key={i} style={{ minHeight: '88px', background: 'var(--bs-secondary-bg)', borderRight: '1px solid var(--bs-border-color)', borderBottom: '1px solid var(--bs-border-color)' }} />
+                const dateStr = localDateStr(cell)
+                return <div key={i}>{renderCell(dateStr, cell.getDate(), getHijriOverlay(cell))}</div>
               })}
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
               {hijriCells.map((cell, i) => {
-                if (!cell) return <div key={i} style={{ minHeight: '88px', background: '#fafafa', borderRight: '1px solid #f0f0f0', borderBottom: '1px solid #f0f0f0' }} />
+                if (!cell) return <div key={i} style={{ minHeight: '88px', background: 'var(--bs-secondary-bg)', borderRight: '1px solid var(--bs-border-color)', borderBottom: '1px solid var(--bs-border-color)' }} />
                 const gDate = hijriToGregorian(hYear, hMonth, cell)
-                const dateStr = getDateStr(gDate)
+                const dateStr = localDateStr(gDate)
                 const gregLabel = gDate.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })
                 return <div key={i}>{renderCell(dateStr, cell, undefined, gregLabel)}</div>
               })}
@@ -492,14 +472,13 @@ export default function CalendarPage() {
         </div>
 
         {/* Legend */}
-        <div style={{ padding: '12px 20px', borderTop: '1px solid #e9ebec', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+        <div style={{ padding: '12px 20px', borderTop: '1px solid var(--bs-border-color)', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
           {[
             { color: '#0ab39c', label: 'Menu set' },
-            { color: '#364574', label: 'Event' },
             { color: '#28a745', label: 'Thaali day' },
             { color: '#e63946', label: 'No thaali' },
           ].map((l, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#6c757d' }}>
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--bs-secondary-color)' }}>
               <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: l.color, display: 'inline-block' }} />{l.label}
             </div>
           ))}
@@ -529,12 +508,12 @@ export default function CalendarPage() {
                   m++; if (m > 12) { m = 1; y++ }
                 }
                 return months.map((mo, i) => (
-                  <div key={i} style={{ background: '#f3f3f9', borderRadius: '8px', padding: '6px 12px', fontSize: '12px' }}>
+                  <div key={i} style={{ background: 'var(--bs-secondary-bg)', borderRadius: '8px', padding: '6px 12px', fontSize: '12px' }}>
                     <span style={{ fontWeight: 700, color: '#364574' }}>{HIJRI_MONTHS[mo.m - 1]}</span>
-                    <span style={{ color: '#6c757d', marginLeft: '6px' }}>
+                    <span style={{ color: 'var(--bs-secondary-color)', marginLeft: '6px' }}>
                       {mo.start.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })} – {mo.end.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
                     </span>
-                    <span style={{ color: '#adb5bd', marginLeft: '6px' }}>({mo.days}d)</span>
+                    <span style={{ color: 'var(--bs-secondary-color)', marginLeft: '6px' }}>({mo.days}d)</span>
                   </div>
                 ))
               })()}
@@ -544,36 +523,35 @@ export default function CalendarPage() {
       )}
 
       {/* ── Day Modal ── */}
-      {showModal && selectedDate && (
+      {showModal && selectedDate && (() => { const locked = isLocked(selectedDate); return (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '40px 16px', overflowY: 'auto' }}>
-          <div style={{ background: '#fff', borderRadius: '14px', width: '100%', maxWidth: '560px', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }} onClick={e => e.stopPropagation()}>
+          <div style={{ background: 'var(--bs-body-bg)', borderRadius: '14px', width: '100%', maxWidth: '560px', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }} onClick={e => e.stopPropagation()}>
 
             {/* Modal header */}
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid #e9ebec' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--bs-border-color)' }}>
               <div className="d-flex align-items-center justify-content-between">
                 <div>
-                  <h6 className="mb-0 fw-bold">
+                  <h6 className="mb-0 fw-bold" style={{ color: 'var(--bs-body-color)' }}>
                     {new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                   </h6>
-                  <p className="mb-0 text-muted" style={{ fontSize: '12px' }}>
+                  <p className="mb-0" style={{ fontSize: '12px', color: 'var(--bs-secondary-color)' }}>
                     {(() => { const h = gregorianToHijri(new Date(selectedDate + 'T00:00:00')); return formatHijri(h.year, h.month, h.day) })()}
                   </p>
                 </div>
-                <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', fontSize: '22px', cursor: 'pointer', color: '#6c757d' }}>×</button>
+                <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', fontSize: '22px', cursor: 'pointer', color: 'var(--bs-secondary-color)' }}>×</button>
               </div>
 
-              {/* Tabs */}
-              <div style={{ display: 'flex', gap: '4px', marginTop: '12px', background: '#f3f3f9', borderRadius: '8px', padding: '3px' }}>
+              {/* 2 tabs only */}
+              <div style={{ display: 'flex', gap: '4px', marginTop: '12px', background: 'var(--bs-secondary-bg)', borderRadius: '8px', padding: '3px' }}>
                 {([
                   { key: 'thaali', label: 'Thaali Schedule', icon: 'bi-cup-hot' },
-                  { key: 'menu', label: 'Daily Menu', icon: 'bi-list-ul' },
-                  { key: 'event', label: 'Event', icon: 'bi-calendar-event' },
+                  { key: 'menu',   label: 'Daily Menu',       icon: 'bi-list-ul' },
                 ] as { key: ModalTab; label: string; icon: string }[]).map(tab => (
                   <button key={tab.key} onClick={() => setModalTab(tab.key)} style={{
-                    flex: 1, padding: '6px 4px', borderRadius: '6px', border: 'none', fontSize: '12px',
+                    flex: 1, padding: '7px 4px', borderRadius: '6px', border: 'none', fontSize: '13px',
                     fontWeight: 600, cursor: 'pointer',
                     background: modalTab === tab.key ? '#364574' : 'transparent',
-                    color: modalTab === tab.key ? '#fff' : '#6c757d',
+                    color: modalTab === tab.key ? '#fff' : 'var(--bs-secondary-color)',
                   }}>
                     <i className={`bi ${tab.icon} me-1`} />{tab.label}
                   </button>
@@ -581,55 +559,89 @@ export default function CalendarPage() {
               </div>
             </div>
 
+
+            {/* Lock banner */}
+            {locked && (
+              <div style={{ margin: '12px 20px 0', padding: '9px 14px', background: '#f8f9fa', border: '1px solid var(--bs-border-color)', borderRadius: '9px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <i className="bi bi-lock-fill" style={{ color: '#6c757d', fontSize: '13px' }} />
+                <span style={{ fontSize: '12px', color: 'var(--bs-secondary-color)', fontWeight: 600 }}>
+                  {selectedDate < todayStr ? 'Past date — read only' : 'Day has started (after 6 AM) — read only'}
+                </span>
+              </div>
+            )}
             {/* ── THAALI SCHEDULE TAB ── */}
             {modalTab === 'thaali' && (
               <div style={{ padding: '20px' }}>
 
-                {/* Thaali enabled toggle */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', padding: '12px 14px', background: scheduleForm.thaali_enabled ? '#28a74510' : '#e6394610', borderRadius: '10px', border: `1px solid ${scheduleForm.thaali_enabled ? '#28a74530' : '#e6394630'}` }}>
+                {/* Toggle */}
+                <div
+                  onClick={() => !locked && handleThaaliToggle(!scheduleForm.thaali_enabled)}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    marginBottom: '16px', padding: '12px 14px', cursor: locked ? 'default' : 'pointer',
+                    opacity: locked ? 0.65 : 1, pointerEvents: locked ? 'none' : 'auto',
+                    background: scheduleForm.thaali_enabled ? '#28a74510' : '#e6394610',
+                    borderRadius: '10px', border: `1px solid ${scheduleForm.thaali_enabled ? '#28a74530' : '#e6394630'}`,
+                    userSelect: 'none',
+                  }}
+                >
                   <div>
                     <div style={{ fontWeight: 700, fontSize: '14px', color: scheduleForm.thaali_enabled ? '#28a745' : '#e63946' }}>
                       {scheduleForm.thaali_enabled ? '✓ Thaali day' : '✕ No thaali today'}
                     </div>
-                    <div style={{ fontSize: '12px', color: '#6c757d' }}>
-                      {scheduleForm.thaali_enabled ? 'Thaali will be distributed' : 'No distribution (Urs, off day, etc.)'}
+                    <div style={{ fontSize: '12px', color: 'var(--bs-secondary-color)' }}>
+                      {scheduleForm.thaali_enabled ? 'Thaali will be distributed' : 'No distribution today'}
                     </div>
                   </div>
-                  <div style={{ position: 'relative' }}>
-                    <input type="checkbox" id="thaali_toggle" checked={scheduleForm.thaali_enabled}
-                      onChange={e => setScheduleForm(p => ({ ...p, thaali_enabled: e.target.checked }))}
-                      style={{ width: '40px', height: '22px', cursor: 'pointer', accentColor: '#364574' }} />
+                  <div style={{
+                    width: '44px', height: '24px', borderRadius: '12px', position: 'relative', flexShrink: 0,
+                    background: scheduleForm.thaali_enabled ? '#28a745' : '#dee2e6', transition: 'background 0.2s',
+                  }}>
+                    <div style={{
+                      position: 'absolute', top: '3px',
+                      left: scheduleForm.thaali_enabled ? '22px' : '3px',
+                      width: '18px', height: '18px', borderRadius: '50%',
+                      background: '#fff', transition: 'left 0.2s',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                    }} />
                   </div>
                 </div>
 
-                {/* Event name */}
+                {/* Day label — shown for both states, different purpose */}
                 <div className="mb-3">
-                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#495057', display: 'block', marginBottom: '4px' }}>
-                    Day Label / Event Name
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--bs-body-color)', display: 'block', marginBottom: '4px' }}>
+                    {scheduleForm.thaali_enabled
+                      ? <>Day Label <span style={{ color: 'var(--bs-secondary-color)', fontWeight: 400 }}>(auto-numbered, can edit)</span></>
+                      : <>Reason <span style={{ color: 'var(--bs-secondary-color)', fontWeight: 400 }}>(why no thaali — shown in app)</span></>
+                    }
                   </label>
-                  <input type="text" className="form-control form-control-sm"
+                  <input
+                    type="text"
+                    className="form-control form-control-sm"
                     value={scheduleForm.event_name}
                     onChange={e => setScheduleForm(p => ({ ...p, event_name: e.target.value }))}
-                    placeholder={scheduleForm.thaali_enabled ? 'e.g. Friday Special, Weekly Thaali...' : 'e.g. Urs Niyaaz, Sunday Off...'}
-                    style={{ borderRadius: '8px', fontSize: '13px' }} />
+                    disabled={locked}
+                    placeholder={scheduleForm.thaali_enabled ? 'e.g. Day 25, Friday Special...' : 'e.g. Urs Niyaaz, Sunday Off, Majlis...'}
+                    style={{ borderRadius: '8px', fontSize: '13px' }}
+                    autoFocus={!scheduleForm.thaali_enabled}
+                  />
                 </div>
 
+                {/* Thaali-only fields */}
                 {scheduleForm.thaali_enabled && (
                   <>
-                    {/* Niyyat status selection */}
                     <div className="mb-3">
-                      <label style={{ fontSize: '12px', fontWeight: 600, color: '#495057', display: 'block', marginBottom: '6px' }}>
-                        Include Niyyat Statuses <span style={{ color: '#6c757d', fontWeight: 400 }}>(who gets thaali)</span>
+                      <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--bs-body-color)', display: 'block', marginBottom: '6px' }}>
+                        Include Niyyat Statuses <span style={{ color: 'var(--bs-secondary-color)', fontWeight: 400 }}>(who gets thaali)</span>
                       </label>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                         {NIYYAT_STATUSES.map(ns => {
-                          const selected = scheduleForm.niyyat_status_ids.includes(ns.id)
+                          const sel = scheduleForm.niyyat_status_ids.includes(ns.id)
                           return (
-                            <button key={ns.id} onClick={() => toggleNiyyat(ns.id)} style={{
+                            <button key={ns.id} onClick={() => !locked && toggleNiyyat(ns.id)} disabled={locked} style={{
                               padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: 'none',
-                              background: selected ? '#364574' : '#f3f3f9',
-                              color: selected ? '#fff' : '#495057',
-                              transition: 'all 0.15s',
+                              background: sel ? '#364574' : 'var(--bs-secondary-bg)',
+                              color: sel ? '#fff' : 'var(--bs-body-color)', transition: 'all 0.15s',
                             }}>
                               {ns.name}
                             </button>
@@ -638,19 +650,18 @@ export default function CalendarPage() {
                       </div>
                     </div>
 
-                    {/* Thaali category filter */}
                     <div className="mb-3">
-                      <label style={{ fontSize: '12px', fontWeight: 600, color: '#495057', display: 'block', marginBottom: '6px' }}>
-                        Category Filter <span style={{ color: '#6c757d', fontWeight: 400 }}>(leave empty = all categories)</span>
+                      <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--bs-body-color)', display: 'block', marginBottom: '6px' }}>
+                        Category Filter <span style={{ color: 'var(--bs-secondary-color)', fontWeight: 400 }}>(empty = all)</span>
                       </label>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                      <div style={{ display: 'flex', gap: '6px' }}>
                         {THAALI_CATEGORIES.map(cat => {
-                          const selected = scheduleForm.thaali_category_ids.includes(cat.id)
+                          const sel = scheduleForm.thaali_category_ids.includes(cat.id)
                           return (
-                            <button key={cat.id} onClick={() => toggleCategory(cat.id)} style={{
-                              padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: 'none',
-                              background: selected ? '#0ab39c' : '#f3f3f9',
-                              color: selected ? '#fff' : '#495057',
+                            <button key={cat.id} onClick={() => !locked && toggleCategory(cat.id)} disabled={locked} style={{
+                              padding: '4px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: 'none',
+                              background: sel ? '#0ab39c' : 'var(--bs-secondary-bg)',
+                              color: sel ? '#fff' : 'var(--bs-body-color)',
                             }}>
                               {cat.name}
                             </button>
@@ -659,35 +670,34 @@ export default function CalendarPage() {
                       </div>
                     </div>
 
-                    {/* Extra thaalis */}
                     <div className="mb-3">
-                      <label style={{ fontSize: '12px', fontWeight: 600, color: '#495057', display: 'block', marginBottom: '4px' }}>
-                        Extra Thaalis <span style={{ color: '#6c757d', fontWeight: 400 }}>(added on top of auto count)</span>
+                      <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--bs-body-color)', display: 'block', marginBottom: '4px' }}>
+                        Extra Thaalis <span style={{ color: 'var(--bs-secondary-color)', fontWeight: 400 }}>(added on top of auto count)</span>
                       </label>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <input type="number" min={0} className="form-control form-control-sm"
                           value={scheduleForm.extra_thaali_count}
                           onChange={e => setScheduleForm(p => ({ ...p, extra_thaali_count: parseInt(e.target.value) || 0 }))}
+                          disabled={locked}
                           style={{ borderRadius: '8px', fontSize: '13px', maxWidth: '120px' }} />
                         {selectedCount && (
                           <div style={{ fontSize: '13px', color: '#364574', fontWeight: 700 }}>
-                            = {selectedCount.approved} approved + {scheduleForm.extra_thaali_count} extra
+                            {selectedCount.approved} approved + {scheduleForm.extra_thaali_count} extra
                             = <span style={{ color: '#28a745' }}>{selectedCount.approved + scheduleForm.extra_thaali_count} total</span>
                           </div>
                         )}
                       </div>
                     </div>
 
-                    {/* Category breakdown */}
                     {selectedCount && Object.keys(selectedCount.byCategory).length > 0 && (
-                      <div style={{ background: '#f8f9fa', borderRadius: '8px', padding: '10px 12px', marginBottom: '12px' }}>
-                        <div style={{ fontSize: '11px', fontWeight: 700, color: '#6c757d', marginBottom: '6px', textTransform: 'uppercase' }}>Breakdown by Category</div>
+                      <div style={{ background: 'var(--bs-tertiary-bg)', borderRadius: '8px', padding: '10px 12px', marginBottom: '12px' }}>
+                        <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--bs-secondary-color)', marginBottom: '6px', textTransform: 'uppercase' }}>Breakdown by Category</div>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                           {Object.entries(selectedCount.byCategory).map(([catId, count]) => {
                             const cat = THAALI_CATEGORIES.find(c => c.id === parseInt(catId))
                             return (
-                              <div key={catId} style={{ background: '#fff', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', border: '1px solid #e9ebec' }}>
-                                <span style={{ color: '#6c757d' }}>{cat?.name || catId}:</span>
+                              <div key={catId} style={{ background: 'var(--bs-body-bg)', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', border: '1px solid var(--bs-border-color)' }}>
+                                <span style={{ color: 'var(--bs-secondary-color)' }}>{cat?.name || catId}:</span>
                                 <span style={{ fontWeight: 700, color: '#364574', marginLeft: '4px' }}>{count}</span>
                               </div>
                             )
@@ -700,11 +710,12 @@ export default function CalendarPage() {
 
                 {/* Notes */}
                 <div>
-                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#495057', display: 'block', marginBottom: '4px' }}>Notes</label>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--bs-body-color)', display: 'block', marginBottom: '4px' }}>Notes</label>
                   <input type="text" className="form-control form-control-sm"
                     value={scheduleForm.notes}
                     onChange={e => setScheduleForm(p => ({ ...p, notes: e.target.value }))}
                     placeholder="Optional notes..."
+                    disabled={locked}
                     style={{ borderRadius: '8px', fontSize: '13px' }} />
                 </div>
               </div>
@@ -723,60 +734,42 @@ export default function CalendarPage() {
                     { key: 'salad', label: 'Salad', icon: '🥗' },
                   ].map(f => (
                     <div key={f.key} className="col-6">
-                      <label style={{ fontSize: '12px', fontWeight: 600, color: '#495057', marginBottom: '4px', display: 'block' }}>{f.icon} {f.label}</label>
+                      <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--bs-body-color)', marginBottom: '4px', display: 'block' }}>{f.icon} {f.label}</label>
                       <input type="text" className="form-control form-control-sm"
                         value={(menuForm as any)[f.key]}
                         onChange={e => setMenuForm(p => ({ ...p, [f.key]: e.target.value }))}
+                        disabled={locked}
                         style={{ borderRadius: '7px', fontSize: '13px' }} />
                     </div>
                   ))}
                   <div className="col-12">
-                    <label style={{ fontSize: '12px', fontWeight: 600, color: '#495057', marginBottom: '4px', display: 'block' }}>Notes</label>
+                    <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--bs-body-color)', marginBottom: '4px', display: 'block' }}>✨ Extra <span style={{ color: 'var(--bs-secondary-color)', fontWeight: 400 }}>(fruit, cake, anything additional)</span></label>
+                    <input type="text" className="form-control form-control-sm" value={menuForm.extra}
+                      onChange={e => setMenuForm(p => ({ ...p, extra: e.target.value }))}
+                      placeholder="e.g. Fruit, Cake, Kheer..."
+                      disabled={locked}
+                      style={{ borderRadius: '7px', fontSize: '13px' }} />
+                  </div>
+                  <div className="col-12">
+                    <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--bs-body-color)', marginBottom: '4px', display: 'block' }}>Notes</label>
                     <input type="text" className="form-control form-control-sm" value={menuForm.notes}
                       onChange={e => setMenuForm(p => ({ ...p, notes: e.target.value }))}
+                      disabled={locked}
                       style={{ borderRadius: '7px', fontSize: '13px' }} />
                   </div>
                 </div>
               </div>
             )}
 
-            {/* ── EVENT TAB ── */}
-            {modalTab === 'event' && (
-              <div style={{ padding: '20px' }}>
-                <div className="row g-2">
-                  <div className="col-12">
-                    <label style={{ fontSize: '12px', fontWeight: 600, color: '#495057', marginBottom: '4px', display: 'block' }}>Event Name *</label>
-                    <input type="text" className="form-control"
-                      value={eventForm.menu}
-                      onChange={e => setEventForm(p => ({ ...p, menu: e.target.value }))}
-                      placeholder="e.g. 15 mi Ramadan - Naiz, Urs Syedna..."
-                      style={{ borderRadius: '8px', fontSize: '13px' }} />
-                  </div>
-                  <div className="col-12">
-                    <label style={{ fontSize: '12px', fontWeight: 600, color: '#495057', marginBottom: '4px', display: 'block' }}>Notes</label>
-                    <input type="text" className="form-control"
-                      value={eventForm.notes}
-                      onChange={e => setEventForm(p => ({ ...p, notes: e.target.value }))}
-                      style={{ borderRadius: '8px', fontSize: '13px' }} />
-                  </div>
-                </div>
-              </div>
-            )}
-
             {/* Modal footer */}
-            <div style={{ padding: '12px 20px', borderTop: '1px solid #e9ebec', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ padding: '12px 20px', borderTop: '1px solid var(--bs-border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                {modalTab === 'menu' && editMenu && (
+                {!locked && modalTab === 'menu' && editMenu && (
                   <button onClick={deleteMenu} className="btn btn-sm" style={{ background: '#e6394615', color: '#e63946', border: 'none', borderRadius: '7px', fontSize: '12px' }}>
                     <i className="bi bi-trash me-1" />Delete
                   </button>
                 )}
-                {modalTab === 'event' && editEvent && (
-                  <button onClick={deleteEvent} className="btn btn-sm" style={{ background: '#e6394615', color: '#e63946', border: 'none', borderRadius: '7px', fontSize: '12px' }}>
-                    <i className="bi bi-trash me-1" />Delete
-                  </button>
-                )}
-                {modalTab === 'thaali' && editSchedule && (
+                {!locked && modalTab === 'thaali' && editSchedule && (
                   <button onClick={deleteSchedule} className="btn btn-sm" style={{ background: '#e6394615', color: '#e63946', border: 'none', borderRadius: '7px', fontSize: '12px' }}>
                     <i className="bi bi-trash me-1" />Remove Schedule
                   </button>
@@ -784,18 +777,18 @@ export default function CalendarPage() {
               </div>
               <div className="d-flex gap-2">
                 <button onClick={() => setShowModal(false)} className="btn btn-sm btn-outline-secondary" style={{ borderRadius: '8px', fontSize: '13px' }}>Cancel</button>
-                <button
-                  onClick={modalTab === 'menu' ? saveMenu : modalTab === 'event' ? saveEvent : saveSchedule}
+                {!locked && <button
+                  onClick={modalTab === 'menu' ? saveMenu : saveSchedule}
                   disabled={saving}
                   className="btn btn-sm"
                   style={{ background: '#364574', color: '#fff', borderRadius: '8px', fontSize: '13px', fontWeight: 600 }}>
                   {saving ? <span className="spinner-border spinner-border-sm" /> : 'Save'}
-                </button>
+                </button>}
               </div>
             </div>
           </div>
         </div>
-      )}
+      )})()}
     </>
   )
 }

@@ -12,9 +12,9 @@ const ALL_MENU_ITEMS = [
   {
     label: 'Thaali', href: '/thaali', icon: 'bi-cup-hot', module: 'thaali',
     children: [
-      { label: 'Registrations',  href: '/thaali',                  icon: 'bi-list-ul'      },
-      { label: 'Customizations', href: '/thaali/customizations',   icon: 'bi-sliders'      },
-      { label: 'Stop Requests',  href: '/thaali/stop-requests',    icon: 'bi-slash-circle' },
+      { label: 'Registrations',  href: '/thaali',                icon: 'bi-list-ul'      },
+      { label: 'Customizations', href: '/thaali/customizations', icon: 'bi-sliders'      },
+      { label: 'Stop Requests',  href: '/thaali/stop-requests',  icon: 'bi-slash-circle' },
     ],
   },
   { label: 'Distribution',  href: '/distribution', icon: 'bi-box-seam',         module: 'distribution' },
@@ -39,7 +39,6 @@ interface Permission {
   can_view: boolean
 }
 
-// ─── Theme helpers (no React state — runs directly on <html>) ────────────────
 const applyTheme = (t: Theme) => {
   const isDark = t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
   document.documentElement.setAttribute('data-bs-theme', isDark ? 'dark' : 'light')
@@ -63,12 +62,10 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [pendingAddressCount, setPendingAddressCount] = useState(0)
 
-  // Init theme from localStorage on mount
   useEffect(() => {
     const saved = loadTheme()
     setThemeState(saved)
     applyTheme(saved)
-    // Watch system preference changes
     const mq = window.matchMedia('(prefers-color-scheme: dark)')
     const handler = () => { if (loadTheme() === 'system') applyTheme('system') }
     mq.addEventListener('change', handler)
@@ -82,12 +79,8 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
-      if (themeMenuRef.current && !themeMenuRef.current.contains(e.target as Node)) {
-        setShowThemeMenu(false)
-      }
-      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) {
-        setShowProfileDropdown(false)
-      }
+      if (themeMenuRef.current && !themeMenuRef.current.contains(e.target as Node)) setShowThemeMenu(false)
+      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) setShowProfileDropdown(false)
     }
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
@@ -109,13 +102,9 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       .single()
 
     if (!adminData) { await supabase.auth.signOut(); router.push('/login'); return }
-    if (adminData.status !== 'active') {
-      await supabase.auth.signOut(); router.push('/login?error=inactive'); return
-    }
+    if (adminData.status !== 'active') { await supabase.auth.signOut(); router.push('/login?error=inactive'); return }
 
     setAdminUser(adminData)
-
-    // Determine if this user is an admin/super_admin
     const groupName = adminData.user_groups?.name?.toLowerCase() || ''
     setIsAdmin(groupName === 'super admin' || groupName === 'admin' || groupName === 'super_admin')
 
@@ -124,7 +113,6 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         .from('permissions')
         .select('module, can_view')
         .eq('user_group_id', adminData.user_group_id)
-
       const perms = permsData || []
       setPermissions(perms)
       const allowed = perms.filter(p => p.can_view).map(p => p.module)
@@ -135,13 +123,11 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       setMenuItems(ALL_MENU_ITEMS.filter(m => m.module === 'dashboard'))
     }
 
-    // Fetch pending address request count
     const { count } = await supabase
       .from('address_change_requests')
       .select('*', { count: 'exact', head: true })
       .eq('status', 'pending')
     setPendingAddressCount(count || 0)
-
     setLoading(false)
   }
 
@@ -150,11 +136,10 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
     router.push('/login')
   }
 
-  // Theme icon + label helpers
   const themeOptions: { val: Theme; icon: string; label: string }[] = [
-    { val: 'light',  icon: 'bi-sun-fill',     label: 'Light' },
-    { val: 'dark',   icon: 'bi-moon-fill',    label: 'Dark' },
-    { val: 'system', icon: 'bi-circle-half',  label: 'System' },
+    { val: 'light',  icon: 'bi-sun-fill',    label: 'Light'  },
+    { val: 'dark',   icon: 'bi-moon-fill',   label: 'Dark'   },
+    { val: 'system', icon: 'bi-circle-half', label: 'System' },
   ]
   const currentOpt = themeOptions.find(o => o.val === theme) || themeOptions[2]
 
@@ -187,21 +172,24 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         </div>
       </div>
 
-      {/* Menu items */}
+      {/* Nav */}
       <nav style={{ padding: '12px 0', flex: 1, overflowY: 'auto' }}>
         {menuItems.map((item) => {
           const hasChildren = !!(item as any).children
           const children = (item as any).children as { label: string; href: string; icon: string }[] | undefined
 
-          // Is this group or item active?
           const isGroupActive = hasChildren
-            ? children!.some(c => pathname === c.href || pathname.startsWith(c.href + '/'))
+            ? children!.some(c => {
+                // FIX: for child whose href equals the group href (Registrations = /thaali),
+                // use exact match so sub-pages don't falsely activate it
+                if (c.href === item.href) return pathname === c.href
+                return pathname === c.href || pathname.startsWith(c.href + '/')
+              })
             : (item.href === '/dashboard' ? pathname === item.href : pathname.startsWith(item.href))
 
           if (hasChildren) {
             return (
               <div key={item.href}>
-                {/* Group header — click to navigate to parent href */}
                 <div
                   onClick={() => router.push(item.href)}
                   style={{
@@ -219,9 +207,14 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                   <span style={{ flex: 1 }}>{item.label}</span>
                   <i className={`bi bi-chevron-${isGroupActive ? 'down' : 'right'}`} style={{ fontSize: '11px', opacity: 0.6 }} />
                 </div>
-                {/* Sub-items — always visible when group is active */}
+
                 {isGroupActive && children!.map(child => {
-                  const isChildActive = pathname === child.href || pathname.startsWith(child.href + '/')
+                  // FIX: Registrations href = /thaali (same as parent) → exact match only
+                  // Other children → exact OR startsWith child href
+                  const isChildActive = child.href === item.href
+                    ? pathname === child.href
+                    : pathname === child.href || pathname.startsWith(child.href + '/')
+
                   return (
                     <div
                       key={child.href}
@@ -246,10 +239,11 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
             )
           }
 
-          // Regular flat item
+          // Flat item
           const isActive = item.href === '/dashboard'
             ? pathname === '/dashboard'
             : pathname.startsWith(item.href)
+
           return (
             <div
               key={item.href}
@@ -269,10 +263,9 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
               <span style={{ flex: 1 }}>{item.label}</span>
               {item.href === '/address-requests' && pendingAddressCount > 0 && (
                 <span style={{
-                  background: '#e63946', color: '#fff',
-                  fontSize: '10px', fontWeight: 700,
-                  borderRadius: '10px', padding: '1px 6px',
-                  lineHeight: '16px', minWidth: '18px', textAlign: 'center',
+                  background: '#e63946', color: '#fff', fontSize: '10px', fontWeight: 700,
+                  borderRadius: '10px', padding: '1px 6px', lineHeight: '16px',
+                  minWidth: '18px', textAlign: 'center',
                 }}>
                   {pendingAddressCount}
                 </span>
@@ -282,7 +275,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         })}
       </nav>
 
-      {/* User info + logout */}
+      {/* User info */}
       <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
           <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#ffbf69', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#364574', fontSize: '13px', fontWeight: 700, flexShrink: 0 }}>
@@ -326,10 +319,8 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         }
         .fmb-sidebar-drawer.open { transform: translateX(0); }
         .fmb-mobile-overlay {
-          position: fixed; inset: 0;
-          background: rgba(0,0,0,0.5); z-index: 1040;
-          opacity: 0; pointer-events: none;
-          transition: opacity 0.27s ease;
+          position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1040;
+          opacity: 0; pointer-events: none; transition: opacity 0.27s ease;
         }
         .fmb-mobile-overlay.open { opacity: 1; pointer-events: auto; }
         @media (max-width: 575.98px) {
@@ -341,16 +332,14 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         @media (max-width: 767.98px) {
           .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
         }
-        /* Theme menu item hover */
         .fmb-theme-opt:hover { background: var(--bs-secondary-bg) !important; }
       `}</style>
 
-      {/* isAdmin passed to children via context — simpler: store in sessionStorage */}
       <script dangerouslySetInnerHTML={{ __html: `window.__fmbIsAdmin = ${isAdmin}` }} />
 
       <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bs-tertiary-bg)' }}>
 
-        {/* Desktop sidebar — always #364574 (brand, not themed) */}
+        {/* Desktop sidebar */}
         <div className="fmb-sidebar-desktop" style={{ width: '240px', background: '#364574', flexDirection: 'column', flexShrink: 0, position: 'fixed', top: 0, left: 0, height: '100vh', zIndex: 100 }}>
           <SidebarContent />
         </div>
@@ -366,41 +355,35 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         {/* Main */}
         <div className="fmb-main" style={{ flex: 1, overflow: 'auto', minHeight: '100vh', overflowX: 'hidden' }}>
 
-          {/* ── Topbar ── */}
+          {/* Topbar */}
           <div className="fmb-topbar" style={{
-            background: 'var(--bs-body-bg)',
-            padding: '0 24px', height: '60px',
+            background: 'var(--bs-body-bg)', padding: '0 24px', height: '60px',
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             borderBottom: '1px solid var(--bs-border-color)',
             boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
             position: 'sticky', top: 0, zIndex: 50,
           }}>
 
-            {/* Hamburger (mobile) */}
             <button className="fmb-hamburger" onClick={() => setSidebarOpen(true)} style={{ display: 'none', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 8px', borderRadius: '6px', color: '#364574' }}>
               <i className="bi bi-list" style={{ fontSize: '24px' }} />
             </button>
 
-            {/* Mobile title */}
             <div className="d-lg-none" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '13px', fontWeight: 700, color: '#364574', marginLeft: '4px' }}>FMB Portal</span>
             </div>
 
-            {/* Right side: theme toggle + profile */}
             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}>
 
-              {/* ── Theme Toggle ── */}
+              {/* Theme toggle */}
               <div ref={themeMenuRef} style={{ position: 'relative' }}>
                 <button
                   onClick={() => setShowThemeMenu(p => !p)}
                   style={{
-                    background: 'var(--bs-secondary-bg)',
-                    border: '1px solid var(--bs-border-color)',
-                    borderRadius: '8px', padding: '5px 10px',
-                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px',
+                    background: 'var(--bs-secondary-bg)', border: '1px solid var(--bs-border-color)',
+                    borderRadius: '8px', padding: '5px 10px', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: '6px',
                     color: 'var(--bs-body-color)', fontSize: '13px', transition: 'all 0.15s',
                   }}
-                  title="Change theme"
                 >
                   <i className={`bi ${currentOpt.icon}`} style={{ fontSize: '14px', color: '#ffbf69' }} />
                   <span className="d-none d-sm-inline" style={{ fontSize: '12px', fontWeight: 500 }}>{currentOpt.label}</span>
@@ -408,16 +391,12 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                 </button>
 
                 {showThemeMenu && (
-                  <div
-                    style={{
-                      position: 'absolute', top: '42px', right: 0,
-                      background: 'var(--bs-body-bg)',
-                      border: '1px solid var(--bs-border-color)',
-                      borderRadius: '10px', minWidth: '145px',
-                      boxShadow: '0 6px 24px rgba(0,0,0,0.13)',
-                      zIndex: 300, overflow: 'hidden',
-                    }}
-                  >
+                  <div style={{
+                    position: 'absolute', top: '42px', right: 0,
+                    background: 'var(--bs-body-bg)', border: '1px solid var(--bs-border-color)',
+                    borderRadius: '10px', minWidth: '145px',
+                    boxShadow: '0 6px 24px rgba(0,0,0,0.13)', zIndex: 300, overflow: 'hidden',
+                  }}>
                     {themeOptions.map(opt => (
                       <div
                         key={opt.val}
@@ -427,8 +406,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                           padding: '9px 14px', cursor: 'pointer', fontSize: '13px',
                           display: 'flex', alignItems: 'center', gap: '10px',
                           background: theme === opt.val ? 'var(--bs-secondary-bg)' : 'transparent',
-                          color: 'var(--bs-body-color)',
-                          fontWeight: theme === opt.val ? 600 : 400,
+                          color: 'var(--bs-body-color)', fontWeight: theme === opt.val ? 600 : 400,
                           transition: 'background 0.12s',
                         }}
                       >
@@ -441,7 +419,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                 )}
               </div>
 
-              {/* ── Profile Dropdown ── */}
+              {/* Profile dropdown */}
               <div ref={profileMenuRef} style={{ position: 'relative' }}>
                 <div
                   onClick={() => setShowProfileDropdown(p => !p)}
@@ -465,14 +443,12 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                 </div>
 
                 {showProfileDropdown && (
-                  <div
-                    style={{
-                      position: 'absolute', top: '48px', right: 0,
-                      background: 'var(--bs-body-bg)', borderRadius: '10px', minWidth: '200px',
-                      boxShadow: '0 6px 24px rgba(0,0,0,0.13)', zIndex: 200,
-                      border: '1px solid var(--bs-border-color)', overflow: 'hidden',
-                    }}
-                  >
+                  <div style={{
+                    position: 'absolute', top: '48px', right: 0,
+                    background: 'var(--bs-body-bg)', borderRadius: '10px', minWidth: '200px',
+                    boxShadow: '0 6px 24px rgba(0,0,0,0.13)', zIndex: 200,
+                    border: '1px solid var(--bs-border-color)', overflow: 'hidden',
+                  }}>
                     <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--bs-border-color)', background: 'var(--bs-secondary-bg)' }}>
                       <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--bs-body-color)' }}>{adminUser?.full_name}</div>
                       <div style={{ fontSize: '12px', color: 'var(--bs-secondary-color)' }}>@{adminUser?.username}</div>

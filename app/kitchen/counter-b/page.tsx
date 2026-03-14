@@ -4,6 +4,13 @@ import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Html5QrcodeScanner } from 'html5-qrcode';
+import {
+  getTodaySchedule,
+  loadKitchenDayData,
+  todayISO,
+  type TodaySchedule,
+  type EligibleRegistration,
+} from '@/lib/kitchen-eligible';
 
 const QTY_MAP: Record<string, { label: string; bg: string; text: string }> = {
   full:       { label: 'Full',         bg: '#1a7a4a', text: '#fff' },
@@ -63,6 +70,9 @@ export default function CounterB() {
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [activeSession, setActiveSession] = useState<Session | null>(null);
 
+  // Schedule — loaded once, used in handleScan for niyyat check
+  const [schedule, setSchedule] = useState<TodaySchedule | null>(null);
+
   // Scanning state
   const [current, setCurrent] = useState<ScannedThaali | null>(null);
   const [previous, setPrevious] = useState<ScannedThaali | null>(null);
@@ -76,7 +86,7 @@ export default function CounterB() {
 
   const scannerRef = useRef<Html5QrcodeScanner | null>(null);
   const manualRef = useRef<HTMLInputElement>(null);
-  const [today] = useState(new Date().toISOString().split('T')[0]);
+  const today = todayISO();
 
   useEffect(() => { loadSessions(); }, []);
 
@@ -105,11 +115,16 @@ export default function CounterB() {
   const loadSessions = async () => {
     setLoadingSessions(true);
     try {
-      const { data } = await supabase
-        .from('distribution_sessions')
-        .select('id, distributor_id, customized_thaalis, status, distributors(full_name)')
-        .eq('session_date', today)
-        .in('status', ['in_progress', 'arrived', 'counter_b_done']);
+      const [{ data }, sched] = await Promise.all([
+        supabase
+          .from('distribution_sessions')
+          .select('id, distributor_id, customized_thaalis, status, distributors(full_name)')
+          .eq('session_date', today)
+          .in('status', ['in_progress', 'arrived', 'counter_b_done']),
+        getTodaySchedule(),
+      ]);
+
+      setSchedule(sched);
 
       const all = (data || []).map((s: any) => ({
         id: s.id,
@@ -136,6 +151,7 @@ export default function CounterB() {
     setTimeout(() => manualRef.current?.focus(), 500);
   };
 
+  // ── handleScan — eligibility checked against today's schedule ─────────────
   const handleScan = async (thaaliNumber: string) => {
     if (!thaaliNumber || !activeSession) return;
     setError('');
@@ -152,7 +168,7 @@ export default function CounterB() {
         });
       }
 
-      // 1. Lookup thaali
+      // 1. Thaali row
       const { data: thaaliRow } = await supabase
         .from('thaalis')
         .select('id, thaali_number')
@@ -165,37 +181,50 @@ export default function CounterB() {
         return;
       }
 
-      // 2. Registration
+      // 2. Registration — no status filter (registrations don't have a status column)
       const { data: reg } = await supabase
         .from('thaali_registrations')
         .select('id, mumin_id, distributor_id')
         .eq('thaali_id', thaaliRow.id)
-        .eq('status', 'approved')
         .maybeSingle();
 
       if (!reg) {
-        setError(`Thaali #${thaaliNumber} has no active registration`);
+        setError(`Thaali #${thaaliNumber} has no registration`);
         setCurrent(null);
         return;
       }
 
-      // 3. Mumin
+      // 3. Mumin — include niyyat_status_id and is_hof for eligibility check
       const { data: mumin } = await supabase
         .from('mumineen')
-        .select('full_name, sf_no')
+        .select('full_name, sf_no, niyyat_status_id, is_hof')
         .eq('id', reg.mumin_id)
         .maybeSingle();
 
-      // 4. Stopped check
+      // 4. Eligibility: must be HOF + correct niyyat status for today
+      const sched = schedule || { niyyat_status_ids: [1], thaali_enabled: true } as TodaySchedule;
+      if (!mumin?.is_hof) {
+        setError(`Thaali #${thaaliNumber} — mumin is not a head of family`);
+        setCurrent(null);
+        return;
+      }
+      if (!sched.niyyat_status_ids.includes(mumin.niyyat_status_id)) {
+        setError(`Thaali #${thaaliNumber} — mumin niyyat status not eligible today`);
+        setCurrent(null);
+        return;
+      }
+
+      // 5. Stop check — correct columns: from_date / to_date
+      //    Sentinel '2099-12-31' means indefinite, so gte(to_date, today) covers both cases
       const { data: stopRow } = await supabase
         .from('stop_thaalis')
         .select('id')
-        .eq('thaali_id', thaaliRow.id)
-        .lte('stop_date', today)
-        .or(`resume_date.is.null,resume_date.gt.${today}`)
+        .eq('mumin_id', reg.mumin_id)
+        .lte('from_date', today)
+        .gte('to_date', today)
         .maybeSingle();
 
-      // 5. Customization
+      // 6. Customization
       const { data: customization } = await supabase
         .from('thaali_customizations')
         .select('*')
@@ -204,7 +233,7 @@ export default function CounterB() {
         .eq('status', 'active')
         .maybeSingle();
 
-      // 6. Today's menu
+      // 7. Today's menu
       const { data: todayMenu } = await supabase
         .from('daily_menu')
         .select('*')
@@ -259,10 +288,10 @@ export default function CounterB() {
     setTimeout(() => manualRef.current?.focus(), 100);
   };
 
+  // ── goToTally — uses kitchen-eligible for correct eligible list ────────────
   const goToTally = async () => {
     if (!activeSession) return;
 
-    // Mark current if still on screen
     if (current) {
       await markFilled(current);
       setFilledThaalis(prev => {
@@ -272,55 +301,50 @@ export default function CounterB() {
       setCurrent(null);
     }
 
-    // Build tally — fetch all customized thaalis for this distributor session
-    const { data: registrations } = await supabase
-      .from('thaali_registrations')
-      .select('id, thaali_id, mumin_id')
-      .eq('distributor_id', activeSession.distributor_id)
-      .eq('status', 'approved');
+    // Get schedule-filtered eligible list for this distributor
+    const { eligible, noThaaliDay } = await loadKitchenDayData({
+      distributorId: activeSession.distributor_id,
+    });
 
-    if (!registrations?.length) { setView('tally'); setTallyItems([]); return; }
+    if (noThaaliDay || eligible.length === 0) {
+      setTallyItems([]);
+      setView('tally');
+      return;
+    }
 
-    const muminIds = registrations.map(r => r.mumin_id);
-    const thaaliIds = registrations.map(r => r.thaali_id);
+    const muminIds = eligible.map(r => r.mumin_id);
+    const thaaliIds = eligible.map(r => r.thaali_id);
 
-    const [thaaliRes, muminRes, customRes, stopRes, filledRes] = await Promise.all([
-      supabase.from('thaalis').select('id, thaali_number').in('id', thaaliIds),
-      supabase.from('mumineen').select('id, full_name, sf_no').in('id', muminIds),
-      supabase.from('thaali_customizations').select('*').in('mumin_id', muminIds).eq('request_date', today).eq('status', 'active'),
-      supabase.from('stop_thaalis').select('thaali_id').in('thaali_id', thaaliIds).lte('stop_date', today).or(`resume_date.is.null,resume_date.gt.${today}`),
-      supabase.from('thaali_daily_status').select('thaali_id').eq('session_id', activeSession.id).eq('status', 'counter_b_filled'),
+    const [customRes, filledRes] = await Promise.all([
+      supabase
+        .from('thaali_customizations')
+        .select('*')
+        .in('mumin_id', muminIds)
+        .eq('request_date', today)
+        .eq('status', 'active'),
+      supabase
+        .from('thaali_daily_status')
+        .select('thaali_id')
+        .eq('session_id', activeSession.id)
+        .eq('status', 'counter_b_filled'),
     ]);
 
-    const thaaliMap = new Map(thaaliRes.data?.map(t => [t.id, t]) || []);
-    const muminMap = new Map(muminRes.data?.map(m => [m.id, m]) || []);
-    const customMap = new Map(customRes.data?.map(c => [c.mumin_id, c]) || []);
-    const stoppedIds = new Set(stopRes.data?.map(s => s.thaali_id) || []);
-    const filledIds = new Set(filledRes.data?.map(f => f.thaali_id) || []);
+    const customMap = new Map(customRes.data?.map((c: any) => [c.mumin_id, c]) || []);
+    const filledIds = new Set(filledRes.data?.map((f: any) => f.thaali_id) || []);
 
-    // Only customized, non-stopped
-    const items: TallyItem[] = registrations
-      .filter(r => {
-        const hasCust = customMap.has(r.mumin_id);
-        const isStopped = stoppedIds.has(r.thaali_id);
-        return hasCust && !isStopped;
-      })
-      .map(r => {
-        const thaali = thaaliMap.get(r.thaali_id);
-        const mumin = muminMap.get(r.mumin_id);
-        const customization = customMap.get(r.mumin_id);
-        const isFilled = filledIds.has(r.thaali_id);
-        return {
-          thaali_number: thaali?.thaali_number || String(r.thaali_id),
-          thaali_id: r.thaali_id,
-          mumin_name: mumin?.full_name || 'Unknown',
-          sf_no: mumin?.sf_no || '',
-          customization,
-          filled: isFilled,
-          reconciled: false,
-          missing: false,
-        };
-      });
+    // Only customized eligible thaalis belong in Counter B tally
+    const items: TallyItem[] = eligible
+      .filter(r => customMap.has(r.mumin_id))
+      .map(r => ({
+        thaali_number: String(r.thaali_number),
+        thaali_id: r.thaali_id,
+        mumin_name: r.full_name,
+        sf_no: r.sf_no,
+        customization: customMap.get(r.mumin_id),
+        filled: filledIds.has(r.thaali_id),
+        reconciled: false,
+        missing: false,
+      }));
 
     setTallyItems(items);
     setView('tally');
@@ -328,17 +352,13 @@ export default function CounterB() {
 
   const toggleMissing = (thaaliId: number) => {
     setTallyItems(prev => prev.map(t =>
-      t.thaali_id === thaaliId
-        ? { ...t, missing: !t.missing, reconciled: false }
-        : t
+      t.thaali_id === thaaliId ? { ...t, missing: !t.missing, reconciled: false } : t
     ));
   };
 
   const toggleReconciled = (thaaliId: number) => {
     setTallyItems(prev => prev.map(t =>
-      t.thaali_id === thaaliId
-        ? { ...t, reconciled: !t.reconciled, missing: false }
-        : t
+      t.thaali_id === thaaliId ? { ...t, reconciled: !t.reconciled, missing: false } : t
     ));
   };
 
@@ -426,12 +446,12 @@ export default function CounterB() {
                   <th key={col.key} style={{
                     textAlign: 'center', padding: '8px 4px 12px',
                     fontSize: '1rem', fontWeight: 700,
-                    borderBottom: '2px solid #dee2e6',
-                    minWidth: '100px', color: '#1e293b',
+                    borderBottom: '2px solid var(--bs-border-color)',
+                    minWidth: '100px', color: 'var(--bs-body-color)',
                   }}>
                     {col.label}
                     {col.menuName && (
-                      <div style={{ fontSize: '0.72rem', fontWeight: 400, color: '#9ca3af', marginTop: 3 }}>
+                      <div style={{ fontSize: '0.72rem', fontWeight: 400, color: 'var(--bs-secondary-color)', marginTop: 3 }}>
                         {col.menuName}
                       </div>
                     )}
@@ -450,9 +470,9 @@ export default function CounterB() {
                         <td key={col.key} style={{ textAlign: 'center', padding: '4px' }}>
                           <div style={{
                             padding: '12px 6px', borderRadius: '8px',
-                            border: isSelected ? `2px solid ${qtyInfo.bg}` : '2px solid #e5e7eb',
-                            background: isSelected ? qtyInfo.bg : '#fff',
-                            color: isSelected ? qtyInfo.text : '#d1d5db',
+                            border: isSelected ? `2px solid ${qtyInfo.bg}` : '2px solid var(--bs-border-color)',
+                            background: isSelected ? qtyInfo.bg : 'var(--bs-body-bg)',
+                            color: isSelected ? qtyInfo.text : 'var(--bs-secondary-color)',
                             fontWeight: isSelected ? 700 : 400,
                             fontSize: '0.9rem',
                             boxShadow: isSelected ? `0 3px 10px ${qtyInfo.bg}44` : 'none',
@@ -479,13 +499,11 @@ export default function CounterB() {
     );
   };
 
-  // ─────────────────────────────────────────────
-  // VIEW: SESSIONS
-  // ─────────────────────────────────────────────
+  // ─── VIEW: SESSIONS ────────────────────────────────────────────────────────
   if (view === 'sessions') {
     return (
-      <div className="min-vh-100 bg-light">
-        <div className="bg-white border-bottom px-4 py-3 mb-4">
+      <div style={{ minHeight: '100vh', background: 'var(--bs-tertiary-bg)' }}>
+        <div style={{ background: 'var(--bs-body-bg)', borderBottom: '1px solid var(--bs-border-color)', padding: '12px 24px' }}>
           <div className="d-flex justify-content-between align-items-center">
             <Link href="/kitchen" className="btn btn-outline-secondary">
               <i className="bi bi-arrow-left me-2"></i>Back
@@ -500,13 +518,12 @@ export default function CounterB() {
           </div>
         </div>
 
-        <div className="container-fluid px-4">
+        <div className="container-fluid px-4 mt-4">
           <div className="alert alert-info mb-4" style={{ fontSize: '0.9rem' }}>
             <i className="bi bi-info-circle me-2"></i>
             Select a distributor session confirmed by Counter A. Scan customized thaalis, fill as shown, then do a tally before marking done.
           </div>
 
-          {/* Active sessions */}
           <h5 className="fw-bold mb-3">
             <i className="bi bi-person-walking me-2 text-warning"></i>
             Awaiting Counter B
@@ -524,11 +541,11 @@ export default function CounterB() {
             <div className="row g-3 mb-4">
               {sessions.map(s => (
                 <div className="col-12 col-md-6 col-lg-4" key={s.id}>
-                  <div className="card border-0 shadow-sm h-100">
+                  <div className="card border-0 shadow-sm h-100" style={{ background: 'var(--bs-body-bg)' }}>
                     <div className="card-body p-4">
                       <h5 className="fw-bold mb-1" style={{ color: '#06b6d4' }}>{s.distributor_name}</h5>
                       <div className="mb-3">
-                        <span className="text-muted small">
+                        <span style={{ color: 'var(--bs-secondary-color)', fontSize: '0.9rem' }}>
                           <i className="bi bi-sliders me-1"></i>
                           {s.customized_thaalis} customized thaalis to fill
                         </span>
@@ -538,8 +555,7 @@ export default function CounterB() {
                         style={{ background: '#06b6d4' }}
                         onClick={() => startSession(s)}
                       >
-                        <i className="bi bi-play-circle me-2"></i>
-                        Start Filling
+                        <i className="bi bi-play-circle me-2"></i>Start Filling
                       </button>
                     </div>
                   </div>
@@ -548,7 +564,6 @@ export default function CounterB() {
             </div>
           )}
 
-          {/* Completed sessions */}
           {completedSessions.length > 0 && (
             <>
               <h5 className="fw-bold mb-3">
@@ -559,15 +574,13 @@ export default function CounterB() {
               <div className="row g-3">
                 {completedSessions.map(s => (
                   <div className="col-12 col-md-6 col-lg-4" key={s.id}>
-                    <div className="card border-0 shadow-sm bg-white opacity-75">
+                    <div className="card border-0 shadow-sm opacity-75" style={{ background: 'var(--bs-body-bg)' }}>
                       <div className="card-body p-3 d-flex justify-content-between align-items-center">
                         <div>
-                          <div className="fw-semibold">{s.distributor_name}</div>
-                          <div className="text-muted small">{s.customized_thaalis} customized</div>
+                          <div className="fw-semibold" style={{ color: 'var(--bs-body-color)' }}>{s.distributor_name}</div>
+                          <div style={{ color: 'var(--bs-secondary-color)', fontSize: '0.85rem' }}>{s.customized_thaalis} customized</div>
                         </div>
-                        <span className="badge bg-success">
-                          <i className="bi bi-check2 me-1"></i>Done
-                        </span>
+                        <span className="badge bg-success"><i className="bi bi-check2 me-1"></i>Done</span>
                       </div>
                     </div>
                   </div>
@@ -580,13 +593,11 @@ export default function CounterB() {
     );
   }
 
-  // ─────────────────────────────────────────────
-  // VIEW: SCANNING
-  // ─────────────────────────────────────────────
+  // ─── VIEW: SCANNING ────────────────────────────────────────────────────────
   if (view === 'scanning') {
     return (
-      <div className="min-vh-100 bg-light">
-        <div className="bg-white border-bottom px-4 py-3 mb-3">
+      <div style={{ minHeight: '100vh', background: 'var(--bs-tertiary-bg)' }}>
+        <div style={{ background: 'var(--bs-body-bg)', borderBottom: '1px solid var(--bs-border-color)', padding: '12px 24px' }}>
           <div className="d-flex justify-content-between align-items-center">
             <button className="btn btn-outline-secondary" onClick={() => { setView('sessions'); setCurrent(null); }}>
               <i className="bi bi-arrow-left me-2"></i>Back
@@ -595,18 +606,15 @@ export default function CounterB() {
               <h1 className="h5 mb-0 fw-bold" style={{ color: '#06b6d4' }}>
                 Counter B — {activeSession?.distributor_name}
               </h1>
-              <div className="text-muted small">{filledThaalis.length} filled so far</div>
+              <div style={{ color: 'var(--bs-secondary-color)', fontSize: '0.85rem' }}>{filledThaalis.length} filled so far</div>
             </div>
-            <button
-              className="btn btn-success fw-bold"
-              onClick={goToTally}
-            >
+            <button className="btn btn-success fw-bold" onClick={goToTally}>
               <i className="bi bi-list-check me-2"></i>Tally &amp; Done
             </button>
           </div>
         </div>
 
-        <div className="container-fluid px-3">
+        <div className="container-fluid px-3 mt-3">
           {error && (
             <div className="alert alert-warning alert-dismissible py-2 mb-3">
               <i className="bi bi-exclamation-triangle me-2"></i>{error}
@@ -615,9 +623,9 @@ export default function CounterB() {
           )}
 
           <div className="row g-3">
-            {/* LEFT — Scanner + input + previous */}
+            {/* LEFT */}
             <div className="col-12 col-lg-4">
-              <div className="card border-0 shadow-sm mb-3">
+              <div className="card border-0 shadow-sm mb-3" style={{ background: 'var(--bs-body-bg)' }}>
                 <div className="card-header py-2 px-3" style={{ background: '#1e293b', color: '#fff' }}>
                   <h6 className="mb-0"><i className="bi bi-qr-code-scan me-2"></i>Scan Thaali QR</h6>
                 </div>
@@ -626,9 +634,9 @@ export default function CounterB() {
                 </div>
               </div>
 
-              <div className="card border-0 shadow-sm mb-3">
+              <div className="card border-0 shadow-sm mb-3" style={{ background: 'var(--bs-body-bg)' }}>
                 <div className="card-body p-3">
-                  <label className="form-label fw-bold mb-1 small">
+                  <label className="form-label fw-bold mb-1 small" style={{ color: 'var(--bs-body-color)' }}>
                     <i className="bi bi-keyboard me-1"></i>Manual — if scan fails
                   </label>
                   <div className="input-group">
@@ -650,49 +658,48 @@ export default function CounterB() {
                       <i className="bi bi-arrow-right fs-5"></i>
                     </button>
                   </div>
-                  <div className="text-muted mt-1" style={{ fontSize: '0.78rem' }}>
+                  <div style={{ color: 'var(--bs-secondary-color)', fontSize: '0.78rem', marginTop: 4 }}>
                     Scanning next thaali auto-marks current as filled
                   </div>
                 </div>
               </div>
 
-              {/* Stats */}
-              <div className="card border-0 shadow-sm mb-3">
+              <div className="card border-0 shadow-sm mb-3" style={{ background: 'var(--bs-body-bg)' }}>
                 <div className="card-body p-3">
                   <div className="row g-2 text-center">
                     <div className="col-6">
                       <div className="fw-bold fs-4" style={{ color: '#06b6d4' }}>{activeSession?.customized_thaalis || 0}</div>
-                      <div className="text-muted" style={{ fontSize: '0.75rem' }}>Expected</div>
+                      <div style={{ color: 'var(--bs-secondary-color)', fontSize: '0.75rem' }}>Expected</div>
                     </div>
                     <div className="col-6">
                       <div className="fw-bold fs-4 text-success">{filledThaalis.length + (current ? 1 : 0)}</div>
-                      <div className="text-muted" style={{ fontSize: '0.75rem' }}>Scanned</div>
+                      <div style={{ color: 'var(--bs-secondary-color)', fontSize: '0.75rem' }}>Scanned</div>
                     </div>
                   </div>
                 </div>
               </div>
 
               {previous && (
-                <div className="card border-0 shadow-sm border-start border-success border-3">
+                <div className="card border-0 shadow-sm" style={{ borderLeft: '3px solid #16a34a', background: 'var(--bs-body-bg)' }}>
                   <div className="card-body py-2 px-3 d-flex align-items-center gap-2">
                     <i className="bi bi-check-circle-fill text-success fs-5"></i>
                     <div>
-                      <div className="fw-bold small">#{previous.thaali_number} — {previous.mumin_name}</div>
-                      <div className="text-muted" style={{ fontSize: '0.75rem' }}>Just filled ✓</div>
+                      <div className="fw-bold small" style={{ color: 'var(--bs-body-color)' }}>#{previous.thaali_number} — {previous.mumin_name}</div>
+                      <div style={{ color: 'var(--bs-secondary-color)', fontSize: '0.75rem' }}>Just filled ✓</div>
                     </div>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* RIGHT — Current thaali */}
+            {/* RIGHT */}
             <div className="col-12 col-lg-8">
               {!current ? (
-                <div className="card border-0 shadow-sm" style={{ minHeight: '400px' }}>
+                <div className="card border-0 shadow-sm" style={{ minHeight: '400px', background: 'var(--bs-body-bg)' }}>
                   <div className="card-body d-flex flex-column align-items-center justify-content-center">
                     <i className="bi bi-qr-code-scan mb-3" style={{ fontSize: '4rem', color: '#06b6d4', opacity: 0.4 }}></i>
-                    <h5 className="text-muted">Waiting for scan...</h5>
-                    <p className="text-muted small mb-4">Scan a thaali QR or enter number manually</p>
+                    <h5 style={{ color: 'var(--bs-secondary-color)' }}>Waiting for scan...</h5>
+                    <p style={{ color: 'var(--bs-secondary-color)', fontSize: '0.9rem' }}>Scan a thaali QR or enter number manually</p>
                     {filledThaalis.length > 0 && (
                       <button className="btn btn-success btn-lg px-4" onClick={goToTally}>
                         <i className="bi bi-list-check me-2"></i>
@@ -702,7 +709,7 @@ export default function CounterB() {
                   </div>
                 </div>
               ) : (
-                <div className="card border-0 shadow-sm">
+                <div className="card border-0 shadow-sm" style={{ background: 'var(--bs-body-bg)' }}>
                   <div className="card-header py-3 px-4" style={{
                     background: current.type === 'stopped' ? '#fee2e2' :
                                  current.type === 'customized' ? '#e0f2fe' : '#f0fdf4',
@@ -714,7 +721,7 @@ export default function CounterB() {
                     <div className="d-flex justify-content-between align-items-start">
                       <div>
                         <div className="d-flex align-items-center gap-3 flex-wrap">
-                          <h3 className="mb-0 fw-bold" style={{ fontSize: '1.8rem' }}>
+                          <h3 className="mb-0 fw-bold" style={{ fontSize: '1.8rem', color: '#1e293b' }}>
                             Thaali No: {current.thaali_number}
                           </h3>
                           <span className={`badge fs-6 px-3 py-2 ${
@@ -725,12 +732,12 @@ export default function CounterB() {
                              current.type === 'customized' ? '✏️ CUSTOMIZED' : '✅ DEFAULT'}
                           </span>
                         </div>
-                        <div className="mt-2 d-flex gap-3 flex-wrap" style={{ fontSize: '0.9rem' }}>
+                        <div className="mt-2 d-flex gap-3 flex-wrap" style={{ fontSize: '0.9rem', color: '#1e293b' }}>
                           <span className="fw-semibold">{current.mumin_name}</span>
-                          <span className="text-muted">SF# {current.sf_no}</span>
+                          <span style={{ opacity: 0.6 }}>SF# {current.sf_no}</span>
                         </div>
                       </div>
-                      <div className="text-end text-muted" style={{ fontSize: '0.8rem' }}>
+                      <div className="text-end" style={{ color: '#475569', fontSize: '0.8rem' }}>
                         {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}<br />
                         {new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
                       </div>
@@ -741,12 +748,12 @@ export default function CounterB() {
                     {renderGrid(current)}
                   </div>
 
-                  <div className="card-footer bg-white py-3 px-4">
+                  <div className="card-footer py-3 px-4" style={{ background: 'var(--bs-body-bg)', borderTop: '1px solid var(--bs-border-color)' }}>
                     <div className="d-flex gap-3 align-items-center flex-wrap">
                       <button className="btn btn-success btn-lg px-4 fw-bold" onClick={handleDoneWithCurrent}>
                         <i className="bi bi-check-lg me-2"></i>Mark Filled — Scan Next
                       </button>
-                      <span className="text-muted small">Or scan next thaali to auto-confirm</span>
+                      <span style={{ color: 'var(--bs-secondary-color)', fontSize: '0.85rem' }}>Or scan next thaali to auto-confirm</span>
                     </div>
                   </div>
                 </div>
@@ -758,17 +765,15 @@ export default function CounterB() {
     );
   }
 
-  // ─────────────────────────────────────────────
-  // VIEW: TALLY
-  // ─────────────────────────────────────────────
+  // ─── VIEW: TALLY ───────────────────────────────────────────────────────────
   const tallyFilled = tallyItems.filter(t => t.filled && !t.missing);
   const tallyMissing = tallyItems.filter(t => t.missing);
   const tallyUnfilled = tallyItems.filter(t => !t.filled && !t.reconciled);
   const allAccountedFor = tallyUnfilled.length === 0;
 
   return (
-    <div className="min-vh-100 bg-light">
-      <div className="bg-white border-bottom px-4 py-3 mb-4">
+    <div style={{ minHeight: '100vh', background: 'var(--bs-tertiary-bg)' }}>
+      <div style={{ background: 'var(--bs-body-bg)', borderBottom: '1px solid var(--bs-border-color)', padding: '12px 24px' }}>
         <div className="d-flex justify-content-between align-items-center">
           <button className="btn btn-outline-secondary" onClick={() => setView('scanning')}>
             <i className="bi bi-arrow-left me-2"></i>Back to Scan
@@ -778,13 +783,12 @@ export default function CounterB() {
               <i className="bi bi-list-check me-2"></i>
               Tally — {activeSession?.distributor_name}
             </h1>
-            <div className="text-muted small">Count physical thaalis against this list</div>
+            <div style={{ color: 'var(--bs-secondary-color)', fontSize: '0.85rem' }}>Count physical thaalis against this list</div>
           </div>
           <button
             className="btn btn-success btn-lg fw-bold px-4"
             onClick={handleMarkSessionDone}
             disabled={completingSession || !allAccountedFor}
-            title={!allAccountedFor ? 'Mark all unfilled thaalis as reconciled or missing first' : ''}
           >
             {completingSession
               ? <><span className="spinner-border spinner-border-sm me-2"></span>Completing...</>
@@ -794,9 +798,7 @@ export default function CounterB() {
         </div>
       </div>
 
-      <div className="container-fluid px-4">
-
-        {/* Summary cards */}
+      <div className="container-fluid px-4 mt-4">
         <div className="row g-3 mb-4">
           {[
             { label: 'Total Customized', value: tallyItems.length, color: 'info' },
@@ -805,15 +807,14 @@ export default function CounterB() {
             { label: 'Missing', value: tallyMissing.length, color: 'danger' },
           ].map(stat => (
             <div className="col-6 col-md-3" key={stat.label}>
-              <div className="card border-0 shadow-sm text-center p-3">
+              <div className="card border-0 shadow-sm text-center p-3" style={{ background: 'var(--bs-body-bg)' }}>
                 <div className={`display-6 fw-bold text-${stat.color}`}>{stat.value}</div>
-                <div className="small text-muted">{stat.label}</div>
+                <div style={{ color: 'var(--bs-secondary-color)', fontSize: '0.85rem' }}>{stat.label}</div>
               </div>
             </div>
           ))}
         </div>
 
-        {/* Status */}
         {allAccountedFor ? (
           <div className="alert alert-success mb-4">
             <i className="bi bi-check-circle-fill me-2"></i>
@@ -823,32 +824,26 @@ export default function CounterB() {
           <div className="alert alert-warning mb-4">
             <i className="bi bi-exclamation-triangle me-2"></i>
             <strong>{tallyUnfilled.length} thaali{tallyUnfilled.length > 1 ? 's' : ''} not yet filled.</strong>
-            {' '}Mark them as reconciled (found &amp; filled now) or missing before completing.
+            {' '}Mark them as reconciled or missing before completing.
           </div>
         )}
 
-        {/* Tally table */}
-        <div className="card border-0 shadow-sm">
-          <div className="card-header bg-white py-3">
-            <h6 className="mb-0 fw-bold">Customized Thaalis — Physical Count</h6>
+        <div className="card border-0 shadow-sm" style={{ background: 'var(--bs-body-bg)' }}>
+          <div className="card-header py-3" style={{ background: 'var(--bs-body-bg)', borderBottom: '1px solid var(--bs-border-color)' }}>
+            <h6 className="mb-0 fw-bold" style={{ color: 'var(--bs-body-color)' }}>Customized Thaalis — Physical Count</h6>
           </div>
           <div className="card-body p-0">
             {tallyItems.length === 0 ? (
-              <div className="text-center py-5 text-muted">
-                <i className="bi bi-inbox fs-2 mb-2 d-block"></i>
-                No customized thaalis for this session
+              <div className="text-center py-5" style={{ color: 'var(--bs-secondary-color)' }}>
+                <i className="bi bi-inbox fs-2 mb-2 d-block"></i>No customized thaalis for this session
               </div>
             ) : (
               <div className="table-responsive">
                 <table className="table table-hover mb-0">
                   <thead className="table-light">
                     <tr>
-                      <th className="ps-3">Thaali #</th>
-                      <th>Mumin</th>
-                      <th>SF#</th>
-                      <th>Customization</th>
-                      <th>Filled</th>
-                      <th>Action</th>
+                      <th className="ps-3">Thaali #</th><th>Mumin</th><th>SF#</th>
+                      <th>Customization</th><th>Filled</th><th>Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -860,7 +855,7 @@ export default function CounterB() {
                       }>
                         <td className="ps-3 fw-bold fs-6">#{t.thaali_number}</td>
                         <td>{t.mumin_name}</td>
-                        <td className="text-muted">{t.sf_no}</td>
+                        <td style={{ color: 'var(--bs-secondary-color)' }}>{t.sf_no}</td>
                         <td>
                           {t.customization?.stop_thaali ? (
                             <span className="badge bg-danger">Stop</span>
@@ -871,11 +866,8 @@ export default function CounterB() {
                                 if (!qty || qty === 'full') return null;
                                 const qtyInfo = QTY_MAP[qty];
                                 return (
-                                  <span
-                                    key={item.key}
-                                    className="badge"
-                                    style={{ background: qtyInfo.bg, color: qtyInfo.text, fontSize: '0.7rem' }}
-                                  >
+                                  <span key={item.key} className="badge"
+                                    style={{ background: qtyInfo.bg, color: qtyInfo.text, fontSize: '0.7rem' }}>
                                     {item.label}: {qtyInfo.label}
                                   </span>
                                 );
@@ -884,48 +876,27 @@ export default function CounterB() {
                           )}
                         </td>
                         <td>
-                          {t.missing ? (
-                            <span className="badge bg-danger">Missing</span>
-                          ) : t.reconciled ? (
-                            <span className="badge bg-warning text-dark">Reconciled</span>
-                          ) : t.filled ? (
-                            <span className="badge bg-success">
-                              <i className="bi bi-check me-1"></i>Filled
-                            </span>
-                          ) : (
-                            <span className="badge bg-secondary">Not Filled</span>
-                          )}
+                          {t.missing    ? <span className="badge bg-danger">Missing</span> :
+                           t.reconciled ? <span className="badge bg-warning text-dark">Reconciled</span> :
+                           t.filled     ? <span className="badge bg-success"><i className="bi bi-check me-1"></i>Filled</span> :
+                                          <span className="badge bg-secondary">Not Filled</span>}
                         </td>
                         <td>
                           {!t.filled && !t.reconciled && !t.missing && (
                             <div className="d-flex gap-2">
-                              <button
-                                className="btn btn-sm btn-outline-success"
-                                onClick={() => toggleReconciled(t.thaali_id)}
-                                title="Found it — filling now"
-                              >
+                              <button className="btn btn-sm btn-outline-success" onClick={() => toggleReconciled(t.thaali_id)}>
                                 <i className="bi bi-check2"></i> Found
                               </button>
-                              <button
-                                className="btn btn-sm btn-outline-danger"
-                                onClick={() => toggleMissing(t.thaali_id)}
-                                title="Cannot find this thaali"
-                              >
+                              <button className="btn btn-sm btn-outline-danger" onClick={() => toggleMissing(t.thaali_id)}>
                                 <i className="bi bi-x"></i> Missing
                               </button>
                             </div>
                           )}
                           {(t.reconciled || t.missing) && (
-                            <button
-                              className="btn btn-sm btn-outline-secondary"
-                              onClick={() => {
-                                setTallyItems(prev => prev.map(ti =>
-                                  ti.thaali_id === t.thaali_id
-                                    ? { ...ti, reconciled: false, missing: false }
-                                    : ti
-                                ));
-                              }}
-                            >
+                            <button className="btn btn-sm btn-outline-secondary"
+                              onClick={() => setTallyItems(prev => prev.map(ti =>
+                                ti.thaali_id === t.thaali_id ? { ...ti, reconciled: false, missing: false } : ti
+                              ))}>
                               Undo
                             </button>
                           )}
@@ -940,18 +911,16 @@ export default function CounterB() {
         </div>
 
         <div className="text-center mt-4 pb-4">
-          <button
-            className="btn btn-success btn-lg px-5 fw-bold"
+          <button className="btn btn-success btn-lg px-5 fw-bold"
             onClick={handleMarkSessionDone}
-            disabled={completingSession || !allAccountedFor}
-          >
+            disabled={completingSession || !allAccountedFor}>
             {completingSession
               ? <><span className="spinner-border spinner-border-sm me-2"></span>Completing...</>
               : <><i className="bi bi-check-circle me-2"></i>Mark Session Done — Next Distributor</>
             }
           </button>
           {!allAccountedFor && (
-            <div className="text-muted small mt-2">
+            <div style={{ color: 'var(--bs-secondary-color)', fontSize: '0.85rem', marginTop: 8 }}>
               Resolve {tallyUnfilled.length} unfilled thaali{tallyUnfilled.length > 1 ? 's' : ''} above first
             </div>
           )}

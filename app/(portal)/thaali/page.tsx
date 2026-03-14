@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -29,24 +29,20 @@ interface Registration {
   thaali_type_id: number | null
   thaali_category_id: number | null
   distributor_id: number | null
-  fiscal_year_id: number | null
   remarks: string
   mumineen?: {
     sf_no: string
     full_name: string
     its_no: string
-    house_sectors?: { name: string }
   }
   thaalis?: { thaali_number: number }
   thaali_types?: { name: string }
   thaali_categories?: { name: string }
   distributors?: { full_name: string }
-  fiscal_years?: { gregorian_year: number; hijri_year: string }
 }
 
 interface Mumin { id: number; sf_no: string; full_name: string; its_no: string }
 interface Distributor { id: number; full_name: string }
-interface FiscalYear { id: number; gregorian_year: number; hijri_year: string; is_active: boolean }
 
 const PAGE_SIZE = 50
 
@@ -70,7 +66,7 @@ export default function ThaaliPage() {
       totalNumbers: nums.count || 0,
       totalRegs: t,
       assigned: a,
-      unassigned: t - a,
+      unassigned: t - a,  // registrations not yet assigned a thaali number
     })
   }
 
@@ -83,7 +79,6 @@ export default function ThaaliPage() {
 
   return (
     <div>
-      {/* Header */}
       <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
         <div>
           <h4 className="mb-0" style={{ color: 'var(--bs-body-color)' }}>Thaali</h4>
@@ -98,15 +93,13 @@ export default function ThaaliPage() {
         {[
           { label: 'Thaali Numbers', value: stats.totalNumbers, color: '#364574' },
           { label: 'Registrations',  value: stats.totalRegs,    color: '#405189' },
-          { label: 'Assigned',       value: stats.assigned,     color: '#0ab39c' },
-          { label: 'Unassigned',     value: stats.unassigned,   color: '#f06548' },
+          { label: 'Assigned',       value: stats.assigned,     color: '#0ab39c',  title: 'Registrations with a thaali number' },
+          { label: 'No Number Yet',  value: stats.unassigned,   color: '#f06548',  title: 'Registrations without a thaali number assigned' },
         ].map((s, i) => (
           <div key={i} className="col-6 col-md-3">
-            <div className="card" style={{
-              border: 'none',
-              boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
-              borderRadius: '10px',
-              background: 'var(--bs-body-bg)',
+            <div className="card" title={(s as any).title} style={{
+              border: 'none', boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+              borderRadius: '10px', background: 'var(--bs-body-bg)',
             }}>
               <div className="card-body p-3">
                 <p className="mb-1" style={{ fontSize: '13px', color: 'var(--bs-secondary-color)' }}>{s.label}</p>
@@ -151,45 +144,42 @@ function RegistrationsTab({ onStatsChange }: { onStatsChange: () => void }) {
   const [total, setTotal] = useState(0)
   const [showFilters, setShowFilters] = useState(false)
 
-  // Filters — no status filter
+  // FIX: ready flag — don't fetch registrations until lookups (and active FY) are loaded
+  const [lookupsReady, setLookupsReady] = useState(false)
+
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
-  const [filterFiscalYear, setFilterFiscalYear] = useState('')
   const [filterDistributor, setFilterDistributor] = useState('')
   const [filterType, setFilterType] = useState('')
   const [filterCategory, setFilterCategory] = useState('')
 
-  // Lookups
   const [allThaalis, setAllThaalis] = useState<Thaali[]>([])
   const [availableThaalis, setAvailableThaalis] = useState<Thaali[]>([])
   const [thaaliTypes, setThaaliTypes] = useState<ThaaliType[]>([])
   const [thaaliCategories, setThaaliCategories] = useState<ThaaliCategory[]>([])
   const [distributors, setDistributors] = useState<Distributor[]>([])
-  const [fiscalYears, setFiscalYears] = useState<FiscalYear[]>([])
 
-  // Modal
+  const [fetchError, setFetchError] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<Registration | null>(null)
   const [saving, setSaving] = useState(false)
 
-  // Mumin live search
-  const [muminSearch, setMuminSearch] = useState('')
-  const [muminResults, setMuminResults] = useState<Mumin[]>([])
-  const [muminSearching, setMuminSearching] = useState(false)
-  const searchRef = useRef<HTMLDivElement>(null)
+  const [unassignedHofs, setUnassignedHofs] = useState<Mumin[]>([])
 
   const [form, setForm] = useState({
     mumin_id: 0, mumin_label: '',
     thaali_id: '', thaali_type_id: '', thaali_category_id: '',
-    distributor_id: '', fiscal_year_id: '', remarks: '',
+    distributor_id: '', remarks: '',
   })
 
+  // FIX: load lookups first, THEN set lookupsReady which triggers registration fetch
   useEffect(() => { fetchLookups() }, [])
-  useEffect(() => {
-    fetchRegistrations()
-  }, [page, search, filterFiscalYear, filterDistributor, filterType, filterCategory])
 
-  // Close mumin dropdown on outside click
+  useEffect(() => {
+    if (!lookupsReady) return   // wait until lookups + active FY are set
+    fetchRegistrations()
+  }, [lookupsReady, page, search, filterDistributor, filterType, filterCategory])
+
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
@@ -201,20 +191,17 @@ function RegistrationsTab({ onStatsChange }: { onStatsChange: () => void }) {
   }, [])
 
   const fetchLookups = async () => {
-    const [tn, tt, tc, d, fy] = await Promise.all([
+    const [tn, tt, tc, d] = await Promise.all([
       supabase.from('thaalis').select('id, thaali_number, status').order('thaali_number'),
       supabase.from('thaali_types').select('id, name, status').eq('status', 'active'),
       supabase.from('thaali_categories').select('id, name'),
       supabase.from('distributors').select('id, full_name').eq('status', 'active').order('full_name'),
-      supabase.from('fiscal_years').select('*').order('id', { ascending: false }),
     ])
     setAllThaalis(tn.data || [])
     setThaaliTypes(tt.data || [])
     setThaaliCategories(tc.data || [])
     setDistributors(d.data || [])
-    setFiscalYears(fy.data || [])
-    const activeFY = (fy.data || []).find((f: FiscalYear) => f.is_active)
-    if (activeFY) setFilterFiscalYear(activeFY.id.toString())
+    setLookupsReady(true)
   }
 
   const fetchAvailableThaalis = async (excludeThaaliId?: number) => {
@@ -233,22 +220,27 @@ function RegistrationsTab({ onStatsChange }: { onStatsChange: () => void }) {
       .from('thaali_registrations')
       .select(`
         *,
-        mumineen!fk_tr_mumin(sf_no, full_name, its_no, house_sectors(name)),
+        mumineen!fk_tr_mumin(sf_no, full_name, its_no),
         thaalis!fk_tr_thaali(thaali_number),
         thaali_types!fk_tr_type(name),
         thaali_categories!fk_tr_category(name),
-        distributors!fk_tr_distributor(full_name),
-        fiscal_years!fk_tr_fiscal(gregorian_year, hijri_year)
+        distributors!fk_tr_distributor(full_name)
       `, { count: 'exact' })
       .order('id', { ascending: false })
       .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
 
-    if (filterFiscalYear)  query = query.eq('fiscal_year_id', parseInt(filterFiscalYear))
     if (filterDistributor) query = query.eq('distributor_id', parseInt(filterDistributor))
     if (filterType)        query = query.eq('thaali_type_id', parseInt(filterType))
     if (filterCategory)    query = query.eq('thaali_category_id', parseInt(filterCategory))
 
-    const { data, count } = await query
+    const { data, count, error } = await query
+    if (error) {
+      console.error('[thaali_registrations fetch error]', error)
+      setFetchError(error.message)
+      setLoading(false)
+      return
+    }
+    setFetchError('')
     let filtered = data || []
     if (search) {
       const s = search.toLowerCase()
@@ -264,39 +256,31 @@ function RegistrationsTab({ onStatsChange }: { onStatsChange: () => void }) {
     setLoading(false)
   }
 
-  // Search active HOF only — family members never appear
-  const searchMumin = async (val: string) => {
-    setMuminSearch(val)
-    setForm(f => ({ ...f, mumin_id: 0, mumin_label: '' }))
-    if (val.length < 2) { setMuminResults([]); return }
-    setMuminSearching(true)
+  // Load all active HOFs not yet registered (for Add dropdown)
+  const loadUnassignedHofs = async () => {
+    const { data: existing } = await supabase
+      .from('thaali_registrations')
+      .select('mumin_id')
+    const registeredIds = new Set((existing || []).map((r: any) => r.mumin_id).filter(Boolean))
+
     const { data } = await supabase
       .from('mumineen')
       .select('id, sf_no, full_name, its_no')
       .eq('is_hof', true)
       .eq('status', 'active')
-      .or(`full_name.ilike.%${val}%,sf_no.ilike.%${val}%,its_no.ilike.%${val}%`)
-      .limit(10)
-    setMuminResults(data || [])
-    setMuminSearching(false)
-  }
-
-  const selectMumin = (m: Mumin) => {
-    setForm(f => ({ ...f, mumin_id: m.id, mumin_label: `${m.sf_no} — ${m.full_name}` }))
-    setMuminSearch('')
-    setMuminResults([])
+      .order('full_name')
+    const unassigned = (data || []).filter((m: any) => !registeredIds.has(m.id))
+    setUnassignedHofs(unassigned)
   }
 
   const openAdd = () => {
     setEditing(null)
-    const activeFY = fiscalYears.find(f => f.is_active)
     setForm({
       mumin_id: 0, mumin_label: '',
       thaali_id: '', thaali_type_id: '', thaali_category_id: '',
-      distributor_id: '', fiscal_year_id: activeFY?.id.toString() || '', remarks: '',
+      distributor_id: '', remarks: '',
     })
-    setMuminSearch('')
-    setMuminResults([])
+    loadUnassignedHofs()
     fetchAvailableThaalis()
     setShowModal(true)
   }
@@ -310,11 +294,8 @@ function RegistrationsTab({ onStatsChange }: { onStatsChange: () => void }) {
       thaali_type_id: r.thaali_type_id?.toString() || '',
       thaali_category_id: r.thaali_category_id?.toString() || '',
       distributor_id: r.distributor_id?.toString() || '',
-      fiscal_year_id: r.fiscal_year_id?.toString() || '',
       remarks: r.remarks || '',
     })
-    setMuminSearch('')
-    setMuminResults([])
     fetchAvailableThaalis(r.thaali_id || undefined)
     setShowModal(true)
   }
@@ -335,7 +316,6 @@ function RegistrationsTab({ onStatsChange }: { onStatsChange: () => void }) {
       thaali_type_id: form.thaali_type_id ? parseInt(form.thaali_type_id) : null,
       thaali_category_id: form.thaali_category_id ? parseInt(form.thaali_category_id) : null,
       distributor_id: form.distributor_id ? parseInt(form.distributor_id) : null,
-      fiscal_year_id: form.fiscal_year_id ? parseInt(form.fiscal_year_id) : null,
       remarks: form.remarks,
     }
     if (editing) {
@@ -352,8 +332,6 @@ function RegistrationsTab({ onStatsChange }: { onStatsChange: () => void }) {
   const clearFilters = () => {
     setSearchInput(''); setSearch('')
     setFilterDistributor(''); setFilterType(''); setFilterCategory('')
-    const activeFY = fiscalYears.find(f => f.is_active)
-    setFilterFiscalYear(activeFY?.id.toString() || '')
     setPage(0)
   }
 
@@ -402,20 +380,8 @@ function RegistrationsTab({ onStatsChange }: { onStatsChange: () => void }) {
             </button>
           </div>
 
-          {/* Filters */}
           {showFilters && (
             <div className="row g-2 mt-2 pt-2" style={{ borderTop: '1px solid var(--bs-border-color)' }}>
-              <div className="col-6 col-md-3">
-                <label style={{ fontSize: '11px', color: 'var(--bs-secondary-color)' }}>Fiscal Year</label>
-                <select className="form-select form-select-sm" value={filterFiscalYear}
-                  onChange={e => { setFilterFiscalYear(e.target.value); setPage(0) }}
-                  style={{ background: 'var(--bs-body-bg)', color: 'var(--bs-body-color)', border: '1px solid var(--bs-border-color)' }}>
-                  <option value="">All Years</option>
-                  {fiscalYears.map(f => (
-                    <option key={f.id} value={f.id}>{f.gregorian_year} / {f.hijri_year}{f.is_active ? ' ★' : ''}</option>
-                  ))}
-                </select>
-              </div>
               <div className="col-6 col-md-3">
                 <label style={{ fontSize: '11px', color: 'var(--bs-secondary-color)' }}>Distributor</label>
                 <select className="form-select form-select-sm" value={filterDistributor}
@@ -451,7 +417,12 @@ function RegistrationsTab({ onStatsChange }: { onStatsChange: () => void }) {
       {/* Table */}
       <div className="card" style={{ border: 'none', boxShadow: '0 1px 4px rgba(0,0,0,0.08)', borderRadius: '10px', background: 'var(--bs-body-bg)' }}>
         <div className="card-body p-0">
-          {loading ? (
+          {fetchError ? (
+            <div className="alert alert-danger m-3" style={{ fontSize: 13 }}>
+              <i className="bi bi-exclamation-triangle me-2" />
+              <strong>Fetch error:</strong> {fetchError}
+            </div>
+          ) : loading ? (
             <div className="text-center py-5">
               <div className="spinner-border spinner-border-sm text-primary" />
             </div>
@@ -466,7 +437,7 @@ function RegistrationsTab({ onStatsChange }: { onStatsChange: () => void }) {
                 <table className="table table-hover mb-0" style={{ fontSize: '13px', minWidth: '800px' }}>
                   <thead style={{ background: 'var(--bs-tertiary-bg)' }}>
                     <tr>
-                      {['#', 'Thaali No', 'SF#', 'Name', 'Type', 'Category', 'Distributor', 'FY', 'Actions'].map(h => (
+                      {['#', 'Thaali No', 'SF#', 'Name', 'Type', 'Category', 'Distributor', 'Actions'].map(h => (
                         <th key={h} style={{ fontSize: '11px', color: 'var(--bs-secondary-color)', fontWeight: 600, whiteSpace: 'nowrap', padding: '10px 12px' }}>
                           {h}
                         </th>
@@ -482,7 +453,7 @@ function RegistrationsTab({ onStatsChange }: { onStatsChange: () => void }) {
                         <td style={{ padding: '10px 12px', fontWeight: 700, color: '#364574' }}>
                           {r.thaalis?.thaali_number
                             ? `#${r.thaalis.thaali_number}`
-                            : <span className="badge bg-warning text-dark" style={{ fontSize: '10px' }}>Unassigned</span>
+                            : <span className="badge bg-warning text-dark" style={{ fontSize: '10px' }}>No Number</span>
                           }
                         </td>
                         <td style={{ padding: '10px 12px', fontWeight: 600, color: '#364574' }}>
@@ -490,11 +461,7 @@ function RegistrationsTab({ onStatsChange }: { onStatsChange: () => void }) {
                         </td>
                         <td style={{ padding: '10px 12px', color: 'var(--bs-body-color)' }}>
                           <div style={{ fontWeight: 500 }}>{r.mumineen?.full_name || '—'}</div>
-                          {r.mumineen?.house_sectors?.name && (
-                            <div style={{ fontSize: '11px', color: 'var(--bs-secondary-color)' }}>
-                              {r.mumineen.house_sectors.name}
-                            </div>
-                          )}
+
                         </td>
                         <td style={{ padding: '10px 12px', color: 'var(--bs-body-color)' }}>
                           {r.thaali_types?.name || '—'}
@@ -504,9 +471,6 @@ function RegistrationsTab({ onStatsChange }: { onStatsChange: () => void }) {
                         </td>
                         <td style={{ padding: '10px 12px', color: 'var(--bs-body-color)' }}>
                           {r.distributors?.full_name || '—'}
-                        </td>
-                        <td style={{ padding: '10px 12px', color: 'var(--bs-secondary-color)', whiteSpace: 'nowrap' }}>
-                          {r.fiscal_years?.gregorian_year || '—'}
                         </td>
                         <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
                           <button
@@ -530,7 +494,6 @@ function RegistrationsTab({ onStatsChange }: { onStatsChange: () => void }) {
                 </table>
               </div>
 
-              {/* Pagination */}
               {totalPages > 1 && (
                 <div className="d-flex justify-content-between align-items-center px-3 py-2"
                   style={{ borderTop: '1px solid var(--bs-border-color)' }}>
@@ -576,87 +539,47 @@ function RegistrationsTab({ onStatsChange }: { onStatsChange: () => void }) {
               <div className="modal-body" style={{ maxHeight: '65vh', overflowY: 'auto', background: 'var(--bs-body-bg)' }}>
                 <div className="row g-3">
 
-                  {/* HOF search — active HOF only, no family members */}
-                  <div className="col-12" ref={searchRef} style={{ position: 'relative' }}>
+                  {/* HOF dropdown — unregistered active HOFs only */}
+                  <div className="col-12">
                     <label className="form-label" style={{ fontSize: '13px', color: 'var(--bs-body-color)', marginBottom: 6 }}>
                       HOF (Head of Family) *
                       <span className="ms-2" style={{ fontSize: '11px', color: 'var(--bs-secondary-color)', fontWeight: 400 }}>
-                        Active HOF only
+                        Active HOF only · already registered are hidden
                       </span>
                     </label>
 
-                    {form.mumin_id ? (
+                    {editing ? (
                       <div className="d-flex align-items-center gap-2 p-2 rounded"
                         style={{ background: 'var(--bs-tertiary-bg)', border: '1px solid var(--bs-border-color)' }}>
                         <i className="bi bi-person-check text-success fs-5" />
-                        <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--bs-body-color)', flex: 1 }}>
+                        <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--bs-body-color)' }}>
                           {form.mumin_label}
                         </span>
-                        {!editing && (
-                          <button className="btn btn-sm btn-outline-secondary" style={{ fontSize: '11px', padding: '2px 10px' }}
-                            onClick={() => setForm(f => ({ ...f, mumin_id: 0, mumin_label: '' }))}>
-                            Change
-                          </button>
-                        )}
                       </div>
                     ) : (
                       <>
-                        <div className="input-group input-group-sm">
-                          <span className="input-group-text"
-                            style={{ background: 'var(--bs-tertiary-bg)', border: '1px solid var(--bs-border-color)', color: 'var(--bs-secondary-color)' }}>
-                            <i className="bi bi-search" />
-                          </span>
-                          <input
-                            type="text"
-                            className="form-control"
-                            placeholder="Type name, SF# or ITS# to search HOF…"
-                            value={muminSearch}
-                            onChange={e => searchMumin(e.target.value)}
-                            style={{ background: 'var(--bs-body-bg)', color: 'var(--bs-body-color)', border: '1px solid var(--bs-border-color)' }}
-                            autoFocus
-                          />
-                          {muminSearching && (
-                            <span className="input-group-text"
-                              style={{ background: 'var(--bs-tertiary-bg)', border: '1px solid var(--bs-border-color)' }}>
-                              <div className="spinner-border spinner-border-sm" />
-                            </span>
-                          )}
-                        </div>
-
-                        {muminResults.length > 0 && (
-                          <div style={{
-                            position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 1050,
-                            background: 'var(--bs-body-bg)',
-                            border: '1px solid var(--bs-border-color)',
-                            borderRadius: '6px',
-                            boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
-                            maxHeight: '200px', overflowY: 'auto',
-                          }}>
-                            {muminResults.map(m => (
-                              <div key={m.id}
-                                style={{
-                                  padding: '10px 14px', cursor: 'pointer',
-                                  borderBottom: '1px solid var(--bs-border-color)',
-                                  color: 'var(--bs-body-color)',
-                                }}
-                                onMouseEnter={e => (e.currentTarget.style.background = 'var(--bs-tertiary-bg)')}
-                                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                                onClick={() => selectMumin(m)}
-                              >
-                                <span style={{ fontWeight: 700, color: '#364574' }}>{m.sf_no}</span>
-                                <span className="mx-2" style={{ color: 'var(--bs-secondary-color)' }}>—</span>
-                                <span>{m.full_name}</span>
-                                <span className="ms-2" style={{ fontSize: '11px', color: 'var(--bs-secondary-color)' }}>
-                                  ITS: {m.its_no}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {muminSearch.length >= 2 && !muminSearching && muminResults.length === 0 && (
+                        <select
+                          className="form-select form-select-sm"
+                          value={form.mumin_id || ''}
+                          onChange={e => {
+                            const id = parseInt(e.target.value)
+                            const m = unassignedHofs.find(h => h.id === id)
+                            if (m) setForm(f => ({ ...f, mumin_id: m.id, mumin_label: `${m.sf_no} — ${m.full_name}` }))
+                            else setForm(f => ({ ...f, mumin_id: 0, mumin_label: '' }))
+                          }}
+                          style={{ background: 'var(--bs-body-bg)', color: 'var(--bs-body-color)', border: '1px solid var(--bs-border-color)' }}
+                          autoFocus
+                        >
+                          <option value="">— Select HOF —</option>
+                          {unassignedHofs.map(m => (
+                            <option key={m.id} value={m.id}>
+                              {m.full_name} · SF# {m.sf_no}
+                            </option>
+                          ))}
+                        </select>
+                        {unassignedHofs.length === 0 && (
                           <div className="mt-1" style={{ fontSize: '12px', color: 'var(--bs-secondary-color)' }}>
-                            No active HOF found for "{muminSearch}"
+                            All active HOFs are already registered
                           </div>
                         )}
                       </>
@@ -669,7 +592,7 @@ function RegistrationsTab({ onStatsChange }: { onStatsChange: () => void }) {
                     <select className="form-select form-select-sm" value={form.thaali_id}
                       onChange={e => setForm(f => ({ ...f, thaali_id: e.target.value }))}
                       style={{ background: 'var(--bs-body-bg)', color: 'var(--bs-body-color)', border: '1px solid var(--bs-border-color)' }}>
-                      <option value="">— Unassigned —</option>
+                      <option value="">— Assign Later —</option>
                       {editing && form.thaali_id && !availableThaalis.find(t => t.id.toString() === form.thaali_id) && (
                         <option value={form.thaali_id}>#{editing.thaalis?.thaali_number} (current)</option>
                       )}
@@ -714,21 +637,6 @@ function RegistrationsTab({ onStatsChange }: { onStatsChange: () => void }) {
                       style={{ background: 'var(--bs-body-bg)', color: 'var(--bs-body-color)', border: '1px solid var(--bs-border-color)' }}>
                       <option value="">— Select Distributor —</option>
                       {distributors.map(d => <option key={d.id} value={d.id}>{d.full_name}</option>)}
-                    </select>
-                  </div>
-
-                  {/* Fiscal Year */}
-                  <div className="col-12 col-sm-6">
-                    <label className="form-label" style={{ fontSize: '13px', color: 'var(--bs-body-color)' }}>Fiscal Year</label>
-                    <select className="form-select form-select-sm" value={form.fiscal_year_id}
-                      onChange={e => setForm(f => ({ ...f, fiscal_year_id: e.target.value }))}
-                      style={{ background: 'var(--bs-body-bg)', color: 'var(--bs-body-color)', border: '1px solid var(--bs-border-color)' }}>
-                      <option value="">— Select Year —</option>
-                      {fiscalYears.map(fy => (
-                        <option key={fy.id} value={fy.id}>
-                          {fy.gregorian_year} / {fy.hijri_year}{fy.is_active ? ' (Active)' : ''}
-                        </option>
-                      ))}
                     </select>
                   </div>
 
@@ -867,7 +775,6 @@ function NumbersTab({ onStatsChange }: { onStatsChange: () => void }) {
                   style={{ background: 'var(--bs-body-bg)', color: 'var(--bs-body-color)', border: '1px solid var(--bs-border-color)' }}
                   autoFocus />
                 {error && <div className="text-danger mt-1" style={{ fontSize: '12px' }}>{error}</div>}
-                <div className="mt-2" style={{ fontSize: '11px', color: 'var(--bs-secondary-color)' }}>Numbers 1–9999. Each number is unique.</div>
               </div>
               <div className="modal-footer" style={{ borderTop: '1px solid var(--bs-border-color)' }}>
                 <button className="btn btn-sm btn-outline-secondary" onClick={() => setShowModal(false)}>Cancel</button>
