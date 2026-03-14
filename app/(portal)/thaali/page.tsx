@@ -180,15 +180,7 @@ function RegistrationsTab({ onStatsChange }: { onStatsChange: () => void }) {
     fetchRegistrations()
   }, [lookupsReady, page, search, filterDistributor, filterType, filterCategory])
 
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
-        setMuminResults([])
-      }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
+
 
   const fetchLookups = async () => {
     const [tn, tt, tc, d] = await Promise.all([
