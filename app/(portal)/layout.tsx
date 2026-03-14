@@ -155,17 +155,22 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
 
       {/* Logo */}
-      <div style={{ padding: '20px 16px', borderBottom: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <img src="/fmb-logo.svg" alt="FMB" style={{ width: '36px', height: '36px', borderRadius: '8px' }} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ color: '#fff', fontSize: '12px', fontWeight: 700, lineHeight: 1.2 }}>Faiz ul Mawaid il Burhaniyah</div>
-            <div style={{ color: '#ffbf69', fontSize: '11px', fontWeight: 500 }}>FMB Portal</div>
+      <div style={{ padding: '16px 16px 14px', borderBottom: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+          <div style={{ flex: 1, minWidth: 0, textAlign: 'center' }}>
+            {/* Logo image — mix-blend-mode:screen removes black background on dark sidebar */}
+            <img
+              src="/fmb-logo.png"
+              alt="Faiz ul Mawaid il Burhaniyah"
+              style={{ width: '100%', maxWidth: '180px', height: 'auto', display: 'block', margin: '0 auto 8px', mixBlendMode: 'screen' }}
+            />
+            <div style={{ color: '#fff', fontSize: '11px', fontWeight: 700, lineHeight: 1.4 }}>Faiz ul Mawaid il Burhaniyah</div>
+            <div style={{ color: '#ffbf69', fontSize: '10px', fontWeight: 500, marginTop: 2 }}>FMB Portal</div>
           </div>
           <button
             onClick={() => setSidebarOpen(false)}
             className="d-lg-none"
-            style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', fontSize: '22px', cursor: 'pointer', padding: '0 0 0 4px', lineHeight: 1, flexShrink: 0 }}
+            style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', fontSize: '20px', cursor: 'pointer', padding: '0', lineHeight: 1, flexShrink: 0, marginLeft: 4 }}
           >
             <i className="bi bi-x" />
           </button>

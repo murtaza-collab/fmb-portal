@@ -15,10 +15,15 @@ interface Mumin {
   total_infant: number; remarks: string; is_hof: boolean; hof_id: number | null
 }
 
-interface Sector       { id: number; name: string }
-interface HouseBlock   { id: number; name: string }
-interface HouseType    { id: number; name: string }
-interface NiyyatStatus { id: number; name: string }
+interface ThaaliReg {
+  thaali_number: number | null
+  distributor_name: string | null
+}
+
+interface Sector        { id: number; name: string }
+interface HouseBlock    { id: number; name: string }
+interface HouseType     { id: number; name: string }
+interface NiyyatStatus  { id: number; name: string }
 interface MuminCategory { id: number; name: string; colour: string }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -65,8 +70,8 @@ const buildAddress = (typeName: string, num: string, cat: string, floor: string,
   const unit = `${typeName ? typeName + ' ' : ''}${num}${cat}`.trim()
   if (unit) parts.push(unit)
   if (floor) {
-    const floorLabel = FLOOR_OPTIONS.find(f => f.value === floor)?.label || `${floor} Floor`
-    parts.push(floorLabel)
+    const lbl = FLOOR_OPTIONS.find(f => f.value === floor)?.label || `${floor} Floor`
+    parts.push(lbl)
   }
   if (blockName) parts.push(`Block ${blockName}`)
   if (sectorName) parts.push(sectorName)
@@ -75,10 +80,8 @@ const buildAddress = (typeName: string, num: string, cat: string, floor: string,
 
 const AGE_COLORS: Record<string, string> = { adult: '#0ab39c', child: '#299cdb', infant: '#f06548' }
 
-// Capitalize first letter of every word
 const toTitleCase = (val: string) => val.replace(/(^|\s)\S/g, c => c.toUpperCase())
 
-// Floor options: Ground Floor, then 1st, 2nd...
 const FLOOR_OPTIONS = [
   { value: '0', label: 'Ground Floor' },
   ...Array.from({ length: 20 }, (_, i) => {
@@ -92,9 +95,9 @@ const FLOOR_OPTIONS = [
 
 const getNiyyatColor = (name: string) => {
   const n = name.toLowerCase()
-  if (n.includes('approved')) return { bg: '#0ab39c20', color: '#0ab39c' }
+  if (n.includes('approved'))                       return { bg: '#0ab39c20', color: '#0ab39c' }
   if (n.includes('no-show') || n.includes('no show')) return { bg: '#e6394620', color: '#e63946' }
-  if (n.includes('pending')) return { bg: '#ffbf6920', color: '#856404' }
+  if (n.includes('pending'))                        return { bg: '#ffbf6920', color: '#856404' }
   return { bg: '#36457420', color: '#364574' }
 }
 
@@ -137,6 +140,7 @@ export default function MuminDetailPage() {
 
   const [hof, setHof]                       = useState<Mumin | null>(null)
   const [family, setFamily]                 = useState<Mumin[]>([])
+  const [thaaliReg, setThaaliReg]           = useState<ThaaliReg | null>(null)
   const [sectors, setSectors]               = useState<Sector[]>([])
   const [blocks, setBlocks]                 = useState<HouseBlock[]>([])
   const [houseTypes, setHouseTypes]         = useState<HouseType[]>([])
@@ -162,16 +166,15 @@ export default function MuminDetailPage() {
   const hf = (k: string, v: any) => setHofForm(p => ({ ...p, [k]: v }))
 
   // Family member modal
-  const [showMemberModal, setShowMemberModal]   = useState(false)
-  const [memberSaving, setMemberSaving]         = useState(false)
-  const [memberSaveError, setMemberSaveError]   = useState('')
-  const [editingMember, setEditingMember]       = useState<Mumin | null>(null)
+  const [showMemberModal, setShowMemberModal] = useState(false)
+  const [memberSaving, setMemberSaving]       = useState(false)
+  const [memberSaveError, setMemberSaveError] = useState('')
+  const [editingMember, setEditingMember]     = useState<Mumin | null>(null)
 
   const emptyMemberForm = { its_no: '', full_name: '', dob: '', phone_cc: '+92', phone_num: '', wa_cc: '+92', wa_num: '' }
   const [memberForm, setMemberForm] = useState(emptyMemberForm)
   const mf = (k: string, v: any) => setMemberForm(p => ({ ...p, [k]: v }))
 
-  // Delete member
   const [showDeleteMember, setShowDeleteMember] = useState<Mumin | null>(null)
   const [deletingMember, setDeletingMember]     = useState(false)
 
@@ -197,6 +200,33 @@ export default function MuminDetailPage() {
     setHouseTypes(tRes.data || [])
     setNiyyatStatuses(nRes.data || [])
     setCategories(cRes.data || [])
+
+    // Fetch thaali registration — separate two-step (avoids FK ambiguity)
+    if (hofRes.data?.id) {
+      const { data: reg } = await supabase
+        .from('thaali_registrations')
+        .select('thaali_id, distributor_id')
+        .eq('mumin_id', hofRes.data.id)
+        .maybeSingle()
+
+      if (reg) {
+        const [thaaliRes, distRes] = await Promise.all([
+          reg.thaali_id
+            ? supabase.from('thaalis').select('thaali_number').eq('id', reg.thaali_id).single()
+            : Promise.resolve({ data: null }),
+          reg.distributor_id
+            ? supabase.from('distributors').select('full_name').eq('id', reg.distributor_id).single()
+            : Promise.resolve({ data: null }),
+        ])
+        setThaaliReg({
+          thaali_number: thaaliRes.data?.thaali_number ?? null,
+          distributor_name: distRes.data?.full_name ?? null,
+        })
+      } else {
+        setThaaliReg(null)
+      }
+    }
+
     setLoading(false)
   }
 
@@ -247,8 +277,7 @@ export default function MuminDetailPage() {
 
   const hofAddrPreview = buildAddress(
     getType(Number(hofForm.address_type_id) || null),
-    hofForm.address_number, hofForm.address_category,
-    hofForm.address_floor,
+    hofForm.address_number, hofForm.address_category, hofForm.address_floor,
     getBlock(Number(hofForm.address_block_id) || null),
     getSector(Number(hofForm.address_sector_id) || null) === '—' ? '' : getSector(Number(hofForm.address_sector_id) || null)
   )
@@ -256,7 +285,6 @@ export default function MuminDetailPage() {
   const handleSaveHof = async () => {
     if (!hofForm.full_name.trim()) { setHofSaveError('Full Name is required.'); return }
     setHofSaving(true); setHofSaveError('')
-    const newAddr = hofAddrPreview || null
     const payload: any = {
       sf_no: hofForm.sf_no.trim() || null, its_no: hofForm.its_no.trim() || null,
       full_name: hofForm.full_name.trim(), dob: hofForm.dob || null,
@@ -269,7 +297,7 @@ export default function MuminDetailPage() {
       address_number: hofForm.address_number || null,
       address_category: hofForm.address_category || null,
       address_floor: hofForm.address_floor || null,
-      full_address: newAddr,
+      full_address: hofAddrPreview || null,
       mumin_category_id: hofForm.mumin_category_id || null,
       niyyat_status_id: hofForm.niyyat_status_id || null,
       status: hofForm.status,
@@ -313,10 +341,8 @@ export default function MuminDetailPage() {
       ? await supabase.from('mumineen').update(payload).eq('id', editingMember.id)
       : await supabase.from('mumineen').insert(payload)
     if (res.error) { setMemberSaveError(res.error.message); setMemberSaving(false); return }
-
     const { data: updatedFamily } = await supabase.from('mumineen').select('*').eq('hof_id', id)
     if (updatedFamily && updatedFamily.some((m: any) => m.dob)) await recalcTotals(updatedFamily as Mumin[])
-
     await fetchAll(); setShowMemberModal(false); setMemberSaving(false)
   }
 
@@ -365,11 +391,11 @@ export default function MuminDetailPage() {
           <p style={sectionLabel}>Personal Information</p>
           <div className="row g-3 mb-3">
             {[
-              { label: 'SF#',        value: hof.sf_no },
-              { label: 'ITS#',       value: hof.its_no },
-              { label: 'Phone',      value: hof.phone_no },
-              { label: 'WhatsApp',   value: hof.whatsapp_no },
-              { label: 'Email',      value: hof.email },
+              { label: 'SF#',           value: hof.sf_no },
+              { label: 'ITS#',          value: hof.its_no },
+              { label: 'Phone',         value: hof.phone_no },
+              { label: 'WhatsApp',      value: hof.whatsapp_no },
+              { label: 'Email',         value: hof.email },
               { label: 'Date of Birth', value: hof.dob ? `${hof.dob} · ${calcAge(hof.dob)}` : null },
             ].map(({ label, value }) => (
               <div key={label} className="col-md-3 col-6">
@@ -408,6 +434,26 @@ export default function MuminDetailPage() {
             <div className="col-md-3 col-6">
               <div style={metaLabel}>Block</div>
               <div style={metaValue}>{getBlock(hof.address_block_id) || '—'}</div>
+            </div>
+          </div>
+
+          {/* Thaali Registration */}
+          <p style={sectionLabel}>Thaali Registration</p>
+          <div className="row g-3 mb-3">
+            <div className="col-md-3 col-6">
+              <div style={metaLabel}>Thaali Number</div>
+              {thaaliReg
+                ? thaaliReg.thaali_number
+                  ? <span className="badge" style={{ background: '#364574', color: '#fff', fontSize: 13, padding: '5px 12px', letterSpacing: 0.5 }}>
+                      #{thaaliReg.thaali_number}
+                    </span>
+                  : <span className="badge" style={{ background: '#fff3cd', color: '#856404', fontSize: 12 }}>Registered — No Number</span>
+                : <span style={{ ...metaValue, color: 'var(--bs-secondary-color)', fontSize: 13 }}>Not registered</span>
+              }
+            </div>
+            <div className="col-md-3 col-6">
+              <div style={metaLabel}>Distributor</div>
+              <div style={metaValue}>{thaaliReg?.distributor_name || '—'}</div>
             </div>
           </div>
 
@@ -616,7 +662,9 @@ export default function MuminDetailPage() {
           </div>
           <div className="modal-footer" style={{ borderTop: '1px solid var(--bs-border-color)' }}>
             <button className="btn btn-light btn-sm" onClick={() => setShowHofModal(false)}>Cancel</button>
-            <button className="btn btn-sm" style={{ background: '#364574', color: '#fff' }} onClick={handleSaveHof} disabled={hofSaving}>{hofSaving ? 'Saving...' : 'Save Changes'}</button>
+            <button className="btn btn-sm" style={{ background: '#364574', color: '#fff' }} onClick={handleSaveHof} disabled={hofSaving}>
+              {hofSaving ? 'Saving...' : 'Save Changes'}
+            </button>
           </div>
         </Modal>
       )}
@@ -672,7 +720,9 @@ export default function MuminDetailPage() {
           </div>
           <div className="modal-footer" style={{ borderTop: '1px solid var(--bs-border-color)' }}>
             <button className="btn btn-light btn-sm" onClick={() => setShowMemberModal(false)}>Cancel</button>
-            <button className="btn btn-sm" style={{ background: '#364574', color: '#fff' }} onClick={handleSaveMember} disabled={memberSaving}>{memberSaving ? 'Saving...' : 'Save'}</button>
+            <button className="btn btn-sm" style={{ background: '#364574', color: '#fff' }} onClick={handleSaveMember} disabled={memberSaving}>
+              {memberSaving ? 'Saving...' : 'Save'}
+            </button>
           </div>
         </Modal>
       )}
@@ -689,7 +739,9 @@ export default function MuminDetailPage() {
           </div>
           <div className="modal-footer border-0 pt-0">
             <button className="btn btn-light btn-sm" onClick={() => setShowDeleteMember(null)}>Cancel</button>
-            <button className="btn btn-danger btn-sm" onClick={handleDeleteMember} disabled={deletingMember}>{deletingMember ? 'Deleting...' : 'Delete'}</button>
+            <button className="btn btn-danger btn-sm" onClick={handleDeleteMember} disabled={deletingMember}>
+              {deletingMember ? 'Deleting...' : 'Delete'}
+            </button>
           </div>
         </Modal>
       )}
