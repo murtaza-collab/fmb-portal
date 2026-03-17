@@ -14,6 +14,10 @@ export default function KitchenScanPage() {
   const [result, setResult]             = useState<'success' | 'error' | null>(null);
   const [resultName, setResultName]     = useState('');
   const today = todayISO();
+  const localToday = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  })();
 
   useEffect(() => { fetchDistributors(); }, []);
 
@@ -22,7 +26,7 @@ export default function KitchenScanPage() {
     const { data: arrived } = await supabase
       .from('distribution_sessions')
       .select('distributor_id')
-      .eq('session_date', today);
+      .eq('session_date', localToday);
 
     const arrivedIds = new Set((arrived || []).map((s: any) => s.distributor_id));
 
@@ -38,28 +42,44 @@ export default function KitchenScanPage() {
     setLoading(false);
   };
 
-  const handleTap = async () => {
-    if (!selectedId || tapping) return;
-    setTapping(true);
-    setResult(null);
+  const [autoDemo, setAutoDemo]     = useState(false);
+  const [autoDemoIdx, setAutoDemoIdx] = useState(0);
+  const [countdown, setCountdown]   = useState(0);
 
-    // Haptic feedback on mobile
+  // Auto demo — check in one by one every 8 seconds
+  useEffect(() => {
+    if (!autoDemo) return;
+    if (autoDemoIdx >= distributors.length) { setAutoDemo(false); return; }
+
+    const dist = distributors[autoDemoIdx];
+    setSelectedId(dist.id);
+    setCountdown(8);
+
+    const countTimer = setInterval(() => setCountdown(c => c - 1), 1000);
+    const tapTimer = setTimeout(async () => {
+      clearInterval(countTimer);
+      await doCheckin(dist.id, dist.full_name);
+      setAutoDemoIdx(i => i + 1);
+    }, 8000);
+
+    return () => { clearInterval(countTimer); clearTimeout(tapTimer); };
+  }, [autoDemo, autoDemoIdx]);
+
+  const doCheckin = async (id: number, name: string) => {
+    setTapping(true); setResult(null);
     if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-
     try {
       const res = await fetch('/api/kitchen/arrival', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ distributor_id: selectedId }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ distributor_id: id }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed');
-      setResultName(data.distributor_name || 'Distributor');
+      setResultName(data.distributor_name || name);
       setResult('success');
-      // Remove from list
       setDistributors(prev => {
-        const next = prev.filter(d => d.id !== selectedId);
-        setSelectedId(next[0]?.id || null);
+        const next = prev.filter(d => d.id !== id);
+        if (!autoDemo) setSelectedId(next[0]?.id || null);
         return next;
       });
     } catch (err: any) {
@@ -133,18 +153,47 @@ export default function KitchenScanPage() {
             </div>
           </div>
 
+          {/* Auto Demo button */}
+          {!autoDemo && distributors.length > 1 && (
+            <div style={{ width: '100%', maxWidth: 340, marginBottom: 24 }}>
+              <button onClick={() => { setAutoDemo(true); setAutoDemoIdx(0); }} style={{
+                width: '100%', padding: '14px', borderRadius: 14, border: '1px solid #334155',
+                background: '#1e293b', color: '#ffbf69', fontSize: 14, fontWeight: 700,
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              }}>
+                ▶ Auto Demo — check in all ({distributors.length}) with 8s gap
+              </button>
+            </div>
+          )}
+
+          {/* Auto demo progress */}
+          {autoDemo && (
+            <div style={{ width: '100%', maxWidth: 340, marginBottom: 24, textAlign: 'center' }}>
+              <div style={{ color: '#ffbf69', fontWeight: 700, fontSize: 15, marginBottom: 6 }}>
+                Auto Demo running — {autoDemoIdx + 1} of {distributors.length + autoDemoIdx}
+              </div>
+              <div style={{ color: '#64748b', fontSize: 13 }}>
+                Next check-in in <span style={{ color: '#fff', fontWeight: 700 }}>{countdown}s</span>
+              </div>
+              <button onClick={() => setAutoDemo(false)} style={{
+                marginTop: 10, padding: '6px 16px', borderRadius: 8, background: 'transparent',
+                border: '1px solid #334155', color: '#64748b', fontSize: 12, cursor: 'pointer',
+              }}>Stop</button>
+            </div>
+          )}
+
           {/* Big tap button */}
           <div style={{ position: 'relative' }}>
             {/* Ripple rings */}
-            {tapping && (
+            {(tapping || autoDemo) && (
               <>
                 <div style={{ position: 'absolute', inset: -20, borderRadius: '50%', border: '2px solid #ffbf69', opacity: 0, animation: 'ripple 1s ease-out forwards' }} />
                 <div style={{ position: 'absolute', inset: -40, borderRadius: '50%', border: '2px solid #ffbf69', opacity: 0, animation: 'ripple 1s ease-out 0.2s forwards' }} />
               </>
             )}
             <button
-              onClick={handleTap}
-              disabled={!selectedId || tapping}
+              onClick={() => selectedId && doCheckin(selectedId, distributors.find(d => d.id === selectedId)?.full_name || '')}
+              disabled={!selectedId || tapping || autoDemo}
               style={{
                 width: 180, height: 180, borderRadius: '50%', border: 'none', cursor: 'pointer',
                 background: tapping
@@ -167,7 +216,7 @@ export default function KitchenScanPage() {
                 {tapping ? '📡' : result === 'success' ? '✅' : result === 'error' ? '❌' : '🪪'}
               </span>
               <span style={{ color: '#fff', fontWeight: 700, fontSize: 14, letterSpacing: 1 }}>
-                {tapping ? 'SCANNING...' : result === 'success' ? 'CHECKED IN' : result === 'error' ? 'FAILED' : 'TAP TO CHECK IN'}
+                {tapping ? 'SCANNING...' : autoDemo ? `NEXT IN ${countdown}s` : result === 'success' ? 'CHECKED IN' : result === 'error' ? 'FAILED' : 'TAP TO CHECK IN'}
               </span>
             </button>
           </div>
