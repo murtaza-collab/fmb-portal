@@ -5,16 +5,19 @@
  *
  * Filter chain:
  *   thaali_registrations
- *     → mumineen.is_hof = true
  *     → mumineen.niyyat_status_id IN thaali_schedule.niyyat_status_ids for today
- *     → EXCLUDE mumin_id where active stop_thaali covers today
+ *     → EXCLUDE mumin_id where active/approved stop_thaali covers today
  *     → EXCLUDE if thaali_category_ids filter set and category doesn't match
  *     → optionally filter by distributor_id (Counter A)
+ *
+ * NOTE: is_hof filter removed — thaali registrations exist on the mumin directly,
+ * not restricted to HOFs only at the kitchen eligibility level.
+ *
+ * NOTE: stop_thaalis — only status='active' or 'approved' rows are counted.
+ * Pending stop requests do not affect kitchen eligibility until admin approves.
  */
 
 import { supabase } from '@/lib/supabase'
-
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface TodaySchedule {
   id?: number
@@ -40,8 +43,6 @@ export interface EligibleRegistration {
   niyyat_status_id: number
 }
 
-// ─── Default schedule (used when no schedule row exists for today) ────────────
-// Default = thaali_enabled, approved (niyyat_status_id = 1) only, no category filter
 const DEFAULT_SCHEDULE: TodaySchedule = {
   event_date: '',
   thaali_enabled: true,
@@ -50,13 +51,10 @@ const DEFAULT_SCHEDULE: TodaySchedule = {
   thaali_category_ids: [],
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
 export function todayISO(): string {
   return new Date().toISOString().split('T')[0]
 }
 
-// ─── 1. Fetch today's schedule ────────────────────────────────────────────────
 export async function getTodaySchedule(date?: string): Promise<TodaySchedule> {
   const d = date || todayISO()
   const { data } = await supabase
@@ -64,12 +62,11 @@ export async function getTodaySchedule(date?: string): Promise<TodaySchedule> {
     .select('*')
     .eq('event_date', d)
     .maybeSingle()
-
   if (!data) return { ...DEFAULT_SCHEDULE, event_date: d }
   return data as TodaySchedule
 }
 
-// ─── 2. Get mumin_ids with an active stop for a given date ───────────────────
+// Only approved/active stops affect kitchen — pending requests are ignored.
 export async function getStoppedMuminIds(date?: string): Promise<Set<number>> {
   const d = date || todayISO()
   const { data } = await supabase
@@ -77,12 +74,10 @@ export async function getStoppedMuminIds(date?: string): Promise<Set<number>> {
     .select('mumin_id')
     .lte('from_date', d)
     .gte('to_date', d)
+    .in('status', ['active', 'approved'])
   return new Set((data || []).map((s: any) => s.mumin_id))
 }
 
-// ─── 3. Get eligible registrations for today ─────────────────────────────────
-// Pass distributorId to scope to one distributor (Counter A).
-// Leave undefined to get ALL eligible (Arrival total, Counter B/C, Dispatch).
 export async function getEligibleRegistrations(opts: {
   schedule: TodaySchedule
   stoppedMuminIds: Set<number>
@@ -97,10 +92,10 @@ export async function getEligibleRegistrations(opts: {
       thaali_type_id,
       thaali_category_id,
       distributor_id,
-      thaalis!fk_tr_thaali(thaali_number),
-      mumineen!fk_tr_mumin(full_name, sf_no, niyyat_status_id, is_hof)
+      thaalis(thaali_number),
+      mumineen(full_name, sf_no, niyyat_status_id)
     `)
-    .not('thaali_id', 'is', null) // must have a thaali number assigned
+    .not('thaali_id', 'is', null)
 
   if (opts.distributorId) {
     query = query.eq('distributor_id', opts.distributorId)
@@ -109,23 +104,18 @@ export async function getEligibleRegistrations(opts: {
   const { data, error } = await query
   if (error || !data) return []
 
+  const statusIds = opts.schedule.niyyat_status_ids.map(Number)
+
   return (data as any[])
     .filter(r => {
       const m = r.mumineen
-      if (!m || !m.is_hof) return false
-
-      // Must be in today's allowed niyyat statuses
-      if (!opts.schedule.niyyat_status_ids.includes(m.niyyat_status_id)) return false
-
-      // Must not have an active stop today
+      if (!m) return false
+      if (!statusIds.includes(Number(m.niyyat_status_id))) return false
       if (opts.stoppedMuminIds.has(r.mumin_id)) return false
-
-      // If schedule has category filter, apply it
       if (
         opts.schedule.thaali_category_ids?.length > 0 &&
         !opts.schedule.thaali_category_ids.includes(r.thaali_category_id)
       ) return false
-
       return true
     })
     .map(r => ({
@@ -142,8 +132,6 @@ export async function getEligibleRegistrations(opts: {
     }))
 }
 
-// ─── 4. Convenience: load everything in one call ─────────────────────────────
-// Use this at the top of each kitchen page's data fetch.
 export async function loadKitchenDayData(opts: { distributorId?: number; date?: string }) {
   const [schedule, stoppedMuminIds] = await Promise.all([
     getTodaySchedule(opts.date),

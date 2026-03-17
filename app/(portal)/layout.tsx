@@ -160,12 +160,12 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
           <div style={{ flex: 1, minWidth: 0, textAlign: 'center' }}>
             {/* Logo image — mix-blend-mode:screen removes black background on dark sidebar */}
             <img
-              src="/fmb-logo.png"
+              src="/fmb-logo-2-2.svg"
               alt="Faiz ul Mawaid il Burhaniyah"
-              style={{ width: '100%', maxWidth: '180px', height: 'auto', display: 'block', margin: '0 auto 8px', mixBlendMode: 'screen' }}
+              style={{ width: '100%', maxWidth: '180px', height: 'auto', display: 'block', margin: '0 auto 8px', filter: 'brightness(0) invert(1)' }}
             />
             <div style={{ color: '#fff', fontSize: '11px', fontWeight: 700, lineHeight: 1.4 }}>Faiz ul Mawaid il Burhaniyah</div>
-            <div style={{ color: '#ffbf69', fontSize: '10px', fontWeight: 500, marginTop: 2 }}>FMB Portal</div>
+            <div style={{ color: '#ffbf69', fontSize: '10px', fontWeight: 500, marginTop: 2 }}></div>
           </div>
           <button
             onClick={() => setSidebarOpen(false)}
