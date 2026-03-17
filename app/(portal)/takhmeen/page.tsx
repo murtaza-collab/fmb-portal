@@ -340,7 +340,7 @@ export default function TakhmeenPage() {
         status: histMap.get(fy.id)?.status ?? null,
         id: fy.id,
       }))
-    setNiyyatHistory(past4)
+    setNiyyatHistory(past4 as any[])
     setShowNiyyatModal(true)
   }
 
