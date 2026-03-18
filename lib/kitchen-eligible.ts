@@ -51,8 +51,20 @@ const DEFAULT_SCHEDULE: TodaySchedule = {
   thaali_category_ids: [],
 }
 
+/**
+ * Returns today's date as YYYY-MM-DD using LOCAL time.
+ *
+ * IMPORTANT: Do NOT use new Date().toISOString() — that returns UTC.
+ * In Pakistan (UTC+5), at 11 PM local time, UTC is still the previous day.
+ * This would cause every kitchen screen to query the wrong date.
+ * All portal date logic must use this function as the single source of truth.
+ */
 export function todayISO(): string {
-  return new Date().toISOString().split('T')[0]
+  const d = new Date()
+  const yyyy = d.getFullYear()
+  const mm   = String(d.getMonth() + 1).padStart(2, '0')
+  const dd   = String(d.getDate()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}`
 }
 
 export async function getTodaySchedule(date?: string): Promise<TodaySchedule> {
@@ -66,7 +78,8 @@ export async function getTodaySchedule(date?: string): Promise<TodaySchedule> {
   return data as TodaySchedule
 }
 
-// Only approved/active stops affect kitchen — pending requests are ignored.
+// Only 'approved' stops affect kitchen — pending/rejected have no effect.
+// 'active' status removed from the data model — approved is the single active state.
 export async function getStoppedMuminIds(date?: string): Promise<Set<number>> {
   const d = date || todayISO()
   const { data } = await supabase
@@ -74,7 +87,7 @@ export async function getStoppedMuminIds(date?: string): Promise<Set<number>> {
     .select('mumin_id')
     .lte('from_date', d)
     .gte('to_date', d)
-    .in('status', ['active', 'approved'])
+    .eq('status', 'approved')
   return new Set((data || []).map((s: any) => s.mumin_id))
 }
 

@@ -11,111 +11,129 @@ export default function LoginPage() {
   const router = useRouter()
 
   const handleLogin = async (e: React.FormEvent) => {
-  e.preventDefault()
-  setLoading(true)
-  setError('')
+    e.preventDefault()
+    setLoading(true)
+    setError('')
 
-  const email = `${username.toLowerCase().trim()}@fmb.internal`
+    const email = `${username.toLowerCase().trim()}@fmb.internal`
 
-  const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
+    const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
 
-  if (authError) {
-    setError('Invalid username or password')
-    setLoading(false)
-    return
+    if (authError) {
+      setError('Invalid username or password')
+      setLoading(false)
+      return
+    }
+
+    const { data: adminData } = await supabase
+      .from('admin_users')
+      .select('status')
+      .ilike('username', username.trim())
+      .single()
+
+    if (!adminData || adminData.status !== 'active') {
+      await supabase.auth.signOut()
+      setError('Your account has been deactivated. Please contact admin.')
+      setLoading(false)
+      return
+    }
+
+    router.push('/dashboard')
   }
-
-  // Check if user is active
-  const { data: adminData } = await supabase
-    .from('admin_users')
-    .select('status')
-    .ilike('username', username.trim())
-    .single()
-
-  if (!adminData || adminData.status !== 'active') {
-    await supabase.auth.signOut()
-    setError('Your account has been deactivated. Please contact admin.')
-    setLoading(false)
-    return
-  }
-
-  router.push('/dashboard')
-}
 
   return (
-    <div className="auth-page-wrapper pt-5" style={{
+    <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(to bottom, #364574, #233044)'
+      background: 'linear-gradient(to bottom, #364574, #233044)',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '2rem 1rem',
     }}>
-      <div className="auth-page-content">
-        <div className="container">
-          <div className="row justify-content-center">
-            <div className="col-md-8 col-lg-6 col-xl-5">
+      <div style={{ width: '100%', maxWidth: 440, marginLeft: 'auto', marginRight: 'auto' }}>
 
-              <div className="text-center mt-5 mb-4">
-                <h3 className="text-white">AMB FMB Niyaz Niyat</h3>
-                <p className="text-white-50">Admin Portal</p>
-              </div>
+        {/* Logo + title */}
+        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '1.5rem' }}>
+          <img
+            src="/fmb-logo-2-2.svg"
+            alt="FMB"
+            style={{ height: 90, marginBottom: 20, filter: 'brightness(0) invert(1)' }}
+          />
+          <h3 className="text-white fw-bold mb-1">Faiz Ul Mawaid Il Burhaniyah</h3>
+          <p style={{ color: 'rgba(255,255,255,0.5)', marginBottom: 0 }}>FMB Portal</p>
+        </div>
 
-              <div className="card mt-4" style={{ borderRadius: '12px' }}>
-                <div className="card-body p-4">
-                  <div className="text-center mb-4">
-                    <h5 className="text-primary">Welcome Back</h5>
-                    <p className="text-muted">Sign in to continue</p>
-                  </div>
+        {/* Card */}
+        <div className="card border-0 shadow-lg" style={{ borderRadius: 16 }}>
+          <div className="card-body p-4 p-md-5">
 
-                  {error && (
-                    <div className="alert alert-danger">{error}</div>
-                  )}
-
-                  <form onSubmit={handleLogin}>
-                    <div className="mb-3">
-                      <label className="form-label">Username</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        placeholder="Enter username"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        required
-                      />
-                    </div>
-
-                    <div className="mb-3">
-                      <label className="form-label">Password</label>
-                      <input
-                        type="password"
-                        className="form-control"
-                        placeholder="Enter password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                      />
-                    </div>
-
-                    <div className="mt-4">
-                      <button
-                        type="submit"
-                        className="btn btn-primary w-100"
-                        disabled={loading}
-                      >
-                        {loading ? 'Signing in...' : 'Sign In'}
-                      </button>
-                    </div>
-                  </form>
-
-                </div>
-              </div>
-
-              <div className="mt-4 text-center">
-                <p className="text-white-50 mb-0">
-                  Faiz ul Mawaid il Burhaniyah © {new Date().getFullYear()}
-                </p>
-              </div>
-
+            <div className="text-center mb-4">
+              <h5 className="fw-bold mb-1" style={{ color: '#364574' }}>Welcome</h5>
+              <p className="text-muted mb-0" style={{ fontSize: '0.9rem' }}>Sign in to continue</p>
             </div>
+
+            {error && (
+              <div className="alert alert-danger py-2" style={{ fontSize: '0.9rem' }}>
+                <i className="bi bi-exclamation-triangle me-2"></i>{error}
+              </div>
+            )}
+
+            <form onSubmit={handleLogin}>
+              <div className="mb-3">
+                <label className="form-label fw-semibold" style={{ fontSize: '0.9rem' }}>
+                  Username
+                </label>
+                <input
+                  type="text"
+                  className="form-control form-control-lg"
+                  placeholder="Enter username"
+                  value={username}
+                  onChange={e => setUsername(e.target.value)}
+                  autoComplete="username"
+                  autoFocus
+                  required
+                />
+              </div>
+
+              <div className="mb-4">
+                <label className="form-label fw-semibold" style={{ fontSize: '0.9rem' }}>
+                  Password
+                </label>
+                <input
+                  type="password"
+                  className="form-control form-control-lg"
+                  placeholder="Enter password"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  autoComplete="current-password"
+                  required
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="btn btn-lg w-100 fw-bold text-white"
+                style={{ background: '#364574', border: 'none', borderRadius: 8 }}
+                disabled={loading}
+              >
+                {loading
+                  ? <><span className="spinner-border spinner-border-sm me-2"></span>Signing in…</>
+                  : 'Sign In'
+                }
+              </button>
+            </form>
+
           </div>
         </div>
+
+        {/* Footer */}
+        <div className="text-center mt-4">
+          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.82rem', marginBottom: 0 }}>
+            Faiz ul Mawaid il Burhaniyah © {new Date().getFullYear()}
+          </p>
+        </div>
+
       </div>
     </div>
   )

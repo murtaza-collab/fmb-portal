@@ -3,7 +3,9 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { loadKitchenDayData, todayISO } from '@/lib/kitchen-eligible';
+import { todayISO } from '@/lib/kitchen-eligible';
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 type View = 'sessions' | 'handover';
 
@@ -32,23 +34,30 @@ type ThaaliDetail = {
   filled: boolean;
 };
 
-export default function Dispatch() {
-  const [view, setView] = useState<View>('sessions');
-  const [sessions, setSessions] = useState<SessionRow[]>([]);
-  const [dispatched, setDispatched] = useState<SessionRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+// ─── Component ───────────────────────────────────────────────────────────────
 
-  const [activeSession, setActiveSession] = useState<SessionRow | null>(null);
-  const [thaalis, setThaalis] = useState<ThaaliDetail[]>([]);
-  const [loadingDetail, setLoadingDetail] = useState(false);
-  const [confirming, setConfirming] = useState(false);
+export default function Dispatch() {
+  const [view, setView]           = useState<View>('sessions');
+  const [sessions, setSessions]   = useState<SessionRow[]>([]);
+  const [dispatched, setDispatched] = useState<SessionRow[]>([]);
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState('');
+
+  const [activeSession, setActiveSession]   = useState<SessionRow | null>(null);
+  const [thaalis, setThaalis]               = useState<ThaaliDetail[]>([]);
+  const [loadingDetail, setLoadingDetail]   = useState(false);
+  const [confirming, setConfirming]         = useState(false);
   const [showDispatchedToday, setShowDispatchedToday] = useState(false);
 
   const today = todayISO();
 
-  useEffect(() => { loadSessions(); }, []);
+  useEffect(() => {
+    loadSessions();
+    const timer = setInterval(loadSessions, 10000);
+    return () => clearInterval(timer);
+  }, []);
 
+  // ─── loadSessions ──────────────────────────────────────────────────────────
   const loadSessions = async () => {
     setLoading(true);
     setError('');
@@ -66,25 +75,34 @@ export default function Dispatch() {
       if (err) throw err;
 
       const rows = (data || []).map((s: any) => {
-        const isDispatched = s.status === 'dispatched';
-        const bDone = s.customized_thaalis === 0 ||
-                      ['counter_b_done', 'counter_c_done', 'dispatched'].includes(s.status);
-        const cDone = s.default_thaalis === 0 ||
-                      ['counter_c_done', 'dispatched'].includes(s.status);
+        const isDispatched  = s.status === 'dispatched';
+        // Counter A confirms by moving status from 'arrived' → 'in_progress'
+        // Until that happens, customized/default counts are 0 and meaningless.
+        const counterADone  = s.status !== 'arrived';
+        // B is done only if no customized thaalis, OR status has passed counter_b_done stage
+        const bDone = counterADone && (
+          s.customized_thaalis === 0 ||
+          ['counter_b_done', 'dispatched'].includes(s.status)
+        );
+        // C is done only if no default thaalis, OR status has reached counter_c_done
+        const cDone = counterADone && (
+          s.default_thaalis === 0 ||
+          ['counter_c_done', 'dispatched'].includes(s.status)
+        );
         return {
-          id: s.id,
-          distributor_id: s.distributor_id,
-          distributor_name: s.distributors?.full_name || 'Unknown',
-          distributor_phone: s.distributors?.phone_no || '',
-          total_thaalis: s.total_thaalis || 0,
-          stopped_thaalis: s.stopped_thaalis || 0,
-          customized_thaalis: s.customized_thaalis || 0,
-          default_thaalis: s.default_thaalis || 0,
-          status: s.status,
-          arrived_at: s.arrived_at,
-          counter_b_done: bDone,
-          counter_c_done: cDone,
-          ready: bDone && cDone && !isDispatched,
+          id:                  s.id,
+          distributor_id:      s.distributor_id,
+          distributor_name:    s.distributors?.full_name || 'Unknown',
+          distributor_phone:   s.distributors?.phone_no || '',
+          total_thaalis:       s.total_thaalis || 0,
+          stopped_thaalis:     s.stopped_thaalis || 0,
+          customized_thaalis:  s.customized_thaalis || 0,
+          default_thaalis:     s.default_thaalis || 0,
+          status:              s.status,
+          arrived_at:          s.arrived_at,
+          counter_b_done:      bDone,
+          counter_c_done:      cDone,
+          ready:               counterADone && bDone && cDone && !isDispatched,
         };
       });
 
@@ -97,7 +115,9 @@ export default function Dispatch() {
     }
   };
 
-  // ── openSession — uses kitchen-eligible for correct eligible list ──────────
+  // ─── openSession ───────────────────────────────────────────────────────────
+  // Counter A seeded thaali_daily_status with the authoritative list.
+  // Read it directly — no eligibility re-check needed.
   const openSession = async (session: SessionRow) => {
     setActiveSession(session);
     setLoadingDetail(true);
@@ -105,60 +125,50 @@ export default function Dispatch() {
     setError('');
 
     try {
-      // Get schedule-filtered eligible list for this distributor
-      const { eligible, noThaaliDay } = await loadKitchenDayData({
-        distributorId: session.distributor_id,
-      });
+      // 1. All status rows for this session
+      const { data: statusRows } = await supabase
+        .from('thaali_daily_status')
+        .select('thaali_id, thaali_number, mumin_id, status')
+        .eq('session_id', session.id);
 
-      if (noThaaliDay || eligible.length === 0) {
+      if (!statusRows || statusRows.length === 0) {
         setThaalis([]);
         setLoadingDetail(false);
         return;
       }
 
-      const muminIds = eligible.map(r => r.mumin_id);
-      const thaaliIds = eligible.map(r => r.thaali_id);
+      // 2. Mumin names in one query
+      const muminIds = statusRows.map((r: any) => r.mumin_id);
+      const { data: muminRows } = await supabase
+        .from('mumineen')
+        .select('id, full_name, sf_no')
+        .in('id', muminIds);
 
-      // Customizations and filled status in parallel
-      const [customRes, filledRes] = await Promise.all([
-        supabase
-          .from('thaali_customizations')
-          .select('mumin_id')
-          .in('mumin_id', muminIds)
-          .eq('request_date', today)
-          .eq('status', 'active'),
-        supabase
-          .from('thaali_daily_status')
-          .select('thaali_id, status')
-          .eq('session_id', session.id),
-      ]);
+      const muminMap = new Map((muminRows || []).map((m: any) => [m.id, m]));
 
-      const customizedIds = new Set(customRes.data?.map((c: any) => c.mumin_id) || []);
-      const filledIds     = new Set(filledRes.data?.map((f: any) => f.thaali_id) || []);
+      // 3. Map status → display type
+      //    counter_b_pending / counter_b_filled → customized
+      //    counter_c_pending / counter_c_filled → default
+      //    stopped                              → stopped
+      const statusToType = (status: string): 'customized' | 'default' | 'stopped' => {
+        if (status === 'stopped')                                      return 'stopped';
+        if (status === 'counter_b_pending' || status === 'counter_b_filled') return 'customized';
+        return 'default';
+      };
 
-      // Eligible list already excludes stopped mumineen (via kitchen-eligible stop filter)
-      // Stopped thaalis seeded by Counter A show up in thaali_daily_status as 'stopped'
-      // We still show them here so dispatch staff knows what was returned to store
-      const stoppedFromSeed = new Set(
-        (filledRes.data || []).filter((f: any) => f.status === 'stopped').map((f: any) => f.thaali_id)
-      );
+      const isFilled = (status: string) =>
+        status === 'counter_b_filled' || status === 'counter_c_filled';
 
-      const details: ThaaliDetail[] = eligible.map(r => {
-        const type: 'customized' | 'default' | 'stopped' =
-          stoppedFromSeed.has(r.thaali_id) ? 'stopped' :
-          customizedIds.has(r.mumin_id)    ? 'customized' :
-          'default';
-        return {
-          thaali_id: r.thaali_id,
-          thaali_number: String(r.thaali_number),
-          mumin_name: r.full_name,
-          sf_no: r.sf_no,
-          type,
-          filled: filledIds.has(r.thaali_id),
-        };
-      });
+      const details: ThaaliDetail[] = statusRows.map((r: any) => ({
+        thaali_id:     r.thaali_id,
+        thaali_number: String(r.thaali_number),
+        mumin_name:    muminMap.get(r.mumin_id)?.full_name || 'Unknown',
+        sf_no:         muminMap.get(r.mumin_id)?.sf_no || '',
+        type:          statusToType(r.status),
+        filled:        isFilled(r.status),
+      }));
 
-      // Sort: customized first, default, stopped last
+      // Sort: customized → default → stopped
       details.sort((a, b) => {
         const order = { customized: 0, default: 1, stopped: 2 };
         return order[a.type] - order[b.type];
@@ -172,6 +182,7 @@ export default function Dispatch() {
     }
   };
 
+  // ─── confirmDispatch ───────────────────────────────────────────────────────
   const confirmDispatch = async () => {
     if (!activeSession) return;
     setConfirming(true);
@@ -197,25 +208,33 @@ export default function Dispatch() {
 
   const netThaalis = (s: SessionRow) => (s.total_thaalis || 0) - (s.stopped_thaalis || 0);
 
-  const readySessions   = sessions.filter(s => s.ready);
-  const pendingSessions = sessions.filter(s => !s.ready);
+  const readySessions      = sessions.filter(s => s.ready);
+  const atCounterASessions = sessions.filter(s => s.status === 'arrived');
+  const pendingSessions    = sessions.filter(s => !s.ready && s.status !== 'arrived');
 
   const stoppedCount    = thaalis.filter(t => t.type === 'stopped').length;
   const toDispatchCount = thaalis.filter(t => t.type !== 'stopped').length;
   const filledCount     = thaalis.filter(t => t.filled && t.type !== 'stopped').length;
 
-  // ─── VIEW: SESSIONS ────────────────────────────────────────────────────────
+  // ══════════════════════════════════════════════════════════════════════════
+  // VIEW: SESSIONS
+  // ══════════════════════════════════════════════════════════════════════════
   if (view === 'sessions') {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--bs-tertiary-bg)' }}>
+
+        {/* Topbar */}
         <div style={{ background: 'var(--bs-body-bg)', borderBottom: '1px solid var(--bs-border-color)', padding: '12px 24px' }}>
           <div className="d-flex justify-content-between align-items-center">
-            <Link href="/kitchen" className="btn btn-outline-secondary">
-              <i className="bi bi-arrow-left me-2"></i>Back
-            </Link>
-            <h1 className="h4 mb-0 fw-bold" style={{ color: '#f59e0b' }}>
-              <i className="bi bi-truck me-2"></i>Dispatch — Final Handover
-            </h1>
+            <div style={{ width: 80 }} />
+            <div className="text-center">
+              <div style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.12em', color: 'var(--bs-secondary-color)', textTransform: 'uppercase' }}>
+                Dispatch
+              </div>
+              <h1 className="h4 mb-0 fw-bold" style={{ color: '#f59e0b' }}>
+                Final Handover
+              </h1>
+            </div>
             <button className="btn btn-sm btn-outline-secondary" onClick={loadSessions}>
               <i className="bi bi-arrow-clockwise me-1"></i>Refresh
             </button>
@@ -231,9 +250,10 @@ export default function Dispatch() {
             </div>
           ) : (
             <>
-              <h5 className="fw-bold mb-3">
+              {/* Ready to dispatch */}
+              <h5 className="fw-bold mb-3" style={{ color: 'var(--bs-body-color)' }}>
                 <i className="bi bi-check-circle me-2 text-success"></i>
-                Ready to Dispatch
+                Ready to dispatch
                 <span className="badge bg-success ms-2">{readySessions.length}</span>
               </h5>
 
@@ -251,18 +271,20 @@ export default function Dispatch() {
                         onClick={() => openSession(s)}>
                         <div className="card-body p-4">
                           <div className="d-flex justify-content-between align-items-start mb-2">
-                            <h5 className="fw-bold mb-0 text-success">{s.distributor_name}</h5>
+                            <h5 className="fw-bold mb-0" style={{ color: 'var(--bs-success-text-emphasis)' }}>
+                              {s.distributor_name}
+                            </h5>
                             <span className="badge bg-success"><i className="bi bi-check2 me-1"></i>Ready</span>
                           </div>
                           {s.distributor_phone && (
-                            <div style={{ color: 'var(--bs-secondary-color)', fontSize: '0.85rem' }} className="mb-2">
+                            <div className="mb-2" style={{ color: 'var(--bs-secondary-color)', fontSize: '0.85rem' }}>
                               <i className="bi bi-telephone me-1"></i>{s.distributor_phone}
                             </div>
                           )}
                           <div className="row g-2 text-center mb-3">
                             <div className="col-4">
-                              <div className="fw-bold">{netThaalis(s)}</div>
-                              <div style={{ color: 'var(--bs-secondary-color)', fontSize: '0.7rem' }}>To Dispatch</div>
+                              <div className="fw-bold" style={{ color: 'var(--bs-body-color)' }}>{netThaalis(s)}</div>
+                              <div style={{ color: 'var(--bs-secondary-color)', fontSize: '0.7rem' }}>To dispatch</div>
                             </div>
                             <div className="col-4">
                               <div className="fw-bold text-info">{s.customized_thaalis}</div>
@@ -285,7 +307,7 @@ export default function Dispatch() {
                             </span>
                           </div>
                           <button className="btn btn-success w-100 fw-bold">
-                            <i className="bi bi-truck me-2"></i>Open Handover
+                            <i className="bi bi-truck me-2"></i>Open handover
                           </button>
                         </div>
                       </div>
@@ -294,11 +316,48 @@ export default function Dispatch() {
                 </div>
               )}
 
+              {/* At Counter A — not yet confirmed by Counter A */}
+              {atCounterASessions.length > 0 && (
+                <>
+                  <h5 className="fw-bold mb-3" style={{ color: 'var(--bs-body-color)' }}>
+                    <i className="bi bi-stopwatch me-2" style={{ color: '#364574' }}></i>
+                    At Counter A
+                    <span className="badge ms-2" style={{ background: '#364574' }}>{atCounterASessions.length}</span>
+                  </h5>
+                  <div className="row g-3 mb-4">
+                    {atCounterASessions.map(s => (
+                      <div className="col-12 col-md-6 col-lg-4" key={s.id}>
+                        <div className="card border-0 shadow-sm opacity-75 h-100"
+                          style={{ background: 'var(--bs-body-bg)', borderLeft: '3px solid #364574' }}>
+                          <div className="card-body p-3">
+                            <div className="d-flex justify-content-between align-items-start mb-2">
+                              <h6 className="fw-bold mb-0" style={{ color: 'var(--bs-body-color)' }}>
+                                {s.distributor_name}
+                              </h6>
+                              <span className="badge text-white" style={{ background: '#364574' }}>
+                                <i className="bi bi-hourglass-split me-1"></i>Counter A
+                              </span>
+                            </div>
+                            <div style={{ color: 'var(--bs-secondary-color)', fontSize: '0.85rem' }}>
+                              <i className="bi bi-clock me-1"></i>Arrived {arrivedTime(s.arrived_at)}
+                            </div>
+                            <div className="mt-2" style={{ color: 'var(--bs-secondary-color)', fontSize: '0.8rem' }}>
+                              Waiting for Counter A to confirm &amp; send
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {/* Still being filled — Counter A done, B/C in progress */}
               {pendingSessions.length > 0 && (
                 <>
-                  <h5 className="fw-bold mb-3">
+                  <h5 className="fw-bold mb-3" style={{ color: 'var(--bs-body-color)' }}>
                     <i className="bi bi-hourglass me-2 text-warning"></i>
-                    Still Being Filled
+                    Being filled
                     <span className="badge bg-warning text-dark ms-2">{pendingSessions.length}</span>
                   </h5>
                   <div className="row g-3 mb-4">
@@ -309,7 +368,9 @@ export default function Dispatch() {
                           onClick={() => openSession(s)}>
                           <div className="card-body p-3">
                             <div className="d-flex justify-content-between align-items-start mb-2">
-                              <h6 className="fw-bold mb-0" style={{ color: 'var(--bs-body-color)' }}>{s.distributor_name}</h6>
+                              <h6 className="fw-bold mb-0" style={{ color: 'var(--bs-body-color)' }}>
+                                {s.distributor_name}
+                              </h6>
                               <span className="badge bg-warning text-dark">Pending</span>
                             </div>
                             <div className="d-flex gap-2 flex-wrap mb-2" style={{ fontSize: '0.75rem' }}>
@@ -332,17 +393,19 @@ export default function Dispatch() {
                 </>
               )}
 
+              {/* Dispatched today (collapsible) */}
               {dispatched.length > 0 && (
                 <>
                   <div className="d-flex justify-content-between align-items-center mb-3 mt-2"
                     style={{ cursor: 'pointer' }}
                     onClick={() => setShowDispatchedToday(p => !p)}>
-                    <h5 className="fw-bold mb-0">
+                    <h5 className="fw-bold mb-0" style={{ color: 'var(--bs-body-color)' }}>
                       <i className="bi bi-check-circle-fill me-2 text-success"></i>
-                      Dispatched Today
+                      Dispatched today
                       <span className="badge bg-success ms-2">{dispatched.length}</span>
                     </h5>
-                    <i className={`bi bi-chevron-${showDispatchedToday ? 'up' : 'down'}`} style={{ color: 'var(--bs-secondary-color)' }}></i>
+                    <i className={`bi bi-chevron-${showDispatchedToday ? 'up' : 'down'}`}
+                      style={{ color: 'var(--bs-secondary-color)' }}></i>
                   </div>
                   {showDispatchedToday && (
                     <div className="row g-3">
@@ -351,7 +414,9 @@ export default function Dispatch() {
                           <div className="card border-0 shadow-sm opacity-75" style={{ background: 'var(--bs-body-bg)' }}>
                             <div className="card-body p-3 d-flex justify-content-between align-items-center">
                               <div>
-                                <div className="fw-semibold" style={{ color: 'var(--bs-body-color)' }}>{s.distributor_name}</div>
+                                <div className="fw-semibold" style={{ color: 'var(--bs-body-color)' }}>
+                                  {s.distributor_name}
+                                </div>
                                 <div style={{ color: 'var(--bs-secondary-color)', fontSize: '0.85rem' }}>
                                   {netThaalis(s)} dispatched · arrived {arrivedTime(s.arrived_at)}
                                 </div>
@@ -369,7 +434,7 @@ export default function Dispatch() {
               {sessions.length === 0 && dispatched.length === 0 && (
                 <div className="alert alert-info">
                   <i className="bi bi-info-circle me-2"></i>
-                  No sessions today. Distributors appear here after checking in at Counter A.
+                  No sessions today. Distributors appear here after checking in at the kitchen arrival.
                 </div>
               )}
             </>
@@ -379,11 +444,15 @@ export default function Dispatch() {
     );
   }
 
-  // ─── VIEW: HANDOVER ────────────────────────────────────────────────────────
+  // ══════════════════════════════════════════════════════════════════════════
+  // VIEW: HANDOVER
+  // ══════════════════════════════════════════════════════════════════════════
   const isReady = activeSession?.ready || false;
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bs-tertiary-bg)' }}>
+
+      {/* Topbar */}
       <div style={{ background: 'var(--bs-body-bg)', borderBottom: '1px solid var(--bs-border-color)', padding: '12px 24px' }}>
         <div className="d-flex justify-content-between align-items-center">
           <button className="btn btn-outline-secondary"
@@ -391,8 +460,11 @@ export default function Dispatch() {
             <i className="bi bi-arrow-left me-2"></i>Back
           </button>
           <div className="text-center">
+            <div style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.12em', color: 'var(--bs-secondary-color)', textTransform: 'uppercase' }}>
+              Dispatch — Handover
+            </div>
             <h1 className="h4 mb-0 fw-bold" style={{ color: '#f59e0b' }}>
-              <i className="bi bi-truck me-2"></i>Handover — {activeSession?.distributor_name}
+              {activeSession?.distributor_name}
             </h1>
             {activeSession?.distributor_phone && (
               <div style={{ color: 'var(--bs-secondary-color)', fontSize: '0.85rem' }}>
@@ -412,18 +484,18 @@ export default function Dispatch() {
         {loadingDetail ? (
           <div className="text-center py-5">
             <div className="spinner-border" style={{ color: '#f59e0b' }}></div>
-            <div className="mt-3" style={{ color: 'var(--bs-secondary-color)' }}>Loading session details...</div>
+            <div className="mt-3" style={{ color: 'var(--bs-secondary-color)' }}>Loading session details…</div>
           </div>
         ) : (
           <>
-            {/* Summary cards */}
+            {/* Summary stat cards */}
             <div className="row g-3 mb-4">
               {[
-                { label: 'Eligible',    value: thaalis.length,        color: 'primary'   },
-                { label: 'To Dispatch', value: toDispatchCount,       color: 'success'   },
-                { label: 'Customized',  value: activeSession?.customized_thaalis || 0, color: 'info' },
-                { label: 'Default',     value: activeSession?.default_thaalis || 0,    color: 'secondary' },
-                { label: 'Stopped',     value: stoppedCount,          color: 'danger'    },
+                { label: 'Total',       value: thaalis.length,        color: 'primary'                                      },
+                { label: 'To dispatch', value: toDispatchCount,       color: 'success'                                      },
+                { label: 'Customized',  value: activeSession?.customized_thaalis || 0, color: 'info'             },
+                { label: 'Default',     value: activeSession?.default_thaalis    || 0, color: 'secondary'        },
+                { label: 'Stopped',     value: stoppedCount,          color: 'danger'                                       },
                 { label: 'Filled',      value: filledCount,           color: filledCount === toDispatchCount ? 'success' : 'warning' },
               ].map(stat => (
                 <div className="col-6 col-md-4 col-lg-2" key={stat.label}>
@@ -435,24 +507,24 @@ export default function Dispatch() {
               ))}
             </div>
 
-            {/* Counter status */}
+            {/* Counter status row */}
             <div className="card border-0 shadow-sm mb-4" style={{ background: 'var(--bs-body-bg)' }}>
               <div className="card-body p-3">
                 <div className="row g-3">
                   {[
                     {
-                      done: activeSession?.counter_b_done || activeSession?.customized_thaalis === 0,
-                      na: activeSession?.customized_thaalis === 0,
+                      done:  activeSession?.counter_b_done || activeSession?.customized_thaalis === 0,
+                      na:    activeSession?.customized_thaalis === 0,
                       label: 'Counter B',
                       count: activeSession?.customized_thaalis || 0,
-                      unit: 'customized',
+                      unit:  'customized',
                     },
                     {
-                      done: activeSession?.counter_c_done || activeSession?.default_thaalis === 0,
-                      na: activeSession?.default_thaalis === 0,
+                      done:  activeSession?.counter_c_done || activeSession?.default_thaalis === 0,
+                      na:    activeSession?.default_thaalis === 0,
                       label: 'Counter C',
                       count: activeSession?.default_thaalis || 0,
-                      unit: 'default',
+                      unit:  'default',
                     },
                   ].map(c => (
                     <div className="col-md-4" key={c.label}>
@@ -465,46 +537,50 @@ export default function Dispatch() {
                             : <><i className="bi bi-hourglass me-2 text-warning"></i>{c.label} — Pending</>
                           }
                         </div>
-                        <div style={{ color: 'var(--bs-secondary-color)', fontSize: '0.85rem' }}>{c.count} {c.unit} thaalis</div>
+                        <div style={{ color: 'var(--bs-secondary-color)', fontSize: '0.85rem' }}>
+                          {c.count} {c.unit} thaalis
+                        </div>
                       </div>
                     </div>
                   ))}
                   <div className="col-md-4">
-                    <div className={`p-3 rounded text-center ${stoppedCount === 0 ? 'bg-light' : 'bg-danger bg-opacity-10 border border-danger'}`}>
+                    <div className={`p-3 rounded text-center ${stoppedCount === 0 ? 'bg-success bg-opacity-10 border border-success' : 'bg-danger bg-opacity-10 border border-danger'}`}>
                       <div className="fw-bold" style={{ color: 'var(--bs-body-color)' }}>
                         {stoppedCount === 0
-                          ? <><i className="bi bi-check-circle me-2 text-success"></i>No Stopped Thaalis</>
-                          : <><i className="bi bi-x-circle-fill me-2 text-danger"></i>{stoppedCount} Stopped — Back to Store</>
+                          ? <><i className="bi bi-check-circle me-2 text-success"></i>No stopped thaalis</>
+                          : <><i className="bi bi-x-circle-fill me-2 text-danger"></i>{stoppedCount} stopped — back to store</>
                         }
                       </div>
-                      <div style={{ color: 'var(--bs-secondary-color)', fontSize: '0.85rem' }}>Do not dispatch stopped thaalis</div>
+                      <div style={{ color: 'var(--bs-secondary-color)', fontSize: '0.85rem' }}>
+                        Do not dispatch stopped thaalis
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Confirm / waiting */}
+            {/* Confirm dispatch / waiting banner */}
             {isReady ? (
-              <div className="card border-0 shadow-sm mb-4" style={{ border: '2px solid #16a34a', background: 'var(--bs-body-bg)' }}>
+              <div className="card border-0 shadow-sm mb-4"
+                style={{ borderLeft: '4px solid var(--bs-success)', background: 'var(--bs-body-bg)' }}>
                 <div className="card-body p-4">
                   <div className="row align-items-center">
                     <div className="col-md-8">
-                      <h5 className="fw-bold mb-1 text-success">
+                      <h5 className="fw-bold mb-1" style={{ color: 'var(--bs-success-text-emphasis)' }}>
                         <i className="bi bi-check-circle-fill me-2"></i>
                         All {toDispatchCount} thaalis ready for handover
                       </h5>
-                      <p style={{ color: 'var(--bs-secondary-color)' }} className="mb-0">
-                        Distributor <strong style={{ color: 'var(--bs-body-color)' }}>{activeSession?.distributor_name}</strong> should verify
-                        the count before you confirm.
+                      <p className="mb-0" style={{ color: 'var(--bs-secondary-color)' }}>
+                        Distributor <strong style={{ color: 'var(--bs-body-color)' }}>{activeSession?.distributor_name}</strong> should verify the count before you confirm.
                       </p>
                     </div>
                     <div className="col-md-4 mt-3 mt-md-0">
                       <button className="btn btn-success btn-lg w-100 fw-bold"
                         onClick={confirmDispatch} disabled={confirming}>
                         {confirming
-                          ? <><span className="spinner-border spinner-border-sm me-2"></span>Confirming...</>
-                          : <><i className="bi bi-truck me-2"></i>Confirm Dispatch</>
+                          ? <><span className="spinner-border spinner-border-sm me-2"></span>Confirming…</>
+                          : <><i className="bi bi-truck me-2"></i>Confirm dispatch</>
                         }
                       </button>
                     </div>
@@ -512,13 +588,14 @@ export default function Dispatch() {
                 </div>
               </div>
             ) : (
-              <div className="card border-0 shadow-sm mb-4" style={{ border: '2px solid #d97706', background: 'var(--bs-body-bg)' }}>
+              <div className="card border-0 shadow-sm mb-4"
+                style={{ borderLeft: '4px solid #d97706', background: 'var(--bs-body-bg)' }}>
                 <div className="card-body p-4">
-                  <h5 className="fw-bold mb-2 text-warning">
+                  <h5 className="fw-bold mb-2" style={{ color: 'var(--bs-warning-text-emphasis)' }}>
                     <i className="bi bi-hourglass me-2"></i>Not ready to dispatch yet
                   </h5>
-                  <p style={{ color: 'var(--bs-secondary-color)' }} className="mb-3">
-                    Waiting for counters to complete filling before this session can be dispatched.
+                  <p className="mb-3" style={{ color: 'var(--bs-secondary-color)' }}>
+                    Waiting for counters to finish before this session can be dispatched.
                   </p>
                   <div className="d-flex gap-2 flex-wrap">
                     {!(activeSession?.counter_b_done || activeSession?.customized_thaalis === 0) && (
@@ -541,24 +618,35 @@ export default function Dispatch() {
               <div className="card-header py-3 d-flex justify-content-between"
                 style={{ background: 'var(--bs-body-bg)', borderBottom: '1px solid var(--bs-border-color)' }}>
                 <h6 className="mb-0 fw-bold" style={{ color: 'var(--bs-body-color)' }}>
-                  <i className="bi bi-list-ul me-2"></i>Thaali List
+                  <i className="bi bi-list-ul me-2"></i>Thaali list
                 </h6>
                 <div className="d-flex gap-2" style={{ fontSize: '0.8rem' }}>
-                  <span className="badge bg-info text-dark">{thaalis.filter(t => t.type === 'customized').length} custom</span>
-                  <span className="badge bg-secondary">{thaalis.filter(t => t.type === 'default').length} default</span>
-                  {stoppedCount > 0 && <span className="badge bg-danger">{stoppedCount} stopped</span>}
+                  <span className="badge bg-info text-dark">
+                    {thaalis.filter(t => t.type === 'customized').length} custom
+                  </span>
+                  <span className="badge bg-secondary">
+                    {thaalis.filter(t => t.type === 'default').length} default
+                  </span>
+                  {stoppedCount > 0 && (
+                    <span className="badge bg-danger">{stoppedCount} stopped</span>
+                  )}
                 </div>
               </div>
               <div className="card-body p-0" style={{ maxHeight: '500px', overflowY: 'auto' }}>
                 {thaalis.length === 0 ? (
                   <div className="text-center py-4" style={{ color: 'var(--bs-secondary-color)' }}>
+                    <i className="bi bi-inbox fs-2 d-block mb-2"></i>
                     No thaalis found for this session
                   </div>
                 ) : (
                   <table className="table table-hover table-sm mb-0">
-                    <thead className="table-light" style={{ position: 'sticky', top: 0 }}>
+                    <thead style={{ position: 'sticky', top: 0, background: 'var(--bs-secondary-bg)' }}>
                       <tr>
-                        <th className="ps-3">Thaali #</th><th>Mumin Name</th><th>SF#</th><th>Type</th><th>Filled</th>
+                        <th className="ps-3" style={{ color: 'var(--bs-body-color)' }}>Thaali #</th>
+                        <th style={{ color: 'var(--bs-body-color)' }}>Mumin name</th>
+                        <th style={{ color: 'var(--bs-body-color)' }}>SF#</th>
+                        <th style={{ color: 'var(--bs-body-color)' }}>Type</th>
+                        <th style={{ color: 'var(--bs-body-color)' }}>Filled</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -566,12 +654,12 @@ export default function Dispatch() {
                         <tr key={t.thaali_id} className={
                           t.type === 'stopped' ? 'table-danger' : t.filled ? 'table-success' : ''
                         }>
-                          <td className="ps-3 fw-bold">#{t.thaali_number}</td>
+                          <td className="ps-3 fw-bold" style={{ color: 'var(--bs-body-color)' }}>#{t.thaali_number}</td>
                           <td style={{ color: 'var(--bs-body-color)' }}>{t.mumin_name}</td>
                           <td style={{ color: 'var(--bs-secondary-color)' }}>{t.sf_no}</td>
                           <td>
                             <span className={`badge ${
-                              t.type === 'stopped' ? 'bg-danger' :
+                              t.type === 'stopped'    ? 'bg-danger' :
                               t.type === 'customized' ? 'bg-info text-dark' : 'bg-secondary'
                             }`}>
                               {t.type === 'stopped' ? '✕ Stopped' :
@@ -580,7 +668,7 @@ export default function Dispatch() {
                           </td>
                           <td>
                             {t.type === 'stopped'
-                              ? <span style={{ color: '#dc2626', fontSize: '0.85rem' }}>Return to store</span>
+                              ? <span style={{ color: 'var(--bs-danger-text-emphasis)', fontSize: '0.85rem' }}>Return to store</span>
                               : t.filled
                               ? <span className="badge bg-success"><i className="bi bi-check me-1"></i>Filled</span>
                               : <span className="badge bg-warning text-dark">Pending</span>

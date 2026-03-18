@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { loadKitchenDayData, getStoppedMuminIds, todayISO, type TodaySchedule, type EligibleRegistration } from '@/lib/kitchen-eligible';
 
@@ -18,29 +18,39 @@ type Session = {
 export default function CounterADetail() {
   const params = useParams();
   const distributorId = parseInt(params.id as string, 10);
+  const router = useRouter();
 
-  const [session, setSession]         = useState<Session | null>(null);
-  const [schedule, setSchedule]       = useState<TodaySchedule | null>(null);
-  const [allRows, setAllRows]         = useState<ThaaliRow[]>([]);
-  const [noThaaliDay, setNoThaaliDay] = useState(false);
-  const [filter, setFilter]           = useState<FilterView>('stopped');
+  const [session, setSession]           = useState<Session | null>(null);
+  const [schedule, setSchedule]         = useState<TodaySchedule | null>(null);
+  const [allRows, setAllRows]           = useState<ThaaliRow[]>([]);
+  // FIX: store which mumin_ids have active customizations today
+  const [customizedMuminIds, setCustomizedMuminIds] = useState<Set<number>>(new Set());
+  const [noThaaliDay, setNoThaaliDay]   = useState(false);
+  const [filter, setFilter]             = useState<FilterView>('stopped');
   const [distributorName, setDistributorName] = useState('');
-  const [loading, setLoading]         = useState(true);
-  const [confirming, setConfirming]   = useState(false);
-  const [confirmed, setConfirmed]     = useState(false);
-  const [error, setError]             = useState('');
+  const [loading, setLoading]           = useState(true);
+  const [confirming, setConfirming]     = useState(false);
+  const [confirmed, setConfirmed]       = useState(false);
+  const [error, setError]               = useState('');
 
   useEffect(() => { if (distributorId) init(); }, [distributorId]);
 
   const init = async () => {
     setLoading(true); setError('');
     const today = todayISO();
+
     const [distRes, sessionRes, dayData] = await Promise.all([
       supabase.from('distributors').select('id, full_name').eq('id', distributorId).single(),
       supabase.from('distribution_sessions').select('*').eq('distributor_id', distributorId).eq('session_date', today).maybeSingle(),
       loadKitchenDayData({ distributorId }),
     ]);
-    if (distRes.error || !distRes.data) { setError(`Distributor not found (id=${distributorId})`); setLoading(false); return; }
+
+    if (distRes.error || !distRes.data) {
+      setError(`Distributor not found (id=${distributorId})`);
+      setLoading(false);
+      return;
+    }
+
     setDistributorName(distRes.data.full_name);
     setSchedule(dayData.schedule);
     setNoThaaliDay(dayData.noThaaliDay);
@@ -52,8 +62,9 @@ export default function CounterADetail() {
       .eq('distributor_id', distributorId)
       .not('thaali_id', 'is', null);
 
-    const stoppedIds = await getStoppedMuminIds(today);
+    const stoppedIds       = await getStoppedMuminIds(today);
     const eligibleMuminIds = new Set(dayData.eligible.map(r => r.mumin_id));
+
     const stoppedRows: ThaaliRow[] = (allRegs || [])
       .filter((r: any) => stoppedIds.has(r.mumin_id) && !eligibleMuminIds.has(r.mumin_id) && r.mumineen)
       .map((r: any) => ({
@@ -64,18 +75,37 @@ export default function CounterADetail() {
         niyyat_status_id: r.mumineen?.niyyat_status_id, preStoppedBySystem: true,
       }));
 
-    setAllRows([...dayData.eligible, ...stoppedRows]);
+    const combined = [...dayData.eligible, ...stoppedRows];
+    setAllRows(combined);
+
+    // FIX: fetch today's active customizations for all eligible mumineen.
+    // This is what determines Counter B vs Counter C — was missing entirely.
+    if (dayData.eligible.length > 0) {
+      const eligibleIds = dayData.eligible.map(r => r.mumin_id);
+      const { data: customRes } = await supabase
+        .from('thaali_customizations')
+        .select('mumin_id')
+        .in('mumin_id', eligibleIds)
+        .eq('request_date', today)
+        .eq('status', 'active');
+
+      setCustomizedMuminIds(new Set((customRes || []).map((c: any) => c.mumin_id)));
+    }
+
     if (sessionRes.data) {
       setSession({ ...sessionRes.data, distributor_name: distRes.data.full_name });
       if (['in_progress', 'completed', 'dispatched'].includes(sessionRes.data.status)) setConfirmed(true);
     }
+
     setLoading(false);
   };
 
-  // ── Derived ───────────────────────────────────────────────────────────────
-  const stoppedList   = allRows.filter(r => r.preStoppedBySystem);
-  const counterBList  = [] as ThaaliRow[];
-  const counterCList  = allRows.filter(r => !r.preStoppedBySystem);
+  // ── Derived lists ─────────────────────────────────────────────────────────
+  // FIX: counterBList now correctly uses customizedMuminIds instead of being []
+  const stoppedList  = allRows.filter(r => r.preStoppedBySystem);
+  const counterBList = allRows.filter(r => !r.preStoppedBySystem && customizedMuminIds.has(r.mumin_id));
+  const counterCList = allRows.filter(r => !r.preStoppedBySystem && !customizedMuminIds.has(r.mumin_id));
+
   const extraCount    = schedule?.extra_thaali_count || 0;
   const totalCount    = allRows.length + extraCount;
   const stoppedCount  = stoppedList.length;
@@ -88,6 +118,11 @@ export default function CounterADetail() {
     filter === 'counter_b' ? counterBList :
     counterCList;
 
+  // ── handleConfirmAndSend ──────────────────────────────────────────────────
+  // FIX: seed now uses correct status per thaali:
+  //   stopped              → 'stopped'
+  //   has active custom    → 'counter_b_pending'
+  //   no custom (default)  → 'counter_c_pending'
   const handleConfirmAndSend = async () => {
     if (confirmed || allRows.length === 0) return;
     setConfirming(true); setError('');
@@ -102,34 +137,59 @@ export default function CounterADetail() {
         if (e) throw e;
         sessionId = newSession.id;
       }
-      const { error: ue } = await supabase.from('distribution_sessions').update({
-  total_thaalis: totalCount, stopped_thaalis: stoppedCount,
-  customized_thaalis: counterBCount, default_thaalis: counterCCount,
-  status: 'in_progress',
-}).eq('id', sessionId);
+
+      const { error: ue } = await supabase
+        .from('distribution_sessions')
+        .update({
+          total_thaalis:      totalCount,
+          stopped_thaalis:    stoppedCount,
+          customized_thaalis: counterBCount,
+          default_thaalis:    counterCCount,
+          status:             'in_progress',
+        })
+        .eq('id', sessionId);
       if (ue) throw ue;
+
       const seedRows = allRows.map(r => ({
-        session_id: sessionId, thaali_id: r.thaali_id, thaali_number: r.thaali_number,
-        mumin_id: r.mumin_id, date: today,
-        status: r.preStoppedBySystem ? 'stopped' : 'counter_c_pending',
+        session_id:    sessionId,
+        thaali_id:     r.thaali_id,
+        thaali_number: r.thaali_number,
+        mumin_id:      r.mumin_id,
+        date:          today,
+        // FIX: correct status based on actual category
+        status: r.preStoppedBySystem
+          ? 'stopped'
+          : customizedMuminIds.has(r.mumin_id)
+          ? 'counter_b_pending'
+          : 'counter_c_pending',
       }));
-      const { error: se } = await supabase.from('thaali_daily_status')
+
+      const { error: se } = await supabase
+        .from('thaali_daily_status')
         .upsert(seedRows, { onConflict: 'session_id,thaali_id' });
       if (se) throw se;
+
       setConfirmed(true);
+      setTimeout(() => router.push('/kitchen'), 2000);
     } catch (err: any) {
       setError(err.message || 'Confirm failed');
-    } finally { setConfirming(false); }
+    } finally {
+      setConfirming(false);
+    }
   };
 
+  // ── Loading / error states ────────────────────────────────────────────────
   if (loading) return (
     <div className="min-vh-100 d-flex align-items-center justify-content-center" style={{ background: 'var(--bs-tertiary-bg)' }}>
       <div className="spinner-border text-primary" style={{ width: '3rem', height: '3rem' }} />
     </div>
   );
+
   if (error && !allRows.length) return (
     <div className="min-vh-100 p-4" style={{ background: 'var(--bs-tertiary-bg)' }}>
-      <Link href="/kitchen" className="btn btn-outline-secondary mb-4"><i className="bi bi-arrow-left me-2" />Back</Link>
+      <Link href="/kitchen" className="btn btn-outline-secondary mb-4">
+        <i className="bi bi-arrow-left me-2" />Back
+      </Link>
       <div className="alert alert-danger">{error}</div>
     </div>
   );
@@ -144,7 +204,9 @@ export default function CounterADetail() {
             <i className="bi bi-arrow-left me-2" />Back
           </Link>
           <h1 className="h4 mb-0 fw-bold text-center">
-            <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--bs-secondary-color)', textTransform: 'uppercase', letterSpacing: 1 }}>Store Counter A</div>
+            <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--bs-secondary-color)', textTransform: 'uppercase', letterSpacing: 1 }}>
+              Store Counter A
+            </div>
             <div style={{ color: '#364574' }}>{distributorName || '—'}</div>
           </h1>
           <span className={`badge fs-6 ${confirmed ? 'bg-success' : 'bg-warning text-dark'}`}>
@@ -159,14 +221,17 @@ export default function CounterADetail() {
         {noThaaliDay ? (
           <div className="alert alert-danger d-flex align-items-center gap-2">
             <i className="bi bi-calendar-x fs-4" />
-            <div><strong>No Thaali Today</strong>{schedule?.event_name && <span className="ms-2">— {schedule.event_name}</span>}</div>
+            <div>
+              <strong>No Thaali Today</strong>
+              {schedule?.event_name && <span className="ms-2">— {schedule.event_name}</span>}
+            </div>
           </div>
         ) : (
           <>
             {/* ── Stat cards ── */}
             <div className="row g-3 mb-4">
 
-              {/* Total — text only, not clickable */}
+              {/* Total */}
               <div className="col-6 col-md-4 col-lg">
                 <div style={{
                   background: 'var(--bs-body-bg)', border: '1px solid var(--bs-border-color)',
@@ -180,7 +245,7 @@ export default function CounterADetail() {
                 </div>
               </div>
 
-              {/* Stopped — clickable */}
+              {/* Stopped */}
               {(() => {
                 const isActive = filter === 'stopped';
                 return (
@@ -196,6 +261,7 @@ export default function CounterADetail() {
                         boxShadow: isActive ? '0 6px 18px #f0654844' : '0 2px 8px rgba(0,0,0,0.07)',
                         transition: 'all 0.15s ease',
                         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
+                        WebkitTapHighlightColor: 'rgba(240,101,72,0.15)',
                       }}>
                       <i className="bi bi-x-circle" style={{ fontSize: 22, color: '#f06548', opacity: isActive ? 1 : 0.7, marginBottom: 4 }} />
                       <div style={{ fontSize: 38, fontWeight: 800, lineHeight: 1, color: '#f06548' }}>{stoppedCount}</div>
@@ -210,7 +276,7 @@ export default function CounterADetail() {
                 );
               })()}
 
-              {/* Counter B — clickable */}
+              {/* Counter B */}
               {(() => {
                 const isActive = filter === 'counter_b';
                 return (
@@ -226,6 +292,7 @@ export default function CounterADetail() {
                         boxShadow: isActive ? '0 6px 18px #40518944' : '0 2px 8px rgba(0,0,0,0.07)',
                         transition: 'all 0.15s ease',
                         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
+                        WebkitTapHighlightColor: 'rgba(64,81,137,0.15)',
                       }}>
                       <i className="bi bi-stars" style={{ fontSize: 22, color: '#405189', opacity: isActive ? 1 : 0.7, marginBottom: 4 }} />
                       <div style={{ fontSize: 38, fontWeight: 800, lineHeight: 1, color: '#405189' }}>{counterBCount}</div>
@@ -240,7 +307,7 @@ export default function CounterADetail() {
                 );
               })()}
 
-              {/* Counter C — clickable */}
+              {/* Counter C */}
               {(() => {
                 const isActive = filter === 'counter_c';
                 return (
@@ -256,6 +323,7 @@ export default function CounterADetail() {
                         boxShadow: isActive ? '0 6px 18px #0ab39c44' : '0 2px 8px rgba(0,0,0,0.07)',
                         transition: 'all 0.15s ease',
                         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
+                        WebkitTapHighlightColor: 'rgba(10,179,156,0.15)',
                       }}>
                       <i className="bi bi-check2-square" style={{ fontSize: 22, color: '#0ab39c', opacity: isActive ? 1 : 0.7, marginBottom: 4 }} />
                       <div style={{ fontSize: 38, fontWeight: 800, lineHeight: 1, color: '#0ab39c' }}>{counterCCount}</div>
@@ -270,7 +338,7 @@ export default function CounterADetail() {
                 );
               })()}
 
-              {/* To Dispatch — text only, not clickable */}
+              {/* To Dispatch */}
               <div className="col-6 col-md-4 col-lg">
                 <div style={{
                   background: 'var(--bs-body-bg)', border: '1px solid var(--bs-border-color)',
@@ -285,9 +353,9 @@ export default function CounterADetail() {
               </div>
             </div>
 
-            {/* ── Confirm & Send ── */}
+            {/* ── Confirm & Send / Confirmed banner ── */}
             {!confirmed ? (
-              <div className="card border-0 shadow-sm mb-4">
+              <div className="card border-0 shadow-sm mb-4" style={{ background: 'var(--bs-body-bg)' }}>
                 <div className="card-body p-3">
                   <div className="d-flex justify-content-between align-items-center flex-wrap gap-3">
                     <div style={{ fontSize: 13, color: 'var(--bs-secondary-color)' }}>
@@ -296,12 +364,17 @@ export default function CounterADetail() {
                       <span style={{ color: '#405189' }} className="fw-semibold">{counterBCount} Counter B</span>
                       <span className="mx-2">·</span>
                       <span className="text-success fw-semibold">{counterCCount} Counter C</span>
-                      {extraCount > 0 && <><span className="mx-2">·</span><span className="text-success">+{extraCount} extra</span></>}
+                      {extraCount > 0 && (
+                        <><span className="mx-2">·</span><span className="text-success">+{extraCount} extra</span></>
+                      )}
                     </div>
-                    <button className="btn btn-success btn-lg fw-bold px-5"
-                      onClick={handleConfirmAndSend} disabled={confirming || allRows.length === 0}>
+                    <button
+                      className="btn btn-success btn-lg fw-bold px-5"
+                      onClick={handleConfirmAndSend}
+                      disabled={confirming || allRows.length === 0}
+                    >
                       {confirming
-                        ? <><span className="spinner-border spinner-border-sm me-2" />Confirming...</>
+                        ? <><span className="spinner-border spinner-border-sm me-2" />Confirming…</>
                         : <><i className="bi bi-check-circle me-2" />Confirm &amp; Send</>}
                     </button>
                   </div>
@@ -313,8 +386,8 @@ export default function CounterADetail() {
                 <div>
                   <strong>Sent to Counters</strong>
                   <span className="ms-3" style={{ fontSize: 13 }}>
-                    {counterCCount > 0 && <span className="text-success fw-semibold me-3">{counterCCount} → Counter C</span>}
                     {counterBCount > 0 && <span style={{ color: '#405189' }} className="fw-semibold me-3">{counterBCount} → Counter B</span>}
+                    {counterCCount > 0 && <span className="text-success fw-semibold me-3">{counterCCount} → Counter C</span>}
                     {stoppedCount > 0 && <span className="text-danger fw-semibold">{stoppedCount} stopped</span>}
                   </span>
                 </div>
@@ -329,7 +402,7 @@ export default function CounterADetail() {
                 <div className="small mt-1">Check niyyat approvals or thaali assignments.</div>
               </div>
             ) : (
-              <div className="card border-0 shadow-sm">
+              <div className="card border-0 shadow-sm" style={{ background: 'var(--bs-body-bg)' }}>
                 <div className="card-header pt-3 pb-0" style={{ background: 'var(--bs-body-bg)' }}>
                   <ul className="nav nav-tabs card-header-tabs">
                     {([
@@ -341,7 +414,8 @@ export default function CounterADetail() {
                         <button
                           className={`nav-link ${filter === tab.key ? 'active fw-bold' : ''}`}
                           style={{ color: filter === tab.key ? tab.color : 'var(--bs-secondary-color)' }}
-                          onClick={() => setFilter(tab.key)}>
+                          onClick={() => setFilter(tab.key)}
+                        >
                           {tab.label}
                           <span className="ms-1 badge rounded-pill" style={{
                             background: filter === tab.key ? tab.color : 'var(--bs-secondary-bg)',
@@ -358,13 +432,17 @@ export default function CounterADetail() {
                     <div className="text-center py-5" style={{ color: 'var(--bs-secondary-color)' }}>
                       <i className="bi bi-inbox fs-3 d-block mb-2" />
                       <div>None in this category</div>
-                      {filter === 'counter_b' && <div className="small mt-1 text-muted">Customizations are assigned via portal admin</div>}
+                      {filter === 'counter_b' && (
+                        <div className="small mt-1 text-muted">
+                          Customizations are assigned by mumineen via the Flutter app
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="table-responsive">
                       <table className="table table-hover mb-0">
-                        <thead className="table-light">
-                          <tr>
+                        <thead>
+                          <tr style={{ background: 'var(--bs-secondary-bg)' }}>
                             <th style={{ color: 'var(--bs-secondary-color)', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Thaali #</th>
                             <th style={{ color: 'var(--bs-secondary-color)', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Mumin Name</th>
                             <th style={{ color: 'var(--bs-secondary-color)', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>SF#</th>
@@ -373,25 +451,28 @@ export default function CounterADetail() {
                         </thead>
                         <tbody>
                           {displayList.map(r => {
-                            const isStopped = r.preStoppedBySystem;
+                            const isStopped    = r.preStoppedBySystem;
+                            const isCustomized = !isStopped && customizedMuminIds.has(r.mumin_id);
                             return (
                               <tr key={r.mumin_id}
-                                style={{ borderLeft: isStopped ? '3px solid #f06548' : '3px solid transparent' }}
-                                className={isStopped ? 'table-danger' : filter === 'counter_b' ? 'table-info' : ''}>
-                                <td className="fw-bold fs-5" style={{ color: isStopped ? '#f06548' : '#364574' }}>#{r.thaali_number}</td>
+                                style={{ borderLeft: isStopped ? '3px solid #f06548' : isCustomized ? '3px solid #405189' : '3px solid transparent' }}
+                                className={isStopped ? 'table-danger' : isCustomized ? 'table-info' : ''}
+                              >
+                                <td className="fw-bold fs-5" style={{ color: isStopped ? '#f06548' : '#364574' }}>
+                                  #{r.thaali_number}
+                                </td>
                                 <td style={{ color: 'var(--bs-body-color)' }}>
                                   {r.full_name}
-                                  {isStopped && (
-                                    <span className="ms-2 badge bg-danger" style={{ fontSize: 10 }}>STOP</span>
-                                  )}
+                                  {isStopped && <span className="ms-2 badge bg-danger" style={{ fontSize: 10 }}>STOP</span>}
+                                  {isCustomized && <span className="ms-2 badge bg-info text-dark" style={{ fontSize: 10 }}>CUSTOM</span>}
                                 </td>
                                 <td style={{ color: 'var(--bs-secondary-color)' }}>{r.sf_no}</td>
                                 <td>
                                   {isStopped
                                     ? <span className="badge bg-danger">✕ Back to Store</span>
-                                    : filter === 'counter_b'
-                                      ? <span className="badge bg-info text-dark">→ Counter B</span>
-                                      : <span className="badge bg-success">→ Counter C</span>}
+                                    : isCustomized
+                                    ? <span className="badge bg-info text-dark">→ Counter B</span>
+                                    : <span className="badge bg-success">→ Counter C</span>}
                                 </td>
                               </tr>
                             );

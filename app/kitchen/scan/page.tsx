@@ -13,20 +13,21 @@ export default function KitchenScanPage() {
   const [tapping, setTapping]           = useState(false);
   const [result, setResult]             = useState<'success' | 'error' | null>(null);
   const [resultName, setResultName]     = useState('');
-  const today = todayISO();
-  const localToday = (() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-  })();
+
+  const [autoDemo, setAutoDemo]       = useState(false);
+  const [autoDemoIdx, setAutoDemoIdx] = useState(0);
+  const [countdown, setCountdown]     = useState(0);
 
   useEffect(() => { fetchDistributors(); }, []);
 
   const fetchDistributors = async () => {
-    // Get distributors that haven't arrived yet today
+    // FIX: use todayISO() — single source of truth, local date, no UTC bug
+    const today = todayISO();
+
     const { data: arrived } = await supabase
       .from('distribution_sessions')
       .select('distributor_id')
-      .eq('session_date', localToday);
+      .eq('session_date', today);
 
     const arrivedIds = new Set((arrived || []).map((s: any) => s.distributor_id));
 
@@ -42,10 +43,6 @@ export default function KitchenScanPage() {
     setLoading(false);
   };
 
-  const [autoDemo, setAutoDemo]     = useState(false);
-  const [autoDemoIdx, setAutoDemoIdx] = useState(0);
-  const [countdown, setCountdown]   = useState(0);
-
   // Auto demo — check in one by one every 8 seconds
   useEffect(() => {
     if (!autoDemo) return;
@@ -56,7 +53,7 @@ export default function KitchenScanPage() {
     setCountdown(8);
 
     const countTimer = setInterval(() => setCountdown(c => c - 1), 1000);
-    const tapTimer = setTimeout(async () => {
+    const tapTimer   = setTimeout(async () => {
       clearInterval(countTimer);
       await doCheckin(dist.id, dist.full_name);
       setAutoDemoIdx(i => i + 1);
@@ -70,7 +67,8 @@ export default function KitchenScanPage() {
     if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
     try {
       const res = await fetch('/api/kitchen/arrival', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ distributor_id: id }),
       });
       const data = await res.json();
@@ -97,15 +95,12 @@ export default function KitchenScanPage() {
       alignItems: 'center', justifyContent: 'center',
       background: '#0f172a', padding: 24, fontFamily: 'system-ui, sans-serif',
     }}>
-
       {/* Header */}
       <div style={{ textAlign: 'center', marginBottom: 40 }}>
         <div style={{ fontSize: 13, color: '#64748b', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 8 }}>
           FMB Kitchen
         </div>
-        <div style={{ fontSize: 24, fontWeight: 800, color: '#fff' }}>
-          Distributor Arrival
-        </div>
+        <div style={{ fontSize: 24, fontWeight: 800, color: '#fff' }}>Distributor Arrival</div>
         <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>
           {new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' })}
         </div>
@@ -153,11 +148,11 @@ export default function KitchenScanPage() {
             </div>
           </div>
 
-          {/* Auto Demo button */}
+          {/* Auto Demo */}
           {!autoDemo && distributors.length > 1 && (
             <div style={{ width: '100%', maxWidth: 340, marginBottom: 24 }}>
               <button onClick={() => { setAutoDemo(true); setAutoDemoIdx(0); }} style={{
-                width: '100%', padding: '14px', borderRadius: 14, border: '1px solid #334155',
+                width: '100%', padding: 14, borderRadius: 14, border: '1px solid #334155',
                 background: '#1e293b', color: '#ffbf69', fontSize: 14, fontWeight: 700,
                 cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               }}>
@@ -166,11 +161,10 @@ export default function KitchenScanPage() {
             </div>
           )}
 
-          {/* Auto demo progress */}
           {autoDemo && (
             <div style={{ width: '100%', maxWidth: 340, marginBottom: 24, textAlign: 'center' }}>
               <div style={{ color: '#ffbf69', fontWeight: 700, fontSize: 15, marginBottom: 6 }}>
-                Auto Demo running — {autoDemoIdx + 1} of {distributors.length + autoDemoIdx}
+                Auto Demo — {autoDemoIdx + 1} of {distributors.length + autoDemoIdx}
               </div>
               <div style={{ color: '#64748b', fontSize: 13 }}>
                 Next check-in in <span style={{ color: '#fff', fontWeight: 700 }}>{countdown}s</span>
@@ -184,7 +178,6 @@ export default function KitchenScanPage() {
 
           {/* Big tap button */}
           <div style={{ position: 'relative' }}>
-            {/* Ripple rings */}
             {(tapping || autoDemo) && (
               <>
                 <div style={{ position: 'absolute', inset: -20, borderRadius: '50%', border: '2px solid #ffbf69', opacity: 0, animation: 'ripple 1s ease-out forwards' }} />
@@ -196,18 +189,11 @@ export default function KitchenScanPage() {
               disabled={!selectedId || tapping || autoDemo}
               style={{
                 width: 180, height: 180, borderRadius: '50%', border: 'none', cursor: 'pointer',
-                background: tapping
-                  ? 'radial-gradient(circle, #ffbf69, #f97316)'
-                  : result === 'success'
-                  ? 'radial-gradient(circle, #22c55e, #16a34a)'
-                  : result === 'error'
-                  ? 'radial-gradient(circle, #ef4444, #dc2626)'
-                  : 'radial-gradient(circle, #364574, #1e3a5f)',
-                boxShadow: tapping
-                  ? '0 0 60px #ffbf6980'
-                  : result === 'success'
-                  ? '0 0 60px #22c55e80'
-                  : '0 0 40px #36457440',
+                background: tapping ? 'radial-gradient(circle, #ffbf69, #f97316)' :
+                  result === 'success' ? 'radial-gradient(circle, #22c55e, #16a34a)' :
+                  result === 'error'   ? 'radial-gradient(circle, #ef4444, #dc2626)' :
+                  'radial-gradient(circle, #364574, #1e3a5f)',
+                boxShadow: tapping ? '0 0 60px #ffbf6980' : result === 'success' ? '0 0 60px #22c55e80' : '0 0 40px #36457440',
                 transform: tapping ? 'scale(0.94)' : 'scale(1)',
                 transition: 'all 0.15s',
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8,
@@ -221,7 +207,6 @@ export default function KitchenScanPage() {
             </button>
           </div>
 
-          {/* Result message */}
           {result === 'success' && (
             <div style={{ marginTop: 32, textAlign: 'center', animation: 'fadeIn 0.3s ease' }}>
               <div style={{ fontSize: 20, fontWeight: 700, color: '#22c55e' }}>{resultName}</div>
@@ -233,7 +218,6 @@ export default function KitchenScanPage() {
               <div style={{ fontSize: 15, color: '#ef4444' }}>{resultName}</div>
             </div>
           )}
-
           {!result && selectedId && (
             <div style={{ marginTop: 24, color: '#475569', fontSize: 13, textAlign: 'center' }}>
               {distributors.find(d => d.id === selectedId)?.full_name}
@@ -243,14 +227,8 @@ export default function KitchenScanPage() {
       )}
 
       <style>{`
-        @keyframes ripple {
-          0%   { transform: scale(1); opacity: 0.6; }
-          100% { transform: scale(1.5); opacity: 0; }
-        }
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(8px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
+        @keyframes ripple { 0% { transform: scale(1); opacity: 0.6; } 100% { transform: scale(1.5); opacity: 0; } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
     </div>
   );

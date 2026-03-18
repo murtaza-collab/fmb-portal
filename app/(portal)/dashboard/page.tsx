@@ -74,7 +74,8 @@ export default function DashboardPage() {
   }
 
   const fetchStats = async () => {
-    const todayStr = new Date().toISOString().split('T')[0]
+    const now = new Date()
+const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`  
 
     const [
       { count: activeHOFs },
@@ -92,7 +93,7 @@ export default function DashboardPage() {
       supabase.from('thaali_registrations').select('*', { count:'exact', head:true }).not('thaali_id', 'is', null),
       // ── FIXED: count active stops from stop_thaalis covering today ──
       supabase.from('stop_thaalis').select('*', { count:'exact', head:true })
-        .lte('from_date', todayStr).gte('to_date', todayStr).in('status', ['active', 'approved']),
+        .lte('from_date', todayStr).gte('to_date', todayStr).eq('status', 'approved'),
       supabase.from('house_sectors').select('*', { count:'exact', head:true }).eq('status', 'active'),
       supabase.from('distributors').select('*', { count:'exact', head:true }).eq('status', 'active'),
       supabase.from('mumineen').select('*', { count:'exact', head:true }).eq('change_address', true),
