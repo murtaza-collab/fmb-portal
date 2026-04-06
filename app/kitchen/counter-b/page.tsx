@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { todayISO } from '@/lib/kitchen-eligible';
+import { nowUTC } from '@/lib/time';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -38,6 +39,7 @@ type ScannedThaali = {
   session_id:    number;
   customization: any;
   todayMenu:     any;
+  alreadyFilled?: boolean;
 };
 
 type TallyItem = {
@@ -111,7 +113,17 @@ export default function CounterB() {
         );
         scanner.render(
           // FIX B2: always calls latest handleScan via ref — reads currentRef, not stale closure
-          (decoded) => handleScanRef.current(decoded.replace('THAALI-', '').trim()),
+          (decoded) => {
+            // QR encodes JSON: {"thaali_id":1247,"symbol":"$"} or plain "THAALI-1247" or "1247"
+            let thaaliNumber = decoded.trim();
+            try {
+              const parsed = JSON.parse(thaaliNumber);
+              if (parsed.thaali_id) thaaliNumber = String(parsed.thaali_id);
+            } catch {
+              thaaliNumber = thaaliNumber.replace('THAALI-', '').trim();
+            }
+            handleScanRef.current(thaaliNumber);
+          },
           () => {}
         );
         scannerRef.current = scanner;
@@ -133,7 +145,7 @@ export default function CounterB() {
         .from('distribution_sessions')
         .select('id, distributor_id, customized_thaalis, status, distributors(full_name)')
         .eq('session_date', today)
-        .in('status', ['arrived', 'in_progress', 'counter_b_done', 'counter_c_done']);
+        .in('status', ['arrived', 'in_progress', 'counter_b_done', 'counter_c_done', 'counter_bc_done']);
 
       const all = (data || []).map((s: any) => ({
         id:                 s.id,
@@ -144,8 +156,9 @@ export default function CounterB() {
       }));
 
       // Only show sessions Counter A confirmed AND that actually have customized thaalis
-      setSessions(all.filter(s => s.status !== 'counter_b_done' && s.customized_thaalis > 0));
-      setCompleted(all.filter(s => s.status === 'counter_b_done'));
+      const DONE_STATUSES = ['counter_b_done', 'counter_bc_done', 'dispatched'];
+      setSessions(all.filter(s => !DONE_STATUSES.includes(s.status) && s.customized_thaalis > 0));
+      setCompleted(all.filter(s => DONE_STATUSES.includes(s.status)));
     } finally {
       setLoadingSessions(false);
     }
@@ -178,7 +191,7 @@ export default function CounterB() {
         .from('thaali_daily_status')
         .update({
           status:    'counter_b_filled',
-          packed_at: new Date().toISOString(),
+          packed_at: nowUTC(),
         })
         .eq('session_id', thaali.session_id)
         .eq('thaali_id',  thaali.thaali_id);
@@ -228,10 +241,9 @@ export default function CounterB() {
         return;
       }
       if (statusRow.status === 'counter_b_filled') {
-        setError(`Thaali #${thaaliNumber} — already filled ✓`);
-        return;
-      }
-      if (statusRow.status !== 'counter_b_pending') {
+        // Don't block — show the customization again with a warning so staff can verify/re-fill
+        // This handles the case where thaali was marked filled but wasn't actually filled
+      } else if (statusRow.status !== 'counter_b_pending') {
         setError(`Thaali #${thaaliNumber} — not assigned to Counter B (status: ${statusRow.status})`);
         return;
       }
@@ -268,10 +280,15 @@ export default function CounterB() {
         session_id:    sess.id,
         customization,
         todayMenu,
+        alreadyFilled: statusRow.status === 'counter_b_filled',
       };
 
       setCurrent(newCurrent);
       currentRef.current = newCurrent;
+
+      // Pause scanner after successful scan — user needs to see the customization
+      // They tap "Mark filled" or scan next thaali manually to continue
+      scannerRef.current?.pause(true);
 
     } catch (err: any) {
       setError(err.message || 'Lookup failed');
@@ -287,6 +304,7 @@ export default function CounterB() {
     if (!current) return;
     await markFilled(current);
     setPrevious(current);
+    setPendingThaalis(prev => prev.filter(t => t.thaali_number !== current.thaali_number));
     setFilledThaalis(prev =>
       prev.find(t => t.thaali_number === current.thaali_number)
         ? prev
@@ -294,6 +312,8 @@ export default function CounterB() {
     );
     setCurrent(null);
     currentRef.current = null;
+    // Resume scanner for next thaali
+    scannerRef.current?.resume();
     setTimeout(() => manualRef.current?.focus(), 100);
   };
 
@@ -322,11 +342,19 @@ export default function CounterB() {
       .in('status', ['counter_b_pending', 'counter_b_filled']);
 
     if (!statusRows || statusRows.length === 0) {
-      setTallyItems([]);
-      setView('tally');
+      // Nothing to tally — just mark done and go back
+      await handleMarkSessionDone();
       return;
     }
 
+    // If ALL thaalis are already filled — skip tally, mark done immediately
+    const allFilled = statusRows.every((r: any) => r.status === 'counter_b_filled');
+    if (allFilled) {
+      await handleMarkSessionDone();
+      return;
+    }
+
+    // Some unfilled — show tally so staff can reconcile
     const muminIds = statusRows.map((r: any) => r.mumin_id);
 
     const [customRes, muminRes] = await Promise.all([
@@ -382,9 +410,11 @@ export default function CounterB() {
     if (!activeSession) return;
     setCompleting(true);
     try {
+      // If Counter C already finished, set combined status so dispatch knows both are done
+      const newStatus = activeSession.status === 'counter_c_done' ? 'counter_bc_done' : 'counter_b_done';
       await supabase
         .from('distribution_sessions')
-        .update({ status: 'counter_b_done' })
+        .update({ status: newStatus })
         .eq('id', activeSession.id);
 
       await loadSessions();
@@ -431,12 +461,26 @@ export default function CounterB() {
         menuName: menu?.[item.key] || '',
         qty:      c[item.key] || 'full',
       })),
-      ...(c.extra_items || []).map((e: any) => ({
-        key:      `extra_${e.name}`,
-        label:    e.name,
-        menuName: '',
-        qty:      e.quantity || 'full',
-      })),
+      // Extras from daily menu (e.g. Salad, Fruit) — show as full unless customized
+      ...(menu?.extra_items || []).map((e: any) => {
+        // Check if this extra is customized
+        const customExtra = (c.extra_items || []).find((ce: any) => ce.name === e.name);
+        return {
+          key:      `extra_${e.name}`,
+          label:    e.name,
+          menuName: e.value || '',
+          qty:      customExtra?.quantity || 'full',
+        };
+      }),
+      // Any customization extras NOT already in menu (rare edge case)
+      ...(c.extra_items || [])
+        .filter((e: any) => !(menu?.extra_items || []).find((me: any) => me.name === e.name))
+        .map((e: any) => ({
+          key:      `extra_custom_${e.name}`,
+          label:    e.name,
+          menuName: '',
+          qty:      e.quantity || 'full',
+        })),
     ];
 
     return (
@@ -662,7 +706,7 @@ export default function CounterB() {
           <div className="row g-3">
 
             {/* ── LEFT: scanner + manual + stats ── */}
-            <div className="col-12 col-lg-4">
+            <div className="col-12 col-lg-3">
 
               {/* QR scanner */}
               <div className="card border-0 shadow-sm mb-3" style={{ background: 'var(--bs-body-bg)' }}>
@@ -692,6 +736,7 @@ export default function CounterB() {
                       value={manualInput}
                       onChange={e => setManualInput(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && manualInput.trim() && handleScan(manualInput.trim())}
+                      onBlur={() => setTimeout(() => manualRef.current?.focus(), 100)}
                       style={{ fontSize: '1.2rem' }}
                     />
                     <button
@@ -775,7 +820,7 @@ export default function CounterB() {
             </div>
 
             {/* ── RIGHT: thaali card ── */}
-            <div className="col-12 col-lg-8">
+            <div className="col-12 col-lg-9">
               {!current ? (
                 <div className="card border-0 shadow-sm" style={{ minHeight: '400px', background: 'var(--bs-body-bg)' }}>
                   <div className="card-body d-flex flex-column align-items-center justify-content-center">
@@ -794,10 +839,9 @@ export default function CounterB() {
                 </div>
               ) : (
                 <div className="card border-0 shadow-sm" style={{ background: 'var(--bs-body-bg)' }}>
-                  {/* FIX B7: was hardcoded #e0f2fe / #fee2e2 / #f0fdf4 */}
                   <div className="card-header py-3 px-4" style={{
-                    background:   'var(--bs-secondary-bg)',
-                    borderBottom: '3px solid #06b6d4',
+                    background:   current.alreadyFilled ? 'var(--bs-warning-bg-subtle)' : 'var(--bs-secondary-bg)',
+                    borderBottom: `3px solid ${current.alreadyFilled ? '#f59e0b' : '#06b6d4'}`,
                   }}>
                     <div className="d-flex justify-content-between align-items-start">
                       <div>
@@ -808,6 +852,11 @@ export default function CounterB() {
                           <span className="badge fs-6 px-3 py-2" style={{ background: '#06b6d4', color: '#fff' }}>
                             ✏️ CUSTOMIZED
                           </span>
+                          {current.alreadyFilled && (
+                            <span className="badge fs-6 px-3 py-2 bg-warning text-dark">
+                              ⚠️ Already marked filled — re-fill if needed
+                            </span>
+                          )}
                         </div>
                         <div className="mt-2 d-flex gap-3 flex-wrap" style={{ fontSize: '0.9rem' }}>
                           <span className="fw-semibold" style={{ color: 'var(--bs-body-color)' }}>
@@ -817,8 +866,8 @@ export default function CounterB() {
                         </div>
                       </div>
                       <div className="text-end" style={{ color: 'var(--bs-secondary-color)', fontSize: '0.8rem' }}>
-                        {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}<br />
-                        {new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                        {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'Asia/Karachi' })}<br />
+                        {new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Karachi' })}
                       </div>
                     </div>
                   </div>
@@ -830,7 +879,8 @@ export default function CounterB() {
                   <div className="card-footer py-3 px-4" style={{ background: 'var(--bs-body-bg)', borderTop: '1px solid var(--bs-border-color)' }}>
                     <div className="d-flex gap-3 align-items-center flex-wrap">
                       <button className="btn btn-success btn-lg px-4 fw-bold" onClick={handleDoneWithCurrent}>
-                        <i className="bi bi-check-lg me-2"></i>Mark Filled — Scan Next
+                        <i className="bi bi-check-lg me-2"></i>
+                        {current.alreadyFilled ? 'Re-mark Filled' : 'Mark Filled — Scan Next'}
                       </button>
                       <span style={{ color: 'var(--bs-secondary-color)', fontSize: '0.85rem' }}>
                         Or scan next thaali to auto-confirm

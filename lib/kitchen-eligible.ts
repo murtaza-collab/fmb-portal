@@ -18,6 +18,10 @@
  */
 
 import { supabase } from '@/lib/supabase'
+import { todayPKT } from '@/lib/time'
+
+// Keep todayISO as an alias so existing imports don't break
+export const todayISO = todayPKT
 
 export interface TodaySchedule {
   id?: number
@@ -51,21 +55,7 @@ const DEFAULT_SCHEDULE: TodaySchedule = {
   thaali_category_ids: [],
 }
 
-/**
- * Returns today's date as YYYY-MM-DD using LOCAL time.
- *
- * IMPORTANT: Do NOT use new Date().toISOString() — that returns UTC.
- * In Pakistan (UTC+5), at 11 PM local time, UTC is still the previous day.
- * This would cause every kitchen screen to query the wrong date.
- * All portal date logic must use this function as the single source of truth.
- */
-export function todayISO(): string {
-  const d = new Date()
-  const yyyy = d.getFullYear()
-  const mm   = String(d.getMonth() + 1).padStart(2, '0')
-  const dd   = String(d.getDate()).padStart(2, '0')
-  return `${yyyy}-${mm}-${dd}`
-}
+// todayISO is now an alias for todayPKT — see lib/time.ts
 
 export async function getTodaySchedule(date?: string): Promise<TodaySchedule> {
   const d = date || todayISO()

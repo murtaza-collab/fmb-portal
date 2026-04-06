@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { todayISO } from '@/lib/kitchen-eligible';
+import { nowUTC } from '@/lib/time';
 
 type Session = {
   id: number;
@@ -46,7 +47,7 @@ export default function CounterC() {
         .from('distribution_sessions')
         .select('id, distributor_id, default_thaalis, status, distributors(full_name)')
         .eq('session_date', today)
-        .in('status', ['in_progress', 'arrived', 'counter_b_done', 'counter_c_done']);
+        .in('status', ['in_progress', 'arrived', 'counter_b_done', 'counter_c_done', 'counter_bc_done']);
 
       const all = (data || []).map((s: any) => ({
         id: s.id,
@@ -56,8 +57,9 @@ export default function CounterC() {
         status: s.status,
       }));
 
-      setSessions(all.filter(s => s.status !== 'counter_c_done' && s.default_thaalis > 0));
-      setCompletedSessions(all.filter(s => s.status === 'counter_c_done'));
+      const DONE_STATUSES = ['counter_c_done', 'counter_bc_done', 'dispatched'];
+      setSessions(all.filter(s => !DONE_STATUSES.includes(s.status) && s.default_thaalis > 0));
+      setCompletedSessions(all.filter(s => DONE_STATUSES.includes(s.status)));
     } finally {
       setLoadingSessions(false);
     }
@@ -110,15 +112,17 @@ export default function CounterC() {
           thaali_number: t.thaali_number,
           date:          today,
           status:        'counter_c_filled',
-          packed_at:     new Date().toISOString(),
+          packed_at:     nowUTC(),
         })),
         { onConflict: 'session_id,thaali_id' }
       );
 
       // 2. Mark session done
+      // If Counter B already finished, set combined status so dispatch knows both are done
+      const newStatus = activeSession.status === 'counter_b_done' ? 'counter_bc_done' : 'counter_c_done';
       await supabase
         .from('distribution_sessions')
-        .update({ status: 'counter_c_done' })
+        .update({ status: newStatus })
         .eq('id', activeSession.id);
 
       // 3. Back to session list

@@ -4,9 +4,11 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { todayHijri, getFMBFiscalYear, formatHijri } from '@/lib/hijri'
 
+interface ExtraItem { name: string; value: string }
 interface TodayMenu {
-  mithas?: string; tarkari?: string; chawal?: string; extra?: string
-  soup?: string; roti?: string; salad?: string; notes?: string
+  mithas?: string; tarkari?: string; chawal?: string
+  soup?: string; roti?: string; notes?: string
+  extra_items?: ExtraItem[]
 }
 
 interface TodaySchedule {
@@ -74,8 +76,8 @@ export default function DashboardPage() {
   }
 
   const fetchStats = async () => {
-    const now = new Date()
-const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`  
+    const d = new Date()
+const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 
     const [
       { count: activeHOFs },
@@ -93,7 +95,7 @@ const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0'
       supabase.from('thaali_registrations').select('*', { count:'exact', head:true }).not('thaali_id', 'is', null),
       // ── FIXED: count active stops from stop_thaalis covering today ──
       supabase.from('stop_thaalis').select('*', { count:'exact', head:true })
-        .lte('from_date', todayStr).gte('to_date', todayStr).eq('status', 'approved'),
+        .lte('from_date', todayStr).gte('to_date', todayStr).in('status', ['active', 'approved']),
       supabase.from('house_sectors').select('*', { count:'exact', head:true }).eq('status', 'active'),
       supabase.from('distributors').select('*', { count:'exact', head:true }).eq('status', 'active'),
       supabase.from('mumineen').select('*', { count:'exact', head:true }).eq('change_address', true),
@@ -114,7 +116,7 @@ const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0'
     // Today's menu
     const { data: menu } = await supabase.from('daily_menu')
       .select('*').eq('menu_date', todayStr).maybeSingle()
-    setTodayMenu(menu)
+    setTodayMenu(menu ? { ...menu, extra_items: Array.isArray((menu as any).extra_items) ? (menu as any).extra_items : [] } as TodayMenu : null)
 
     // Today's thaali schedule
     const { data: sched } = await supabase.from('thaali_schedule')
@@ -186,8 +188,9 @@ const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0'
     { label:'Soup',    value:todayMenu.soup,    icon:'🍲' },
     { label:'Chawal',  value:todayMenu.chawal,  icon:'🍚' },
     { label:'Roti',    value:todayMenu.roti,    icon:'🫓' },
-    { label:'Salad',   value:todayMenu.salad,   icon:'🥗' },
-    { label:'Extra',   value:todayMenu.extra,   icon:'🍽️' },
+    ...(todayMenu.extra_items || []).filter(e => e.name && e.value).map(e => ({
+      label: e.name, value: e.value, icon: '✨'
+    })),
   ].filter(i => i.value) : []
 
   const kitchenFlow = [

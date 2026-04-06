@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import NotificationBell from './components/NotificationBell'
 
 type Theme = 'light' | 'dark' | 'system'
 
@@ -21,6 +22,7 @@ const ALL_MENU_ITEMS = [
   { label: 'Distributors',  href: '/distributors', icon: 'bi-truck',            module: 'distributors' },
   { label: 'Takhmeem',      href: '/takhmeen',     icon: 'bi-clipboard-check',  module: 'takhmeem' },
   { label: 'Calendar',      href: '/calendar',     icon: 'bi-calendar3',        module: 'calendar' },
+  { label: 'Notifications', href: '/notifications', icon: 'bi-bell',             module: 'notifications' },
   { label: 'Users',         href: '/users',        icon: 'bi-shield-lock',      module: 'users' },
   { label: 'Settings',      href: '/settings',     icon: 'bi-gear',             module: 'settings' },
 ]
@@ -60,7 +62,6 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   const [theme, setThemeState] = useState<Theme>('system')
   const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [pendingAddressCount, setPendingAddressCount] = useState(0)
 
   useEffect(() => {
     const saved = loadTheme()
@@ -123,11 +124,6 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       setMenuItems(ALL_MENU_ITEMS.filter(m => m.module === 'dashboard'))
     }
 
-    const { count } = await supabase
-      .from('address_change_requests')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'pending')
-    setPendingAddressCount(count || 0)
     setLoading(false)
   }
 
@@ -153,12 +149,9 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
 
   const SidebarContent = () => (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-
-      {/* Logo */}
       <div style={{ padding: '16px 16px 14px', borderBottom: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
           <div style={{ flex: 1, minWidth: 0, textAlign: 'center' }}>
-            {/* Logo image — mix-blend-mode:screen removes black background on dark sidebar */}
             <img
               src="/fmb-logo-2-2.svg"
               alt="Faiz ul Mawaid il Burhaniyah"
@@ -177,7 +170,6 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         </div>
       </div>
 
-      {/* Nav */}
       <nav style={{ padding: '12px 0', flex: 1, overflowY: 'auto' }}>
         {menuItems.map((item) => {
           const hasChildren = !!(item as any).children
@@ -185,8 +177,6 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
 
           const isGroupActive = hasChildren
             ? children!.some(c => {
-                // FIX: for child whose href equals the group href (Registrations = /thaali),
-                // use exact match so sub-pages don't falsely activate it
                 if (c.href === item.href) return pathname === c.href
                 return pathname === c.href || pathname.startsWith(c.href + '/')
               })
@@ -214,8 +204,6 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                 </div>
 
                 {isGroupActive && children!.map(child => {
-                  // FIX: Registrations href = /thaali (same as parent) → exact match only
-                  // Other children → exact OR startsWith child href
                   const isChildActive = child.href === item.href
                     ? pathname === child.href
                     : pathname === child.href || pathname.startsWith(child.href + '/')
@@ -244,7 +232,6 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
             )
           }
 
-          // Flat item
           const isActive = item.href === '/dashboard'
             ? pathname === '/dashboard'
             : pathname.startsWith(item.href)
@@ -266,21 +253,11 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
             >
               <i className={`bi ${item.icon}`} style={{ fontSize: '16px', width: '18px' }} />
               <span style={{ flex: 1 }}>{item.label}</span>
-              {item.href === '/address-requests' && pendingAddressCount > 0 && (
-                <span style={{
-                  background: '#e63946', color: '#fff', fontSize: '10px', fontWeight: 700,
-                  borderRadius: '10px', padding: '1px 6px', lineHeight: '16px',
-                  minWidth: '18px', textAlign: 'center',
-                }}>
-                  {pendingAddressCount}
-                </span>
-              )}
             </div>
           )
         })}
       </nav>
 
-      {/* User info */}
       <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
           <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#ffbf69', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#364574', fontSize: '13px', fontWeight: 700, flexShrink: 0 }}>
@@ -343,24 +320,16 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       <script dangerouslySetInnerHTML={{ __html: `window.__fmbIsAdmin = ${isAdmin}` }} />
 
       <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bs-tertiary-bg)' }}>
-
-        {/* Desktop sidebar */}
         <div className="fmb-sidebar-desktop" style={{ width: '240px', background: '#364574', flexDirection: 'column', flexShrink: 0, position: 'fixed', top: 0, left: 0, height: '100vh', zIndex: 100 }}>
           <SidebarContent />
         </div>
 
-        {/* Mobile overlay */}
         <div className={`fmb-mobile-overlay${sidebarOpen ? ' open' : ''}`} onClick={() => setSidebarOpen(false)} />
-
-        {/* Mobile drawer */}
         <div className={`fmb-sidebar-drawer${sidebarOpen ? ' open' : ''}`}>
           <SidebarContent />
         </div>
 
-        {/* Main */}
         <div className="fmb-main" style={{ flex: 1, overflow: 'auto', minHeight: '100vh', overflowX: 'hidden' }}>
-
-          {/* Topbar */}
           <div className="fmb-topbar" style={{
             background: 'var(--bs-body-bg)', padding: '0 24px', height: '60px',
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -368,7 +337,6 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
             boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
             position: 'sticky', top: 0, zIndex: 50,
           }}>
-
             <button className="fmb-hamburger" onClick={() => setSidebarOpen(true)} style={{ display: 'none', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 8px', borderRadius: '6px', color: '#364574' }}>
               <i className="bi bi-list" style={{ fontSize: '24px' }} />
             </button>
@@ -378,6 +346,8 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
             </div>
 
             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {/* ✅ Notification Bell */}
+              <NotificationBell />
 
               {/* Theme toggle */}
               <div ref={themeMenuRef} style={{ position: 'relative' }}>

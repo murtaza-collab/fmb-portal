@@ -102,7 +102,7 @@ export default function KitchenScanPage() {
         </div>
         <div style={{ fontSize: 24, fontWeight: 800, color: '#fff' }}>Distributor Arrival</div>
         <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>
-          {new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' })}
+          {new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Karachi' })}
         </div>
       </div>
 

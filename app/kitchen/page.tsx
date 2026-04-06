@@ -118,7 +118,7 @@ export default function KitchenHome() {
         .sort((a, b) => new Date(a.arrived_at).getTime() - new Date(b.arrived_at).getTime());
 
       const startedSessions = (sessions || [])
-        .filter(s => ['in_progress', 'counter_b_done', 'counter_c_done'].includes(s.status))
+        .filter(s => ['in_progress', 'counter_b_done', 'counter_c_done', 'counter_bc_done'].includes(s.status))
         .sort((a, b) => new Date(a.arrived_at).getTime() - new Date(b.arrived_at).getTime());
 
       setArrivedSessions(arrivedOnly);
@@ -167,8 +167,9 @@ export default function KitchenHome() {
     switch (status) {
       case 'arrived':        return { label: 'Arrived',     cls: 'bg-warning text-dark' }
       case 'in_progress':    return { label: 'Counter A',   cls: 'bg-info text-dark'    }
-      case 'counter_b_done': return { label: 'Counter B ✓', cls: 'bg-primary'           }
-      case 'counter_c_done': return { label: 'Counter C ✓', cls: 'bg-success'           }
+      case 'counter_b_done':  return { label: 'Counter B ✓',   cls: 'bg-primary' }
+      case 'counter_c_done':  return { label: 'Counter C ✓',   cls: 'bg-success' }
+      case 'counter_bc_done': return { label: 'B & C Done ✓',  cls: 'bg-success' }
       case 'dispatched':     return { label: '✓ Dispatched', cls: 'bg-success'          }
       default:               return { label: status,         cls: 'bg-secondary'        }
     }

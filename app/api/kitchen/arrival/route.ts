@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { todayPKT, nowUTC } from '@/lib/time';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -15,7 +16,7 @@ export async function POST(request: NextRequest) {
     }
 
     const distId = parseInt(distributor_id, 10);
-    const today = new Date().toISOString().split('T')[0];
+    const today  = todayPKT(); // always PKT — works on server too
 
     // 1. Check distributor exists
     const { data: distributor, error: distError } = await supabase
@@ -28,31 +29,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Distributor not found' }, { status: 404 });
     }
 
-    // 2. Get all approved thaali registrations for this distributor
+    // 2. Get all thaali registrations for this distributor with a thaali assigned
+    // FIX B1: removed .eq('status', 'approved') — all rows are status='active' per v4.0
     const { data: registrations, error: regError } = await supabase
       .from('thaali_registrations')
       .select('id, thaali_id, mumin_id')
       .eq('distributor_id', distId)
-      .eq('status', 'approved');
+      .not('thaali_id', 'is', null);
 
     if (regError) {
       return NextResponse.json({ error: regError.message }, { status: 500 });
     }
 
     const totalThaalis = registrations?.length || 0;
-    const registrationIds = registrations?.map(r => r.id) || [];
-    const thaaliIds = registrations?.map(r => r.thaali_id) || [];
-    const muminIds = registrations?.map(r => r.mumin_id) || [];
+    const muminIds     = registrations?.map(r => r.mumin_id) || [];
 
-    // 3. Count stopped thaalis (stop_thaalis table for today)
+    // 3. Count stopped thaalis for today
+    // FIX B2: use from_date/to_date (not stop_date/resume_date) + approved status only
     let stoppedCount = 0;
-    if (thaaliIds.length > 0) {
+    if (muminIds.length > 0) {
       const { data: stopped } = await supabase
         .from('stop_thaalis')
-        .select('id, thaali_id')
-        .in('thaali_id', thaaliIds)
-        .lte('stop_date', today)
-        .or(`resume_date.is.null,resume_date.gt.${today}`);
+        .select('id')
+        .in('mumin_id', muminIds)
+        .eq('status', 'approved')
+        .lte('from_date', today)
+        .gte('to_date', today);
 
       stoppedCount = stopped?.length || 0;
     }
@@ -62,7 +64,7 @@ export async function POST(request: NextRequest) {
     if (muminIds.length > 0) {
       const { data: customizations } = await supabase
         .from('thaali_customizations')
-        .select('id, mumin_id')
+        .select('id')
         .in('mumin_id', muminIds)
         .eq('request_date', today)
         .eq('status', 'active');
@@ -70,10 +72,10 @@ export async function POST(request: NextRequest) {
       customizedCount = customizations?.length || 0;
     }
 
-    const netThaalis = totalThaalis - stoppedCount;
-    const defaultCount = netThaalis - customizedCount;
+    const netThaalis  = totalThaalis - stoppedCount;
+    const defaultCount = Math.max(0, netThaalis - customizedCount);
 
-    // 5. Check if session already exists for today
+    // 5. Upsert session for today
     const { data: existingSession } = await supabase
       .from('distribution_sessions')
       .select('id, status')
@@ -84,16 +86,15 @@ export async function POST(request: NextRequest) {
     let session;
 
     if (existingSession) {
-      // Update existing session
       const { data: updated, error: updateError } = await supabase
         .from('distribution_sessions')
         .update({
-          total_thaalis: totalThaalis,
-          stopped_thaalis: stoppedCount,
+          total_thaalis:      totalThaalis,
+          stopped_thaalis:    stoppedCount,
           customized_thaalis: customizedCount,
-          default_thaalis: defaultCount < 0 ? 0 : defaultCount,
-          status: existingSession.status === 'dispatched' ? 'dispatched' : 'arrived',
-          arrived_at: new Date().toISOString(),
+          default_thaalis:    defaultCount,
+          status:             existingSession.status === 'dispatched' ? 'dispatched' : 'arrived',
+          arrived_at:         nowUTC(),
         })
         .eq('id', existingSession.id)
         .select()
@@ -104,18 +105,17 @@ export async function POST(request: NextRequest) {
       }
       session = updated;
     } else {
-      // Create new session
       const { data: created, error: createError } = await supabase
         .from('distribution_sessions')
         .insert({
-          distributor_id: distId,
-          session_date: today,
-          total_thaalis: totalThaalis,
-          stopped_thaalis: stoppedCount,
+          distributor_id:     distId,
+          session_date:       today,
+          total_thaalis:      totalThaalis,
+          stopped_thaalis:    stoppedCount,
           customized_thaalis: customizedCount,
-          default_thaalis: defaultCount < 0 ? 0 : defaultCount,
-          status: 'arrived',
-          arrived_at: new Date().toISOString(),
+          default_thaalis:    defaultCount,
+          status:             'arrived',
+          arrived_at:         nowUTC(),
         })
         .select()
         .single();
@@ -139,8 +139,8 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const distributor_id = searchParams.get('distributor_id');
-  const today = new Date().toISOString().split('T')[0];
+  const distributor_id   = searchParams.get('distributor_id');
+  const today            = todayPKT();
 
   if (!distributor_id) {
     return NextResponse.json({ error: 'distributor_id required' }, { status: 400 });

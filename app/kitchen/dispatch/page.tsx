@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { todayISO } from '@/lib/kitchen-eligible';
+import { nowUTC } from '@/lib/time';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -79,15 +80,15 @@ export default function Dispatch() {
         // Counter A confirms by moving status from 'arrived' → 'in_progress'
         // Until that happens, customized/default counts are 0 and meaningless.
         const counterADone  = s.status !== 'arrived';
-        // B is done only if no customized thaalis, OR status has passed counter_b_done stage
+        // B is done if: no customized thaalis, OR status reached counter_b_done/counter_bc_done/dispatched
         const bDone = counterADone && (
           s.customized_thaalis === 0 ||
-          ['counter_b_done', 'dispatched'].includes(s.status)
+          ['counter_b_done', 'counter_bc_done', 'dispatched'].includes(s.status)
         );
-        // C is done only if no default thaalis, OR status has reached counter_c_done
+        // C is done if: no default thaalis, OR status reached counter_c_done/counter_bc_done/dispatched
         const cDone = counterADone && (
           s.default_thaalis === 0 ||
-          ['counter_c_done', 'dispatched'].includes(s.status)
+          ['counter_c_done', 'counter_bc_done', 'dispatched'].includes(s.status)
         );
         return {
           id:                  s.id,
@@ -190,7 +191,7 @@ export default function Dispatch() {
     try {
       await supabase
         .from('distribution_sessions')
-        .update({ status: 'dispatched', dispatched_at: new Date().toISOString() })
+        .update({ status: 'dispatched', dispatched_at: nowUTC() })
         .eq('id', activeSession.id);
       await loadSessions();
       setView('sessions');
@@ -594,21 +595,9 @@ export default function Dispatch() {
                   <h5 className="fw-bold mb-2" style={{ color: 'var(--bs-warning-text-emphasis)' }}>
                     <i className="bi bi-hourglass me-2"></i>Not ready to dispatch yet
                   </h5>
-                  <p className="mb-3" style={{ color: 'var(--bs-secondary-color)' }}>
-                    Waiting for counters to finish before this session can be dispatched.
+                  <p className="mb-0" style={{ color: 'var(--bs-secondary-color)' }}>
+                    Waiting for counters to finish. Check back shortly.
                   </p>
-                  <div className="d-flex gap-2 flex-wrap">
-                    {!(activeSession?.counter_b_done || activeSession?.customized_thaalis === 0) && (
-                      <Link href="/kitchen/counter-b" className="btn btn-outline-info btn-sm">
-                        <i className="bi bi-clipboard-check me-1"></i>Go to Counter B
-                      </Link>
-                    )}
-                    {!(activeSession?.counter_c_done || activeSession?.default_thaalis === 0) && (
-                      <Link href="/kitchen/counter-c" className="btn btn-outline-success btn-sm">
-                        <i className="bi bi-box-seam me-1"></i>Go to Counter C
-                      </Link>
-                    )}
-                  </div>
                 </div>
               </div>
             )}

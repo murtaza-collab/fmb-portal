@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { todayPKT } from '@/lib/time';
 
 interface Registration {
   id: number
@@ -144,7 +145,7 @@ export default function DistributionPage() {
     setTotal(count || 0)
 
     // Stats — total and withThaali derived from full (unfiltered) count query
-    const today = new Date().toISOString().split('T')[0]
+    const today = todayPKT()
     let totalQuery = supabase.from('thaali_registrations').select('id, thaali_id', { count: 'exact' })
     if (activeFiscalYearId) totalQuery = totalQuery.eq('fiscal_year_id', activeFiscalYearId)
     const { data: allRegs, count: totalCount } = await totalQuery
@@ -154,7 +155,7 @@ export default function DistributionPage() {
     const { count: stoppedCount } = await supabase
       .from('stop_thaalis')
       .select('*', { count: 'exact', head: true })
-      .eq('status', 'approved')
+      .in('status', ['active', 'approved'])
       .lte('from_date', today)
       .gte('to_date', today)
 
@@ -221,7 +222,7 @@ export default function DistributionPage() {
     const url  = URL.createObjectURL(blob)
     const a    = document.createElement('a')
     a.href     = url
-    a.download = `distribution_${new Date().toISOString().split('T')[0]}.csv`
+    a.download = `distribution_${todayPKT()}.csv`
     a.click()
     URL.revokeObjectURL(url)
     setExporting(false)
