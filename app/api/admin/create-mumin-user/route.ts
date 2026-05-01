@@ -6,9 +6,6 @@ export async function POST(request: Request) {
   // ── Auth guard ──────────────────────────────────────────────────────────────
   const auth = await requireAdminAuth()
   if (!auth.ok) return auth.response
-  if (!auth.isAdmin) {
-    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-  }
 
   try {
     const { mumin_id, sf_no, its_no } = await request.json()

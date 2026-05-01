@@ -281,10 +281,17 @@ export default function MumineenPage() {
       const { id, sf_no, its_no } = (res as any).data
       if (its_no) {
         try {
-          await fetch('/api/admin/create-mumin-user', {
+          const authRes = await fetch('/api/admin/create-mumin-user', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ mumin_id: id, sf_no, its_no })
           })
+          if (!authRes.ok) {
+            const authErr = await authRes.json().catch(() => ({}))
+            console.warn('Auth user creation failed:', authErr)
+            setSaveError(`HOF saved but login account failed: ${authErr.error ?? 'Unknown error'}`)
+            setSaving(false)
+            return
+          }
         } catch (e) { console.warn('Auth user creation failed:', e) }
       }
     }

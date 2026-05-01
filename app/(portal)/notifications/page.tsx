@@ -266,7 +266,7 @@ export default function NotificationsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="mb-4" style={{ borderBottom:'1px solid var(--bs-border-color)' }}>
+      <div className="mb-4" style={{ borderBottom:'1px solid var(--bs-border-color)', display:'flex', alignItems:'center' }}>
         {(['automated','broadcast','logs'] as const).map(t => (
           <button key={t} onClick={() => setTab(t)} style={{
             background:'none', border:'none', padding:'8px 18px 10px', fontSize:'13px',
@@ -285,6 +285,15 @@ export default function NotificationsPage() {
             )}
           </button>
         ))}
+        <a href="/notifications/whatsapp" style={{
+          marginLeft:'auto', display:'flex', alignItems:'center', gap:6,
+          background:'rgba(37,211,102,0.1)', border:'1px solid rgba(37,211,102,0.3)',
+          borderRadius:20, padding:'5px 14px', fontSize:12, fontWeight:600,
+          color:'#128C7E', textDecoration:'none', marginBottom:4,
+        }}>
+          <i className="bi bi-whatsapp" style={{ fontSize:13 }} />
+          WhatsApp
+        </a>
       </div>
 
       {loading && (
