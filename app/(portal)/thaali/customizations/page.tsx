@@ -1,6 +1,7 @@
 'use client'
 import { Fragment, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { todayPKT } from '@/lib/time'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -42,15 +43,10 @@ const QTY: Record<string, { bg: string; color: string; label: string }> = {
   not_needed: { bg: 'var(--bs-secondary-bg)', color: 'var(--bs-secondary-color)', label: 'None' },
 }
 
-const localToday = () => {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function CustomizationsPage() {
-  const today = localToday()
+  const today = todayPKT()
 
   const [rows, setRows]             = useState<CustomizationRow[]>([])
   const [loading, setLoading]       = useState(true)

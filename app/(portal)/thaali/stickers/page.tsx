@@ -28,20 +28,20 @@ export default function ThaaliStickersPage() {
 
   const fetchData = async () => {
     setLoading(true)
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('thaali_registrations')
       .select(`
         id, mumin_id, thaali_id,
         mumineen!fk_tr_mumin(sf_no, full_name, house_sectors(name)),
         thaalis!fk_tr_thaali(thaali_number),
-        thaali_types!fk_tr_type(name),
-        thaali_categories!fk_tr_category(name),
-        distributors!fk_tr_distributor(full_name)
+        thaali_types(name),
+        thaali_categories(name),
+        distributors(full_name)
       `)
-      .eq('status', 'approved')
       .not('thaali_id', 'is', null)
       .order('thaali_id')
-    setRegistrations((data || []) as any[])
+    if (error) console.error('stickers fetch error:', error)
+    setRegistrations((data || []) as unknown as AssignedThaali[])
     setLoading(false)
   }
 
@@ -54,7 +54,7 @@ export default function ThaaliStickersPage() {
     setDistributors(d.data || [])
   }
 
-  const filtered = registrations.filter((r: any) => {
+  const filtered = registrations.filter(r => {
     const matchSearch = !search ||
       r.mumineen?.full_name?.toLowerCase().includes(search.toLowerCase()) ||
       r.mumineen?.sf_no?.toLowerCase().includes(search.toLowerCase()) ||
@@ -71,10 +71,10 @@ export default function ThaaliStickersPage() {
   }
 
   const toggleSelectAll = () => {
-    setSelected(selected.size === filtered.length ? new Set() : new Set(filtered.map((r: any) => r.id)))
+    setSelected(selected.size === filtered.length ? new Set() : new Set(filtered.map(r => r.id)))
   }
 
-  const selectedRegs = registrations.filter((r: any) => selected.has(r.id))
+  const selectedRegs = registrations.filter(r => selected.has(r.id))
 
   const generatePDF = async () => {
     if (selected.size === 0) return
@@ -107,7 +107,7 @@ export default function ThaaliStickersPage() {
       const qr2X = 9.3 + qrSize + 3.5  // mm from left
 
       for (let personIdx = 0; personIdx < selectedRegs.length; personIdx++) {
-        const reg = selectedRegs[personIdx] as any
+        const reg = selectedRegs[personIdx]
         if (personIdx > 0) doc.addPage()
 
         const name = reg.mumineen?.full_name || ''

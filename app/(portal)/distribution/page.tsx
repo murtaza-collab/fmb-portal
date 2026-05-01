@@ -26,23 +26,11 @@ interface Registration {
   thaali_types?: { name: string }
   thaali_categories?: { name: string }
   distributors?: { full_name: string }
-  fiscal_years?: { gregorian_year: number; hijri_year: string }
 }
 
 interface LookupItem { id: number; name: string }
-interface FiscalYear { id: number; gregorian_year: number; hijri_year: string; is_active: boolean }
 
 const PAGE_SIZE = 50
-
-const STATUS_COLORS: Record<string, string> = {
-  active:               'bg-success',
-  approved:             'bg-success',
-  pending:              'bg-warning text-dark',
-  stopped:              'bg-danger',
-  transfered:           'bg-info text-dark',
-  'not required':       'bg-secondary',
-  'required distributor': 'bg-primary',
-}
 
 export default function DistributionPage() {
   const [registrations, setRegistrations] = useState<Registration[]>([])
@@ -56,15 +44,13 @@ export default function DistributionPage() {
   const [thaaliCategories, setThaaliCategories] = useState<LookupItem[]>([])
   const [houseBlocks, setHouseBlocks]           = useState<LookupItem[]>([])
 
-  // Active FY id — set once from DB, never shown as a filter
-  const [activeFiscalYearId, setActiveFiscalYearId] = useState<number | null>(null)
-  const [lookupsReady, setLookupsReady]             = useState(false)
+  const [allThaalis, setAllThaalis]     = useState<{ id: number; thaali_number: number }[]>([])
+  const [lookupsReady, setLookupsReady] = useState(false)
 
   const [searchInput, setSearchInput]           = useState('')
   const [search, setSearch]                     = useState('')
   const [filterDistributor, setFilterDistributor] = useState('')
   const [filterSector, setFilterSector]         = useState('')
-  const [filterStatus, setFilterStatus]         = useState('')
   const [filterThaaliType, setFilterThaaliType] = useState('')
   const [filterThaaliCategory, setFilterThaaliCategory] = useState('')
   const [filterBlock, setFilterBlock]           = useState('')
@@ -75,43 +61,38 @@ export default function DistributionPage() {
   // Load lookups first, then trigger data fetch
   useEffect(() => { fetchLookups() }, [])
 
-  // Only fetch registrations after lookups are ready (so activeFiscalYearId is set)
   useEffect(() => {
     if (!lookupsReady) return
     fetchRegistrations()
-  }, [lookupsReady, page, search, filterDistributor, filterSector, filterStatus,
+  }, [lookupsReady, page, search, filterDistributor, filterSector,
       filterThaaliType, filterThaaliCategory, filterBlock])
 
   const fetchLookups = async () => {
-    const [d, s, fy, tt, tc, hb] = await Promise.all([
+    const [d, s, tt, tc, hb, tn] = await Promise.all([
       supabase.from('distributors').select('id, name:full_name').eq('status', 'active').order('full_name'),
       supabase.from('house_sectors').select('id, name').eq('status', 'active').order('name'),
-      supabase.from('fiscal_years').select('id, gregorian_year, hijri_year, is_active').order('id', { ascending: false }),
       supabase.from('thaali_types').select('id, name').eq('status', 'active'),
       supabase.from('thaali_categories').select('id, name'),
       supabase.from('house_blocks').select('id, name').order('name'),
+      supabase.from('thaalis').select('id, thaali_number').order('thaali_number').limit(6000),
     ])
     setDistributors(d.data || [])
     setSectors(s.data || [])
     setThaaliTypes(tt.data || [])
     setThaaliCategories(tc.data || [])
     setHouseBlocks(hb.data || [])
-
-    const activeFY = (fy.data || []).find((f: FiscalYear) => f.is_active)
-    if (activeFY) setActiveFiscalYearId(activeFY.id)
-
+    setAllThaalis(tn.data || [])
     setLookupsReady(true)
   }
 
   const fetchRegistrations = async () => {
     setLoading(true)
 
-    // Build query — NO FK hints (removed in v4.0, they break queries)
     let query = supabase
       .from('thaali_registrations')
       .select(`
-        *,
-        mumineen(
+        id, mumin_id, thaali_id, distributor_id, thaali_type_id, thaali_category_id, remarks,
+        mumineen!fk_tr_mumin(
           sf_no, full_name, its_no,
           address_sector_id, address_block_id,
           address_number, address_floor, full_address,
@@ -121,63 +102,60 @@ export default function DistributionPage() {
           house_types(name),
           niyyat_statuses(name)
         ),
-        thaalis(thaali_number),
+        thaalis!fk_tr_thaali(thaali_number),
         thaali_types(name),
         thaali_categories(name),
-        distributors(full_name),
-        fiscal_years(gregorian_year, hijri_year)
+        distributors(full_name)
       `, { count: 'exact' })
       .order('thaali_id')
-      .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
 
-    // Always filter by active fiscal year
-    if (activeFiscalYearId) query = query.eq('fiscal_year_id', activeFiscalYearId)
-
-    if (filterStatus)         query = query.eq('status', filterStatus)
     if (filterDistributor)    query = query.eq('distributor_id', parseInt(filterDistributor))
     if (filterThaaliType)     query = query.eq('thaali_type_id', parseInt(filterThaaliType))
     if (filterThaaliCategory) query = query.eq('thaali_category_id', parseInt(filterThaaliCategory))
 
-    const { data, count } = await query
+    // Server-side: pre-query mumin IDs for search + sector + block
+    if (search || filterSector || filterBlock) {
+      let muminQuery = supabase.from('mumineen').select('id')
+      if (search)       muminQuery = muminQuery.or(`full_name.ilike.%${search}%,sf_no.ilike.%${search}%,its_no.ilike.%${search}%`)
+      if (filterSector) muminQuery = muminQuery.eq('address_sector_id', parseInt(filterSector))
+      if (filterBlock)  muminQuery = muminQuery.eq('address_block_id', parseInt(filterBlock))
+      const { data: matchingMumin } = await muminQuery
+      const muminIds = (matchingMumin || []).map((m: any) => m.id as number)
 
-    const filtered = applyClientFilters(data || [])
-    setRegistrations(filtered)
+      // Also check thaali numbers when searching without geo filter
+      const thaaliIds = (search && !filterSector && !filterBlock)
+        ? allThaalis.filter(t => t.thaali_number.toString().includes(search)).map(t => t.id)
+        : []
+
+      const orParts: string[] = []
+      if (muminIds.length > 0)  orParts.push(`mumin_id.in.(${muminIds.join(',')})`)
+      if (thaaliIds.length > 0) orParts.push(`thaali_id.in.(${thaaliIds.join(',')})`)
+
+      if (orParts.length === 0) {
+        setRegistrations([]); setTotal(0); setLoading(false); return
+      }
+      query = query.or(orParts.join(','))
+    }
+
+    query = query.range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
+
+    const { data, count } = await query
+    setRegistrations((data || []) as unknown as Registration[])
     setTotal(count || 0)
 
-    // Stats — total and withThaali derived from full (unfiltered) count query
+    // Stats — server-side count queries (no full fetch)
     const today = todayPKT()
-    let totalQuery = supabase.from('thaali_registrations').select('id, thaali_id', { count: 'exact' })
-    if (activeFiscalYearId) totalQuery = totalQuery.eq('fiscal_year_id', activeFiscalYearId)
-    const { data: allRegs, count: totalCount } = await totalQuery
-
-    const withThaaliCount = (allRegs || []).filter((r: any) => r.thaali_id !== null).length
-
-    const { count: stoppedCount } = await supabase
-      .from('stop_thaalis')
-      .select('*', { count: 'exact', head: true })
-      .in('status', ['active', 'approved'])
-      .lte('from_date', today)
-      .gte('to_date', today)
-
-    setStats({ total: totalCount || 0, withThaali: withThaaliCount, stopped: stoppedCount || 0 })
+    const [totalRes, withThaaliRes, stoppedRes] = await Promise.all([
+      supabase.from('thaali_registrations').select('*', { count: 'exact', head: true }),
+      supabase.from('thaali_registrations').select('*', { count: 'exact', head: true }).not('thaali_id', 'is', null),
+      supabase.from('stop_thaalis').select('*', { count: 'exact', head: true })
+        .in('status', ['active', 'approved'])
+        .lte('from_date', today)
+        .gte('to_date', today),
+    ])
+    setStats({ total: totalRes.count || 0, withThaali: withThaaliRes.count || 0, stopped: stoppedRes.count || 0 })
 
     setLoading(false)
-  }
-
-  const applyClientFilters = (data: Registration[]) => {
-    let filtered = data
-    if (search) {
-      const q = search.toLowerCase()
-      filtered = filtered.filter(r =>
-        r.mumineen?.full_name?.toLowerCase().includes(q) ||
-        r.mumineen?.sf_no?.toLowerCase().includes(q) ||
-        r.mumineen?.its_no?.toLowerCase().includes(q) ||
-        r.thaalis?.thaali_number?.toString().includes(q)
-      )
-    }
-    if (filterSector) filtered = filtered.filter(r => r.mumineen?.address_sector_id?.toString() === filterSector)
-    if (filterBlock)  filtered = filtered.filter(r => r.mumineen?.address_block_id?.toString() === filterBlock)
-    return filtered
   }
 
   const exportCSV = async () => {
@@ -185,38 +163,52 @@ export default function DistributionPage() {
     let query = supabase
       .from('thaali_registrations')
       .select(`
-        *,
-        mumineen(sf_no, full_name, its_no, address_number, address_floor, full_address,
+        id, mumin_id, thaali_id, remarks,
+        mumineen!fk_tr_mumin(sf_no, full_name, its_no, address_number, address_floor, full_address,
           whatsapp_no, phone_no, address_sector_id, address_block_id,
           house_sectors(name), house_blocks(name), house_types(name), niyyat_statuses(name)),
-        thaalis(thaali_number),
+        thaalis!fk_tr_thaali(thaali_number),
         thaali_types(name),
         thaali_categories(name),
-        distributors(full_name),
-        fiscal_years(gregorian_year, hijri_year)
+        distributors(full_name)
       `)
       .order('thaali_id')
-      .range(0, 9999)
+      .limit(10000)
 
-    if (activeFiscalYearId) query = query.eq('fiscal_year_id', activeFiscalYearId)
-    if (filterStatus)       query = query.eq('status', filterStatus)
-    if (filterDistributor)  query = query.eq('distributor_id', parseInt(filterDistributor))
+    if (filterDistributor)    query = query.eq('distributor_id', parseInt(filterDistributor))
+    if (filterThaaliType)     query = query.eq('thaali_type_id', parseInt(filterThaaliType))
+    if (filterThaaliCategory) query = query.eq('thaali_category_id', parseInt(filterThaaliCategory))
+
+    if (search || filterSector || filterBlock) {
+      let muminQuery = supabase.from('mumineen').select('id')
+      if (search)       muminQuery = muminQuery.or(`full_name.ilike.%${search}%,sf_no.ilike.%${search}%,its_no.ilike.%${search}%`)
+      if (filterSector) muminQuery = muminQuery.eq('address_sector_id', parseInt(filterSector))
+      if (filterBlock)  muminQuery = muminQuery.eq('address_block_id', parseInt(filterBlock))
+      const { data: matchingMumin } = await muminQuery
+      const muminIds = (matchingMumin || []).map((m: any) => m.id as number)
+      const thaaliIds = (search && !filterSector && !filterBlock)
+        ? allThaalis.filter(t => t.thaali_number.toString().includes(search)).map(t => t.id)
+        : []
+      const orParts: string[] = []
+      if (muminIds.length > 0)  orParts.push(`mumin_id.in.(${muminIds.join(',')})`)
+      if (thaaliIds.length > 0) orParts.push(`thaali_id.in.(${thaaliIds.join(',')})`)
+      if (orParts.length > 0)   query = query.or(orParts.join(','))
+    }
 
     const { data } = await query
-    const filtered = applyClientFilters(data || [])
 
-    const headers = ['SF#','ITS#','Full Name','Thaali No','Size','Type','Distributor','Sector','Block','Number','Floor','Full Address','WhatsApp','Phone','Niyyat Status','Status','Remarks']
-    const rows = filtered.map(r => [
+    const headers = ['SF#','ITS#','Full Name','Thaali No','Size','Type','Distributor','Sector','Block','Number','Floor','Full Address','WhatsApp','Phone','Niyyat Status','Remarks']
+    const rows = (data || []).map((r: any) => [
       r.mumineen?.sf_no || '', r.mumineen?.its_no || '', r.mumineen?.full_name || '',
       r.thaalis?.thaali_number || '', r.thaali_types?.name || '', r.thaali_categories?.name || '',
       r.distributors?.full_name || '', r.mumineen?.house_sectors?.name || '',
       r.mumineen?.house_blocks?.name || '', r.mumineen?.address_number || '',
       r.mumineen?.address_floor || '', r.mumineen?.full_address || '',
       r.mumineen?.whatsapp_no || '', r.mumineen?.phone_no || '',
-      r.mumineen?.niyyat_statuses?.name || '', r.status || '', r.remarks || '',
+      r.mumineen?.niyyat_statuses?.name || '', r.remarks || '',
     ])
     const csv = [headers, ...rows].map(row =>
-      row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')
+      row.map((v: any) => `"${String(v).replace(/"/g, '""')}"`).join(',')
     ).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url  = URL.createObjectURL(blob)
@@ -243,10 +235,14 @@ export default function DistributionPage() {
       <div className="d-flex justify-content-between align-items-center mb-4">
         <div>
           <h4 className="mb-0" style={{ color: 'var(--bs-body-color)' }}>Distribution</h4>
-          <p className="mb-0" style={{ fontSize: 13, color: 'var(--bs-secondary-color)' }}>Master delivery list</p>
+          <p className="mb-0" style={{ fontSize: 13, color: 'var(--bs-secondary-color)' }}>
+            Delivery list — filter by fiscal year, sector, distributor, then export
+          </p>
         </div>
-        <button className="btn btn-success btn-sm" onClick={exportCSV} disabled={exporting}>
-          {exporting ? 'Exporting…' : '↓ Export CSV'}
+        <button className="btn btn-success btn-sm" onClick={exportCSV} disabled={exporting || loading}>
+          {exporting
+            ? <><span className="spinner-border spinner-border-sm me-1" />Exporting…</>
+            : <><i className="bi bi-download me-1" />Export CSV ({total} rows)</>}
         </button>
       </div>
 
@@ -269,7 +265,7 @@ export default function DistributionPage() {
         ))}
       </div>
 
-      {/* Filters — no fiscal year picker, it's always active FY */}
+      {/* Filters */}
       <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 10 }}>
         <div className="card-body py-3" style={{ background: 'var(--bs-body-bg)' }}>
           <div className="row g-2 align-items-end">
@@ -346,7 +342,7 @@ export default function DistributionPage() {
               <table className="table table-hover mb-0" style={{ fontSize: 12, minWidth: 1100 }}>
                 <thead>
                   <tr style={{ background: 'var(--bs-secondary-bg)' }}>
-                    {['#','Thaali No','SF#','ITS#','Name','Size','Type','Block','No','Floor','Sector','Distributor','WhatsApp','Niyyat','Status'].map(h => (
+                    {['#','Thaali No','SF#','ITS#','Name','Size','Type','Block','No','Floor','Sector','Distributor','WhatsApp','Niyyat'].map(h => (
                       <th key={h} style={{ fontSize: 11, color: 'var(--bs-secondary-color)', fontWeight: 600, whiteSpace: 'nowrap', padding: '10px 12px' }}>{h}</th>
                     ))}
                   </tr>
@@ -374,16 +370,11 @@ export default function DistributionPage() {
                           {r.mumineen?.niyyat_statuses?.name || '—'}
                         </span>
                       </td>
-                      <td style={{ padding: '8px 12px' }}>
-                        <span className={`badge ${STATUS_COLORS[r.status] || 'bg-secondary'}`} style={{ fontSize: 10 }}>
-                          {r.status}
-                        </span>
-                      </td>
                     </tr>
                   ))}
                   {registrations.length === 0 && (
                     <tr>
-                      <td colSpan={15} className="text-center py-5" style={{ color: 'var(--bs-secondary-color)' }}>
+                      <td colSpan={14} className="text-center py-5" style={{ color: 'var(--bs-secondary-color)' }}>
                         No records found
                       </td>
                     </tr>

@@ -66,6 +66,7 @@ export default function SettingsPage() {
   const [selectedStickers, setSelectedStickers]         = useState<number[]>([])
   const [stickerSearch, setStickerSearch]               = useState('')
   const [generatingPDF, setGeneratingPDF]               = useState(false)
+  const [previewUrl, setPreviewUrl]                     = useState<string | null>(null)
 
   useEffect(() => { loadTab(activeTab) }, [activeTab])
 
@@ -122,8 +123,8 @@ export default function SettingsPage() {
       setThaaliFilter('all')
     } else if (tab === 'stickers') {
       const { data } = await supabase.from('thaali_registrations')
-        .select('id, thaalis(thaali_number), mumineen(full_name, sf_no)')
-        .eq('status', 'active').order('id')
+        .select('id, thaalis!fk_tr_thaali(thaali_number), mumineen!fk_tr_mumin(full_name, sf_no)')
+        .not('thaali_id', 'is', null).order('id')
       setStickerRegistrations(data || [])
     } else {
       const table = LOOKUP_TABLE[tab]
@@ -220,35 +221,149 @@ export default function SettingsPage() {
     if (!selectedStickers.length) return showMsg('Select at least one registration', true)
     setGeneratingPDF(true)
     const selected = stickerRegistrations.filter((r: any) => selectedStickers.includes(r.id))
-    const jsPDF = (await import('jspdf')).default
-    const QRCode = (await import('qrcode')).default
-    const doc = new jsPDF({ unit: 'in', format: 'letter' })
-    const pageW = 8.5, margin = 0.5
-    const cols = 2, stickerW = (pageW - margin * 2) / cols
-    const upperH = 1.75, lowerH = 0.75, gap = 0.15
-    let x = margin, y = margin
-    for (let i = 0; i < selected.length; i++) {
-      const r = selected[i]
-      const thaaliNo = r.thaalis?.thaali_number || ''
-      const name = r.mumineen?.full_name || ''
-      const sfNo = r.mumineen?.sf_no || ''
-      if (i > 0 && i % (cols * Math.floor((11 - margin * 2) / (upperH + lowerH + gap))) === 0) { doc.addPage(); x = margin; y = margin }
-      const col = i % cols
-      x = margin + col * stickerW
-      if (col === 0 && i > 0) y += upperH + lowerH + gap + 0.1
-      doc.setDrawColor(200); doc.rect(x, y, stickerW - 0.1, upperH)
-      const qr1 = await QRCode.toDataURL(thaaliNo, { width: 80 })
-      doc.addImage(qr1, 'PNG', x + 0.1, y + 0.1, 0.8, 0.8)
-      doc.setFontSize(14); doc.setFont('helvetica', 'bold'); doc.text(`#${thaaliNo}`, x + 1.05, y + 0.45)
-      doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.text(name, x + 1.05, y + 0.65); doc.text(`SF: ${sfNo}`, x + 1.05, y + 0.82)
-      const ly = y + upperH + gap
-      doc.setDrawColor(200); doc.rect(x, ly, stickerW - 0.1, lowerH)
-      const qr2 = await QRCode.toDataURL(`${thaaliNo}|${sfNo}`, { width: 60 })
-      doc.addImage(qr2, 'PNG', x + 0.05, ly + 0.05, 0.6, 0.6)
-      doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.text(`#${thaaliNo}`, x + 0.75, ly + 0.38)
-      doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.text(sfNo, x + 0.75, ly + 0.55)
+
+    try {
+      const { jsPDF } = await import('jspdf')
+      const QRCode   = (await import('qrcode')).default
+
+      // A4: 210 × 297mm — 2 cols × 6 rows = 12 stickers per person
+      // Rows 0-2 (top 6):    large portrait stickers
+      // Rows 3-5 (bottom 6): small landscape stickers
+      const mX     = 10.9
+      const mY     = 16
+      const sW     = (210 - 2 * mX) / 2          // ≈ 94.1mm per sticker
+      const largeH = 49.4
+      const smallH = (297 - 2 * mY - 3 * largeH) / 3  // ≈ 38.9mm
+
+      const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' })
+
+      for (let pi = 0; pi < selected.length; pi++) {
+        const r        = selected[pi]
+        const thaaliNo = String(r.thaalis?.thaali_number || '').trim()
+        const name     = r.mumineen?.full_name || ''
+        const sfNo     = r.mumineen?.sf_no || ''
+        if (!thaaliNo) continue
+
+        if (pi > 0) doc.addPage()
+
+        // Single QR per person — encodes thaali number
+        const qrUrl: string = await QRCode.toDataURL(thaaliNo, {
+          width: 200, margin: 0, errorCorrectionLevel: 'M',
+          color: { dark: '#000000', light: '#ffffff' },
+        })
+
+        for (let i = 0; i < 12; i++) {
+          const col     = i % 2
+          const row     = Math.floor(i / 2)
+          const isLarge = row < 3
+          const sx      = mX + col * sW
+          const sy      = mY + (isLarge ? row * largeH : 3 * largeH + (row - 3) * smallH)
+          const sh      = isLarge ? largeH : smallH
+
+          // Dashed border
+          doc.setDrawColor(160, 160, 160)
+          doc.setLineWidth(0.25)
+          doc.setLineDashPattern([1.5, 1.0], 0)
+          doc.rect(sx, sy, sW, sh)
+          doc.setLineDashPattern([], 0)
+
+          if (isLarge) {
+            // ── Large sticker: Name+SF# centered top, QR left, number right ──
+            const qrSize = 27
+            const qrX    = sx + 4
+            const qrSy   = sy + 17
+
+            // Name bold centered
+            doc.setFont('helvetica', 'bold')
+            doc.setFontSize(10)
+            doc.setTextColor(0, 0, 0)
+            const nameLines: string[] = doc.splitTextToSize(name, sW - 10)
+            const nl = nameLines.slice(0, 2)
+            doc.text(nl, sx + sW / 2, sy + 7, { align: 'center' })
+
+            // SF# bold centered
+            const sfYlg = sy + 7 + nl.length * 4.5
+            doc.setFont('helvetica', 'bold')
+            doc.setFontSize(9)
+            doc.setTextColor(0, 0, 0)
+            doc.text(`SF - ${sfNo}`, sx + sW / 2, sfYlg, { align: 'center' })
+
+            // QR image
+            doc.addImage(qrUrl, 'PNG', qrX, qrSy, qrSize, qrSize)
+
+            // Small "Thaali#" label below QR
+            doc.setFont('helvetica', 'normal')
+            doc.setFontSize(5.5)
+            doc.setTextColor(100, 100, 100)
+            doc.text('Thaali#', qrX + qrSize / 2, qrSy + qrSize + 2, { align: 'center' })
+
+            // Right area center X
+            const rightCX = sx + 4 + qrSize + (sW - 4 - qrSize) / 2
+
+            // "Thaali#" heading right
+            doc.setFont('helvetica', 'bold')
+            doc.setFontSize(9)
+            doc.setTextColor(0, 0, 0)
+            doc.text('Thaali#', rightCX, sy + 22, { align: 'center' })
+
+            // Large thaali number
+            doc.setFont('helvetica', 'bold')
+            doc.setFontSize(40)
+            doc.setTextColor(0, 0, 0)
+            doc.text(thaaliNo, rightCX, sy + 44, { align: 'center' })
+
+          } else {
+            // ── Small sticker: QR left | Name+SF# center | Thaali# right ──
+            const qrSize = 18
+            const qrX    = sx + 3
+            const qrSy   = sy + (sh - qrSize) / 2 - 1
+            const midCY  = sy + sh / 2
+
+            // QR image
+            doc.addImage(qrUrl, 'PNG', qrX, qrSy, qrSize, qrSize)
+
+            // Small "Thaali#" label below QR
+            doc.setFontSize(5)
+            doc.setTextColor(100, 100, 100)
+            doc.text('Thaali#', qrX + qrSize / 2, sy + sh - 2, { align: 'center' })
+
+            // Name
+            const midX = sx + 3 + qrSize + 4
+            doc.setFont('helvetica', 'bold')
+            doc.setFontSize(7.5)
+            doc.setTextColor(0, 0, 0)
+            const snl: string[] = doc.splitTextToSize(name, 44)
+            doc.text(snl[0] || '', midX, midCY - 2)
+            if (snl[1]) doc.text(snl[1], midX, midCY + 2.5)
+
+            // SF#
+            doc.setFont('helvetica', 'bold')
+            doc.setFontSize(7)
+            doc.setTextColor(0, 0, 0)
+            doc.text(`SF - ${sfNo}`, midX, snl[1] ? midCY + 7 : midCY + 4)
+
+            // "Thaali#" label + large number — right-aligned
+            const rightX = sx + sW - 3
+            doc.setFont('helvetica', 'bold')
+            doc.setFontSize(6.5)
+            doc.setTextColor(80, 80, 80)
+            doc.text('Thaali#', rightX, midCY - 5, { align: 'right' })
+
+            doc.setFont('helvetica', 'bold')
+            doc.setFontSize(26)
+            doc.setTextColor(0, 0, 0)
+            doc.text(thaaliNo, rightX, midCY + 10, { align: 'right' })
+          }
+        }
+      }
+
+      const blob = doc.output('blob')
+      if (previewUrl) URL.revokeObjectURL(previewUrl)
+      setPreviewUrl(URL.createObjectURL(blob))
+    } catch (err: any) {
+      showMsg('PDF error: ' + err.message, true)
     }
-    doc.save('thaali-stickers.pdf'); setGeneratingPDF(false)
+    setGeneratingPDF(false)
   }
 
   const hasColour = activeTab === 'mumin_categories'
@@ -721,6 +836,24 @@ export default function SettingsPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Sticker PDF Preview Modal — full screen */}
+      {previewUrl && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, display: 'flex', flexDirection: 'column', background: '#1a1a1a' }}>
+          <div style={{ padding: '10px 16px', background: '#2a2a2a', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+            <span style={{ color: '#fff', fontWeight: 600, fontSize: 14 }}>Sticker Preview</span>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <a href={previewUrl} download={`thaali-stickers-${new Date().toISOString().slice(0,10)}.pdf`}
+                className="btn btn-sm" style={{ background: '#364574', color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>
+                Download PDF
+              </a>
+              <button onClick={() => { URL.revokeObjectURL(previewUrl); setPreviewUrl(null) }}
+                style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer', color: '#aaa', lineHeight: 1, padding: '0 4px' }}>×</button>
+            </div>
+          </div>
+          <iframe src={previewUrl} style={{ flex: 1, border: 'none', width: '100%' }} title="Sticker PDF Preview" />
         </div>
       )}
     </>

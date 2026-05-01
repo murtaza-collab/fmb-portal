@@ -243,32 +243,53 @@ function RegistrationsTab({ onStatsChange }: { onStatsChange: () => void }) {
 
   const fetchRegistrations = async () => {
     setLoading(true)
+    setFetchError('')
+
     let query = supabase.from('thaali_registrations')
       .select(`*, mumineen!fk_tr_mumin(sf_no, full_name, its_no),
-        thaalis!fk_tr_thaali(thaali_number), thaali_types!fk_tr_type(name),
-        thaali_categories!fk_tr_category(name), distributors!fk_tr_distributor(full_name)`,
+        thaalis!fk_tr_thaali(thaali_number), thaali_types(name),
+        thaali_categories(name), distributors(full_name)`,
         { count: 'exact' })
       .order('id', { ascending: false })
-      .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
 
     if (filterDistributor) query = query.eq('distributor_id', parseInt(filterDistributor))
     if (filterType)        query = query.eq('thaali_type_id', parseInt(filterType))
     if (filterCategory)    query = query.eq('thaali_category_id', parseInt(filterCategory))
+
+    if (search) {
+      const s = search.trim()
+
+      // Server-side: find mumin IDs matching name / SF# / ITS#
+      const { data: matchingMumin } = await supabase
+        .from('mumineen')
+        .select('id')
+        .or(`full_name.ilike.%${s}%,sf_no.ilike.%${s}%,its_no.ilike.%${s}%`)
+      const muminIds = (matchingMumin || []).map((m: any) => m.id as number)
+
+      // Thaali number search — use already-loaded allThaalis lookup (integers)
+      const thaaliIds = allThaalis
+        .filter(t => t.thaali_number.toString().includes(s))
+        .map(t => t.id)
+
+      const orParts: string[] = []
+      if (muminIds.length > 0)  orParts.push(`mumin_id.in.(${muminIds.join(',')})`)
+      if (thaaliIds.length > 0) orParts.push(`thaali_id.in.(${thaaliIds.join(',')})`)
+
+      if (orParts.length === 0) {
+        setRegistrations([])
+        setTotal(0)
+        setLoading(false)
+        return
+      }
+      query = query.or(orParts.join(','))
+    }
+
+    query = query.range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
+
     const { data, count, error } = await query
     if (error) { setFetchError(error.message); setLoading(false); return }
 
-    setFetchError('')
-    let filtered = data || []
-    if (search) {
-      const s = search.toLowerCase()
-      filtered = filtered.filter((r: Registration) =>
-        r.mumineen?.full_name?.toLowerCase().includes(s) ||
-        r.mumineen?.sf_no?.toLowerCase().includes(s) ||
-        r.mumineen?.its_no?.toLowerCase().includes(s) ||
-        r.thaalis?.thaali_number?.toString().includes(s)
-      )
-    }
-    setRegistrations(filtered)
+    setRegistrations(data || [])
     setTotal(count || 0)
     setLoading(false)
   }

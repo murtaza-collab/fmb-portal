@@ -6,6 +6,7 @@ import {
   HIJRI_MONTHS, HIJRI_MONTHS_SHORT,
   daysInHijriMonth, todayHijri, hijriMonthStart
 } from '@/lib/hijri'
+import { todayPKT } from '@/lib/time'
 
 interface ExtraItem { name: string; value: string }
 interface DailyMenu {
@@ -42,7 +43,7 @@ function localDateStr(d: Date): string {
 
 export default function CalendarPage() {
   const today    = new Date()
-  const todayStr = localDateStr(today)
+  const todayStr = todayPKT()   // PKT date — avoids wrong day for overseas admins
   const todayH   = todayHijri()
 
   const [viewMode, setViewMode] = useState<ViewMode>('gregorian')
@@ -279,7 +280,9 @@ export default function CalendarPage() {
   const isLocked   = (dateStr: string): boolean => {
     if (dateStr < todayStr) return true
     if (dateStr > todayStr) return false
-    return today.getHours() >= 6
+    // Use PKT hour (UTC+5) — browser timezone would give wrong cutoff for overseas admins
+    const pktHour = new Date(Date.now() + 5 * 60 * 60 * 1000).getUTCHours()
+    return pktHour >= 6
   }
 
   const buildGregorianGrid = () => {

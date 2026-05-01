@@ -58,7 +58,7 @@ export default function CounterADetail() {
     const { data: allRegs } = await supabase
       .from('thaali_registrations')
       .select(`id, mumin_id, thaali_id, thaali_type_id, thaali_category_id, distributor_id,
-        thaalis(thaali_number), mumineen(full_name, sf_no, niyyat_status_id)`)
+        thaalis!fk_tr_thaali(thaali_number), mumineen!fk_tr_mumin(full_name, sf_no, niyyat_status_id)`)
       .eq('distributor_id', distributorId)
       .not('thaali_id', 'is', null);
 
@@ -130,12 +130,11 @@ export default function CounterADetail() {
     try {
       let sessionId = session?.id;
       if (!sessionId) {
-        const { data: newSession, error: e } = await supabase
-          .from('distribution_sessions')
-          .insert({ distributor_id: distributorId, session_date: today, status: 'active' })
-          .select('id').single();
-        if (e) throw e;
-        sessionId = newSession.id;
+        // No session means the distributor hasn't checked in via the arrival desk yet.
+        // Don't auto-create — require the proper arrival flow so counts are set correctly.
+        setError('No arrival session found. Please check this distributor in at the arrival desk first.');
+        setConfirming(false);
+        return;
       }
 
       const { error: ue } = await supabase

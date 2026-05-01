@@ -8,7 +8,7 @@ type Template = {
 }
 type Log = {
   id: number; title: string; body: string; segment: string
-  sent_count: number; sent_at: string; event_type: string
+  sent_count: number; failed_count?: number; sent_at: string; event_type: string
 }
 type NiyyatStatus = { id: number; name: string }
 type Segment = { key: string; label: string; description: string; icon: string; niyyat_status_id?: number }
@@ -55,6 +55,10 @@ export default function NotificationsPage() {
   const [saving, setSaving]         = useState<number | null>(null)
   const [saved, setSaved]           = useState<number | null>(null)
   const [toast, setToast]           = useState<{ msg: string; type: 'success' | 'danger' } | null>(null)
+  const [logsOffset, setLogsOffset] = useState(0)
+  const [logsMore, setLogsMore]     = useState(true)
+  const [logsLoading, setLogsLoading] = useState(false)
+  const LOGS_PAGE = 30
 
   // Broadcast
   const [segment, setSegment]   = useState('all')
@@ -71,15 +75,33 @@ export default function NotificationsPage() {
   useEffect(() => {
     Promise.all([
       supabase.from('notification_templates').select('*').order('id'),
-      supabase.from('notification_logs').select('*').order('sent_at', { ascending: false }).limit(30),
+      supabase.from('notification_logs').select('*').order('sent_at', { ascending: false }).range(0, LOGS_PAGE - 1),
       supabase.from('niyyat_statuses').select('id, name').order('id'),
     ]).then(([t, l, n]) => {
       if (t.data) setTemplates(t.data)
-      if (l.data) setLogs(l.data)
+      if (l.data) {
+        setLogs(l.data)
+        setLogsMore(l.data.length === LOGS_PAGE)
+        setLogsOffset(l.data.length)
+      }
       if (n.data) setNiyyatStatuses(n.data)
       setLoading(false)
     })
   }, [])
+
+  const loadMoreLogs = async () => {
+    setLogsLoading(true)
+    const { data } = await supabase
+      .from('notification_logs').select('*')
+      .order('sent_at', { ascending: false })
+      .range(logsOffset, logsOffset + LOGS_PAGE - 1)
+    if (data) {
+      setLogs(prev => [...prev, ...data])
+      setLogsMore(data.length === LOGS_PAGE)
+      setLogsOffset(prev => prev + data.length)
+    }
+    setLogsLoading(false)
+  }
 
   // Build segments dynamically from niyyat statuses
   const segments: Segment[] = [
@@ -136,6 +158,21 @@ export default function NotificationsPage() {
     setTimeout(() => setSaved(null), 2000)
   }
 
+  // Toggle enabled and immediately persist — toggle should feel instant
+  const toggleTemplate = async (t: Template, enabled: boolean) => {
+    updateTemplate(t.id, { enabled })
+    setSaving(t.id)
+    const { error } = await supabase
+      .from('notification_templates')
+      .update({ enabled, updated_at: new Date().toISOString() })
+      .eq('id', t.id)
+    setSaving(null)
+    if (error) {
+      updateTemplate(t.id, { enabled: !enabled }) // revert on failure
+      showToast('Failed to update', 'danger')
+    }
+  }
+
   const sendBroadcast = async () => {
     if (!bTitle.trim() || !bBody.trim()) { showToast('Title and message required', 'danger'); return }
     setSending(true)
@@ -175,13 +212,19 @@ export default function NotificationsPage() {
       const result = await res.json()
       if (!res.ok) throw new Error(result.error || 'Send failed')
 
-      showToast(`Sent to ${result.sent} device${result.sent !== 1 ? 's' : ''}`)
+      const sentMsg   = `${result.sent ?? 0} sent`
+      const failedMsg = result.failed > 0 ? `, ${result.failed} failed` : ''
+      showToast(`${sentMsg}${failedMsg}`, result.failed > 0 ? 'danger' : 'success')
       setBTitle(''); setBBody('')
 
       // Refresh logs
       const { data: newLogs } = await supabase
-        .from('notification_logs').select('*').order('sent_at', { ascending: false }).limit(30)
-      if (newLogs) setLogs(newLogs)
+        .from('notification_logs').select('*').order('sent_at', { ascending: false }).range(0, LOGS_PAGE - 1)
+      if (newLogs) {
+        setLogs(newLogs)
+        setLogsMore(newLogs.length === LOGS_PAGE)
+        setLogsOffset(newLogs.length)
+      }
       setTab('logs')
     } catch (e: any) {
       showToast(e.message || 'Send failed', 'danger')
@@ -237,7 +280,7 @@ export default function NotificationsPage() {
             {t.charAt(0).toUpperCase() + t.slice(1)}
             {t === 'logs' && logs.length > 0 && (
               <span className="badge rounded-pill ms-2" style={{ background:'rgba(54,69,116,0.15)', color:'#364574', fontSize:'10px' }}>
-                {logs.length}
+                {logs.length}{logsMore ? '+' : ''}
               </span>
             )}
           </button>
@@ -283,20 +326,21 @@ export default function NotificationsPage() {
                         <div className="form-check form-switch mb-0">
                           <input className="form-check-input" type="checkbox" role="switch"
                             checked={t.enabled} style={{ cursor:'pointer', width:'40px', height:'20px' }}
-                            onChange={e => updateTemplate(t.id, { enabled: e.target.checked })} />
+                            disabled={saving === t.id}
+                            onChange={e => toggleTemplate(t, e.target.checked)} />
                         </div>
                       </div>
                     </div>
                     <div className="card-body" style={{ padding:'16px' }}>
                       <div className="mb-3">
                         <label className="form-label mb-1" style={{ fontSize:'11px', fontWeight:600, color:'var(--bs-secondary-color)', textTransform:'uppercase', letterSpacing:'0.5px' }}>Title</label>
-                        <input className="form-control form-control-sm" value={t.title} disabled={!t.enabled}
+                        <input className="form-control form-control-sm" value={t.title} disabled={saving === t.id}
                           onChange={e => updateTemplate(t.id, { title: e.target.value })}
                           style={{ borderRadius:'8px', fontSize:'13px' }} />
                       </div>
                       <div className="mb-4">
                         <label className="form-label mb-1" style={{ fontSize:'11px', fontWeight:600, color:'var(--bs-secondary-color)', textTransform:'uppercase', letterSpacing:'0.5px' }}>Message</label>
-                        <textarea className="form-control form-control-sm" rows={2} value={t.body} disabled={!t.enabled}
+                        <textarea className="form-control form-control-sm" rows={2} value={t.body} disabled={saving === t.id}
                           onChange={e => updateTemplate(t.id, { body: e.target.value })}
                           style={{ borderRadius:'8px', fontSize:'13px', resize:'none' }} />
                       </div>
@@ -304,7 +348,7 @@ export default function NotificationsPage() {
                         <span style={{ fontSize:'11px', color:'var(--bs-secondary-color)' }}>
                           <i className="bi bi-lightning-charge me-1" />Fires automatically on event
                         </span>
-                        <button className="btn btn-sm" disabled={saving===t.id || !t.enabled} onClick={() => saveTemplate(t)}
+                        <button className="btn btn-sm" disabled={saving===t.id} onClick={() => saveTemplate(t)}
                           style={{ background: saved===t.id ? '#0ab39c' : '#364574', color:'#fff',
                             border:'none', borderRadius:'8px', fontSize:'13px', padding:'5px 16px', minWidth:'80px', transition:'all 0.2s' }}>
                           {saving===t.id ? <span className="spinner-border spinner-border-sm" />
@@ -450,42 +494,59 @@ export default function NotificationsPage() {
                 <p className="mt-3 mb-0" style={{ fontSize:'13px' }}>No notifications sent yet</p>
               </div>
             ) : (
-              <div className="table-responsive">
-                <table className="table table-hover mb-0" style={{ fontSize:'13px' }}>
-                  <thead style={{ background:'var(--bs-secondary-bg)' }}>
-                    <tr>
-                      {['Title / Message','Segment','Sent','When'].map(h => (
-                        <th key={h} className="px-3 py-3 fw-semibold border-0"
-                          style={{ fontSize:'12px', color:'var(--bs-secondary-color)', textTransform:'uppercase', letterSpacing:'0.4px', whiteSpace:'nowrap' }}>
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {logs.map(l => (
-                      <tr key={l.id}>
-                        <td className="px-3 py-3">
-                          <div className="fw-semibold" style={{ color:'var(--bs-body-color)', marginBottom:'2px' }}>{l.title}</div>
-                          <div style={{ color:'var(--bs-secondary-color)', fontSize:'12px' }}>{l.body}</div>
-                        </td>
-                        <td className="px-3 py-3">
-                          <span className="badge rounded-pill"
-                            style={{ background:'rgba(54,69,116,0.1)', color:'#364574', fontSize:'11px', padding:'4px 10px' }}>
-                            {l.segment || l.event_type || '—'}
-                          </span>
-                        </td>
-                        <td className="px-3 py-3">
-                          <span className="fw-semibold" style={{ color:'#0ab39c' }}>{l.sent_count}</span>
-                        </td>
-                        <td className="px-3 py-3" style={{ color:'var(--bs-secondary-color)', whiteSpace:'nowrap' }}>
-                          {new Date(l.sent_at).toLocaleString('en-PK', { dateStyle:'medium', timeStyle:'short' })}
-                        </td>
+              <>
+                <div className="table-responsive">
+                  <table className="table table-hover mb-0" style={{ fontSize:'13px' }}>
+                    <thead style={{ background:'var(--bs-secondary-bg)' }}>
+                      <tr>
+                        {['Title / Message','Segment','Sent','Failed','When'].map(h => (
+                          <th key={h} className="px-3 py-3 fw-semibold border-0"
+                            style={{ fontSize:'12px', color:'var(--bs-secondary-color)', textTransform:'uppercase', letterSpacing:'0.4px', whiteSpace:'nowrap' }}>
+                            {h}
+                          </th>
+                        ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {logs.map(l => (
+                        <tr key={l.id}>
+                          <td className="px-3 py-3">
+                            <div className="fw-semibold" style={{ color:'var(--bs-body-color)', marginBottom:'2px' }}>{l.title}</div>
+                            <div style={{ color:'var(--bs-secondary-color)', fontSize:'12px' }}>{l.body}</div>
+                          </td>
+                          <td className="px-3 py-3">
+                            <span className="badge rounded-pill"
+                              style={{ background:'rgba(54,69,116,0.1)', color:'#364574', fontSize:'11px', padding:'4px 10px' }}>
+                              {l.segment || l.event_type || '—'}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3">
+                            <span className="fw-semibold" style={{ color:'#0ab39c' }}>{l.sent_count}</span>
+                          </td>
+                          <td className="px-3 py-3">
+                            {l.failed_count
+                              ? <span className="fw-semibold" style={{ color:'#f06548' }}>{l.failed_count}</span>
+                              : <span style={{ color:'var(--bs-secondary-color)' }}>—</span>}
+                          </td>
+                          <td className="px-3 py-3" style={{ color:'var(--bs-secondary-color)', whiteSpace:'nowrap' }}>
+                            {new Date(l.sent_at).toLocaleString('en-PK', { dateStyle:'medium', timeStyle:'short' })}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {logsMore && (
+                  <div className="text-center py-3" style={{ borderTop:'1px solid var(--bs-border-color)' }}>
+                    <button className="btn btn-sm btn-outline-secondary" onClick={loadMoreLogs} disabled={logsLoading}
+                      style={{ borderRadius:'8px', fontSize:'13px' }}>
+                      {logsLoading
+                        ? <><span className="spinner-border spinner-border-sm me-1" />Loading…</>
+                        : <><i className="bi bi-chevron-down me-1" />Load more</>}
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

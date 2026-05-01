@@ -7,6 +7,20 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+// In-memory rate limiter: max 5 requests per 60s per distributor_id
+const rateMap = new Map<number, number[]>()
+const RATE_LIMIT    = 5
+const RATE_WINDOW   = 60_000
+
+function checkRateLimit(distId: number): boolean {
+  const now  = Date.now()
+  const hits = (rateMap.get(distId) || []).filter(t => now - t < RATE_WINDOW)
+  if (hits.length >= RATE_LIMIT) return false
+  hits.push(now)
+  rateMap.set(distId, hits)
+  return true
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { distributor_id } = await request.json();
@@ -15,13 +29,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'distributor_id is required' }, { status: 400 });
     }
 
-    const distId = parseInt(distributor_id, 10);
-    const today  = todayPKT(); // always PKT — works on server too
+    const distId = parseInt(String(distributor_id), 10);
+    if (isNaN(distId)) {
+      return NextResponse.json({ error: 'distributor_id must be a number' }, { status: 400 });
+    }
 
-    // 1. Check distributor exists
+    if (!checkRateLimit(distId)) {
+      return NextResponse.json({ error: 'Too many requests — wait a moment and try again' }, { status: 429 });
+    }
+
+    const today = todayPKT();
+
+    // 1. Check distributor exists AND is active
     const { data: distributor, error: distError } = await supabase
       .from('distributors')
-      .select('id, full_name')
+      .select('id, full_name, status')
       .eq('id', distId)
       .single();
 
@@ -29,8 +51,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Distributor not found' }, { status: 404 });
     }
 
-    // 2. Get all thaali registrations for this distributor with a thaali assigned
-    // FIX B1: removed .eq('status', 'approved') — all rows are status='active' per v4.0
+    if (distributor.status !== 'active') {
+      return NextResponse.json({ error: 'Distributor is not active' }, { status: 403 });
+    }
+
+    // 2. Check if already dispatched today — prevent re-check-in rolling back status
+    const { data: existingSession } = await supabase
+      .from('distribution_sessions')
+      .select('id, status')
+      .eq('distributor_id', distId)
+      .eq('session_date', today)
+      .single();
+
+    if (existingSession?.status === 'dispatched') {
+      return NextResponse.json(
+        { error: 'This distributor has already been dispatched today', session: existingSession },
+        { status: 409 }
+      );
+    }
+
+    // 3. Get all thaali registrations for this distributor with a thaali assigned
     const { data: registrations, error: regError } = await supabase
       .from('thaali_registrations')
       .select('id, thaali_id, mumin_id')
@@ -41,11 +81,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: regError.message }, { status: 500 });
     }
 
-    const totalThaalis = registrations?.length || 0;
-    const muminIds     = registrations?.map(r => r.mumin_id) || [];
+    const totalThaalis = registrations?.length ?? 0;
+    const muminIds     = registrations?.map(r => r.mumin_id) ?? [];
 
-    // 3. Count stopped thaalis for today
-    // FIX B2: use from_date/to_date (not stop_date/resume_date) + approved status only
+    // 4. Count stopped thaalis for today (approved stops where today falls in range)
     let stoppedCount = 0;
     if (muminIds.length > 0) {
       const { data: stopped } = await supabase
@@ -56,10 +95,10 @@ export async function POST(request: NextRequest) {
         .lte('from_date', today)
         .gte('to_date', today);
 
-      stoppedCount = stopped?.length || 0;
+      stoppedCount = stopped?.length ?? 0;
     }
 
-    // 4. Count customized thaalis for today
+    // 5. Count customized thaalis for today
     let customizedCount = 0;
     if (muminIds.length > 0) {
       const { data: customizations } = await supabase
@@ -69,20 +108,13 @@ export async function POST(request: NextRequest) {
         .eq('request_date', today)
         .eq('status', 'active');
 
-      customizedCount = customizations?.length || 0;
+      customizedCount = customizations?.length ?? 0;
     }
 
-    const netThaalis  = totalThaalis - stoppedCount;
+    const netThaalis   = totalThaalis - stoppedCount;
     const defaultCount = Math.max(0, netThaalis - customizedCount);
 
-    // 5. Upsert session for today
-    const { data: existingSession } = await supabase
-      .from('distribution_sessions')
-      .select('id, status')
-      .eq('distributor_id', distId)
-      .eq('session_date', today)
-      .single();
-
+    // 6. Create or update session
     let session;
 
     if (existingSession) {
@@ -93,7 +125,7 @@ export async function POST(request: NextRequest) {
           stopped_thaalis:    stoppedCount,
           customized_thaalis: customizedCount,
           default_thaalis:    defaultCount,
-          status:             existingSession.status === 'dispatched' ? 'dispatched' : 'arrived',
+          status:             'arrived',
           arrived_at:         nowUTC(),
         })
         .eq('id', existingSession.id)
@@ -132,8 +164,11 @@ export async function POST(request: NextRequest) {
       distributor_name: distributor.full_name,
     });
 
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Unexpected error' }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'Unexpected error' },
+      { status: 500 }
+    );
   }
 }
 
@@ -146,10 +181,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'distributor_id required' }, { status: 400 });
   }
 
+  const distId = parseInt(distributor_id, 10);
+  if (isNaN(distId)) {
+    return NextResponse.json({ error: 'distributor_id must be a number' }, { status: 400 });
+  }
+
   const { data: session, error } = await supabase
     .from('distribution_sessions')
     .select('*')
-    .eq('distributor_id', parseInt(distributor_id, 10))
+    .eq('distributor_id', distId)
     .eq('session_date', today)
     .single();
 

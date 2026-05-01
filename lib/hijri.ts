@@ -6,7 +6,7 @@
  * - Odd months (1,3,5,7,9,11) = 30 days (kamil)
  * - Even months (2,4,6,8,10,12) = 29 days (naqis)
  * - Kabisa years: Zilhajj (month 12) gets 30 days instead of 29
- * - Kabisa years in 30-year cycle: 2,5,7,10,13,15,18,21,24,26,29
+ * - Kabisa years in 30-year cycle: 2,5,8,10,13,16,18,21,24,26,29 (Bohra Misri — differs from standard Islamic 2,5,7,10,13,15,18,21,24,26,29)
  *
  * Verified anchor: 1 Moharram 1446H = 7 July 2024
  * Verified: 1 Ramadan 1447H = 17 Feb 2026 ✓

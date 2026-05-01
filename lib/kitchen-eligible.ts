@@ -95,8 +95,8 @@ export async function getEligibleRegistrations(opts: {
       thaali_type_id,
       thaali_category_id,
       distributor_id,
-      thaalis(thaali_number),
-      mumineen(full_name, sf_no, niyyat_status_id)
+      thaalis!fk_tr_thaali(thaali_number),
+      mumineen!fk_tr_mumin(full_name, sf_no, niyyat_status_id)
     `)
     .not('thaali_id', 'is', null)
 

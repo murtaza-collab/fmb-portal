@@ -244,6 +244,7 @@ export default function MumineenPage() {
     if (!form.full_name.trim()) { setSaveError('Full Name is required.'); return }
     if (!form.sf_no.trim())     { setSaveError('SF# is required.'); return }
     if (!form.its_no.trim())    { setSaveError('ITS# is required for HOF.'); return }
+    if (!/^\d{8}$/.test(form.its_no.trim())) { setSaveError('ITS# must be exactly 8 digits.'); return }
     if (!validateEmail(form.email)) { setSaveError('Enter a valid email address.'); return }
     setSaving(true); setSaveError('')
 
@@ -328,6 +329,7 @@ export default function MumineenPage() {
   const handleSaveMember = async () => {
     if (!memberForm.full_name.trim()) { setMemberError('Full Name is required.'); return }
     if (!memberForm.its_no.trim())    { setMemberError('ITS# is required.'); return }
+    if (!/^\d{8}$/.test(memberForm.its_no.trim())) { setMemberError('ITS# must be exactly 8 digits.'); return }
     if (!familyModalHof)              { setMemberError('HOF not set.'); return }
     setSavingMember(true); setMemberError('')
 
@@ -763,8 +765,8 @@ export default function MumineenPage() {
                 <input className="form-control form-control-sm" placeholder="e.g. 1234" value={form.sf_no} onChange={e => f('sf_no', e.target.value)} />
               </div>
               <div className="col-6">
-                <label style={labelStyle}>ITS# * <span style={{ fontWeight: 400, color: 'var(--bs-secondary-color)', fontSize: 11 }}>(unique per person)</span></label>
-                <input className="form-control form-control-sm" placeholder="e.g. 40000001" value={form.its_no} onChange={e => f('its_no', e.target.value)} />
+                <label style={labelStyle}>ITS# * <span style={{ fontWeight: 400, color: 'var(--bs-secondary-color)', fontSize: 11 }}>(8-digit number, unique per person)</span></label>
+                <input className="form-control form-control-sm" placeholder="e.g. 40000001" value={form.its_no} onChange={e => f('its_no', e.target.value)} maxLength={8} inputMode="numeric" />
               </div>
               <div className="col-6">
                 <label style={labelStyle}>Full Name *</label>
@@ -910,8 +912,8 @@ export default function MumineenPage() {
             {memberError && <div className="alert alert-danger py-2 mb-3" style={{ fontSize: 13 }}>{memberError}</div>}
             <div className="row g-3">
               <div className="col-12">
-                <label style={labelStyle}>ITS# *</label>
-                <input className="form-control form-control-sm" placeholder="e.g. 40000002" value={memberForm.its_no} onChange={e => mf('its_no', e.target.value)} />
+                <label style={labelStyle}>ITS# * <span style={{ fontWeight: 400, color: 'var(--bs-secondary-color)', fontSize: 11 }}>(8 digits)</span></label>
+                <input className="form-control form-control-sm" placeholder="e.g. 40000002" value={memberForm.its_no} onChange={e => mf('its_no', e.target.value)} maxLength={8} inputMode="numeric" />
               </div>
               <div className="col-12">
                 <label style={labelStyle}>Full Name *</label>
