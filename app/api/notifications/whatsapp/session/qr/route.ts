@@ -13,7 +13,7 @@ export async function GET() {
   }
 
   try {
-    const res = await fetch(`${wahaBase}/api/screenshot?session=default`, {
+    const res = await fetch(`${wahaBase}/api/default/auth/qr`, {
       headers: { 'X-Api-Key': wahaKey },
       signal: AbortSignal.timeout(8000),
     })

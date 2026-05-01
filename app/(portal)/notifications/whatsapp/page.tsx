@@ -294,7 +294,7 @@ export default function WhatsAppPage() {
           {/* QR Image */}
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: '#fff', borderRadius: 12, padding: 16, minHeight: 300,
+            background: '#fff', borderRadius: 12, padding: 24, minHeight: 360,
             border: '1px solid var(--bs-border-color)',
           }}>
             {qrLoading && !qrUrl && (
@@ -314,7 +314,7 @@ export default function WhatsAppPage() {
             )}
             {qrUrl && !qrError && (
               <img src={qrUrl} alt="WhatsApp QR Code"
-                style={{ maxWidth: 280, maxHeight: 280, borderRadius: 8 }} />
+                style={{ width: 320, height: 320, objectFit: 'contain', imageRendering: 'pixelated' }} />
             )}
           </div>
 
