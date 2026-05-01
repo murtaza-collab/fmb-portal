@@ -17,8 +17,18 @@ type StatusResult = {
   error?: string
 }
 
+type WaTemplate = { id: number; title: string; body: string; variables: string[] }
+
+const VARIABLES = [
+  { key: 'mumin_name',       label: 'Mumin Name',       available: true  },
+  { key: 'sf_no',            label: 'SF Number',         available: true  },
+  { key: 'takhmeen_amount',  label: 'Takhmeen Amount',   available: false },
+  { key: 'due_date',         label: 'Due Date',          available: false },
+  { key: 'sector_name',      label: 'Sector Name',       available: false },
+]
+
 export default function WhatsAppPage() {
-  const [tab, setTab] = useState<'session' | 'qr'>('session')
+  const [tab, setTab] = useState<'session' | 'qr' | 'templates'>('session')
 
   // Session status
   const [status, setStatus]     = useState<StatusResult | null>(null)
@@ -34,6 +44,14 @@ export default function WhatsAppPage() {
   const [qrLoading, setQrLoading] = useState(false)
   const [qrError, setQrError]     = useState<string | null>(null)
   const intervalRef               = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Templates
+  const [templates, setTemplates]   = useState<WaTemplate[]>([])
+  const [tplTitle, setTplTitle]     = useState('')
+  const [tplBody, setTplBody]       = useState('')
+  const [savingTpl, setSavingTpl]   = useState(false)
+  const [deletingId, setDeletingId] = useState<number | null>(null)
+  const bodyRef                     = useRef<HTMLTextAreaElement>(null)
 
   // Toast
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'danger' } | null>(null)
@@ -53,6 +71,57 @@ export default function WhatsAppPage() {
     }
     return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
   }, [tab])
+
+  // Load templates when on templates tab
+  useEffect(() => {
+    if (tab === 'templates') fetchTemplates()
+  }, [tab])
+
+  const fetchTemplates = async () => {
+    const res = await fetch('/api/notifications/whatsapp/templates')
+    const data = await res.json()
+    if (data.templates) setTemplates(data.templates)
+  }
+
+  const insertVariable = (key: string) => {
+    const ta = bodyRef.current
+    if (!ta) { setTplBody(prev => prev + `{{${key}}}`); return }
+    const start = ta.selectionStart
+    const end   = ta.selectionEnd
+    const newVal = tplBody.slice(0, start) + `{{${key}}}` + tplBody.slice(end)
+    setTplBody(newVal)
+    setTimeout(() => { ta.focus(); ta.setSelectionRange(start + key.length + 4, start + key.length + 4) }, 0)
+  }
+
+  const saveTemplate = async () => {
+    if (!tplTitle.trim() || !tplBody.trim()) { showToast('Title and body required', 'danger'); return }
+    setSavingTpl(true)
+    const res  = await fetch('/api/notifications/whatsapp/templates', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: tplTitle, body: tplBody }),
+    })
+    const data = await res.json()
+    if (!res.ok) { showToast(data.error ?? 'Save failed', 'danger') }
+    else {
+      showToast('Template saved')
+      setTplTitle(''); setTplBody('')
+      fetchTemplates()
+    }
+    setSavingTpl(false)
+  }
+
+  const deleteTemplate = async (id: number) => {
+    setDeletingId(id)
+    const res = await fetch('/api/notifications/whatsapp/templates', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    })
+    if (res.ok) { showToast('Template deleted'); fetchTemplates() }
+    else showToast('Delete failed', 'danger')
+    setDeletingId(null)
+  }
 
   const fetchQr = async () => {
     setQrLoading(true)
@@ -150,8 +219,9 @@ export default function WhatsAppPage() {
       {/* Tabs */}
       <div className="mb-4" style={{ borderBottom: '1px solid var(--bs-border-color)' }}>
         {([
-          { key: 'session', label: 'Session', icon: 'bi-plug-fill' },
-          { key: 'qr',      label: 'Connect QR', icon: 'bi-qr-code' },
+          { key: 'session',   label: 'Session',    icon: 'bi-plug-fill'    },
+          { key: 'qr',        label: 'Connect QR', icon: 'bi-qr-code'      },
+          { key: 'templates', label: 'Templates',  icon: 'bi-file-text-fill' },
         ] as const).map(t => (
           <button key={t.key} onClick={() => setTab(t.key)} style={{
             background: 'none', border: 'none', padding: '8px 18px 10px', fontSize: 13,
@@ -324,6 +394,108 @@ export default function WhatsAppPage() {
               <strong> Settings</strong> → <strong>Linked Devices</strong> → <strong>Link a Device</strong> → scan this QR.
             </p>
           </div>
+        </div>
+      )}
+
+      {/* ── Templates Tab ── */}
+      {tab === 'templates' && (
+        <div>
+          {/* New Template */}
+          <div style={{ background: 'var(--bs-body-bg)', border: '1px solid var(--bs-border-color)', borderRadius: 12, padding: 20, marginBottom: 20 }}>
+            <h6 className="fw-bold mb-3" style={{ color: 'var(--bs-body-color)', fontSize: 14 }}>
+              <i className="bi bi-plus-circle-fill me-2" style={{ color: '#364574' }} />
+              New Template
+            </h6>
+
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--bs-secondary-color)', display: 'block', marginBottom: 6 }}>Title</label>
+              <input type="text" className="form-control" value={tplTitle}
+                onChange={e => setTplTitle(e.target.value)}
+                placeholder="e.g. Payment Reminder"
+                style={{ borderRadius: 8, fontSize: 13 }} />
+            </div>
+
+            <div style={{ marginBottom: 10 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--bs-secondary-color)', display: 'block', marginBottom: 6 }}>Message Body</label>
+              <textarea ref={bodyRef} className="form-control" value={tplBody}
+                onChange={e => setTplBody(e.target.value)}
+                rows={4} placeholder="e.g. Assalamualaikum {{mumin_name}}, this is a reminder from FMB."
+                style={{ borderRadius: 8, fontSize: 13, resize: 'vertical' }} />
+            </div>
+
+            {/* Variable Picker */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 11, color: 'var(--bs-secondary-color)', marginBottom: 6 }}>Insert variable at cursor:</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {VARIABLES.map(v => (
+                  <button key={v.key} onClick={() => v.available && insertVariable(v.key)}
+                    disabled={!v.available}
+                    style={{
+                      border: '1px solid',
+                      borderColor: v.available ? '#364574' : 'var(--bs-border-color)',
+                      background: v.available ? 'rgba(54,69,116,0.08)' : 'var(--bs-tertiary-bg)',
+                      color: v.available ? '#364574' : 'var(--bs-secondary-color)',
+                      borderRadius: 16, padding: '3px 10px', fontSize: 12, cursor: v.available ? 'pointer' : 'not-allowed',
+                    }}>
+                    {`{{${v.key}}}`}
+                    {!v.available && <span style={{ fontSize: 10, marginLeft: 4, opacity: 0.6 }}>soon</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button onClick={saveTemplate} disabled={savingTpl} className="btn btn-sm"
+              style={{ background: '#364574', color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600 }}>
+              {savingTpl
+                ? <><span className="spinner-border spinner-border-sm me-2" />Saving...</>
+                : <><i className="bi bi-check-lg me-1" />Save Template</>}
+            </button>
+          </div>
+
+          {/* Saved Templates */}
+          {templates.length > 0 && (
+            <div style={{ background: 'var(--bs-body-bg)', border: '1px solid var(--bs-border-color)', borderRadius: 12, overflow: 'hidden' }}>
+              <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--bs-border-color)' }}>
+                <h6 className="fw-bold mb-0" style={{ color: 'var(--bs-body-color)', fontSize: 14 }}>
+                  Saved Templates ({templates.length})
+                </h6>
+              </div>
+              {templates.map((t, i) => (
+                <div key={t.id} style={{
+                  padding: '14px 20px',
+                  borderBottom: i < templates.length - 1 ? '1px solid var(--bs-border-color)' : 'none',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div style={{ flex: 1, marginRight: 12 }}>
+                      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--bs-body-color)', marginBottom: 4 }}>{t.title}</div>
+                      <div style={{ fontSize: 12, color: 'var(--bs-secondary-color)', whiteSpace: 'pre-wrap' }}>{t.body}</div>
+                      {t.variables?.length > 0 && (
+                        <div style={{ marginTop: 6, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                          {t.variables.map(v => (
+                            <span key={v} style={{ fontSize: 11, background: 'rgba(54,69,116,0.1)', color: '#364574', borderRadius: 10, padding: '2px 8px' }}>
+                              {`{{${v}}}`}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <button onClick={() => deleteTemplate(t.id)} disabled={deletingId === t.id}
+                      style={{ background: 'none', border: 'none', color: '#f06548', cursor: 'pointer', fontSize: 16, padding: 4 }}>
+                      {deletingId === t.id
+                        ? <span className="spinner-border spinner-border-sm" />
+                        : <i className="bi bi-trash3" />}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {templates.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--bs-secondary-color)', fontSize: 13 }}>
+              No templates yet. Create one above.
+            </div>
+          )}
         </div>
       )}
     </div>
