@@ -38,6 +38,7 @@ export async function POST(req: NextRequest) {
     .from('notification_templates')
     .insert({
       title:        title.trim(),
+      label:        title.trim(),
       body:         body.trim(),
       variables:    [...new Set(variables)],
       channel:      'whatsapp',

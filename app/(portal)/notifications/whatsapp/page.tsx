@@ -28,7 +28,7 @@ const VARIABLES = [
 ]
 
 export default function WhatsAppPage() {
-  const [tab, setTab] = useState<'session' | 'qr' | 'templates'>('session')
+  const [tab, setTab] = useState<'session' | 'qr' | 'templates' | 'campaigns'>('session')
 
   // Session status
   const [status, setStatus]     = useState<StatusResult | null>(null)
@@ -53,6 +53,13 @@ export default function WhatsAppPage() {
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const bodyRef                     = useRef<HTMLTextAreaElement>(null)
 
+  // Campaigns
+  const [campName, setCampName]       = useState('')
+  const [campTemplate, setCampTemplate] = useState('')
+  const [campSegment, setCampSegment] = useState('all')
+  const [queuing, setQueuing]         = useState(false)
+  const [queueResult, setQueueResult] = useState<{ queued: number; skipped: number; total_recipients: number; message?: string } | null>(null)
+
   // Toast
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'danger' } | null>(null)
 
@@ -72,9 +79,10 @@ export default function WhatsAppPage() {
     return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
   }, [tab])
 
-  // Load templates when on templates tab
+  // Load templates when on templates or campaigns tab
   useEffect(() => {
-    if (tab === 'templates') fetchTemplates()
+    if (tab === 'templates' || tab === 'campaigns') fetchTemplates()
+    if (tab === 'campaigns') setQueueResult(null)
   }, [tab])
 
   const fetchTemplates = async () => {
@@ -121,6 +129,25 @@ export default function WhatsAppPage() {
     if (res.ok) { showToast('Template deleted'); fetchTemplates() }
     else showToast('Delete failed', 'danger')
     setDeletingId(null)
+  }
+
+  const queueCampaign = async () => {
+    if (!campName.trim())    { showToast('Enter a campaign name', 'danger'); return }
+    if (!campTemplate)       { showToast('Select a template', 'danger'); return }
+    setQueuing(true)
+    setQueueResult(null)
+    const res  = await fetch('/api/notifications/whatsapp/campaigns/queue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ template_id: campTemplate, campaign_name: campName, segment: campSegment }),
+    })
+    const data = await res.json()
+    if (!res.ok) showToast(data.error ?? 'Queue failed', 'danger')
+    else {
+      setQueueResult(data)
+      showToast(`${data.queued} messages queued`)
+    }
+    setQueuing(false)
   }
 
   const fetchQr = async () => {
@@ -221,7 +248,8 @@ export default function WhatsAppPage() {
         {([
           { key: 'session',   label: 'Session',    icon: 'bi-plug-fill'    },
           { key: 'qr',        label: 'Connect QR', icon: 'bi-qr-code'      },
-          { key: 'templates', label: 'Templates',  icon: 'bi-file-text-fill' },
+          { key: 'templates', label: 'Templates',  icon: 'bi-file-text-fill'   },
+          { key: 'campaigns', label: 'Campaigns',  icon: 'bi-megaphone-fill'   },
         ] as const).map(t => (
           <button key={t.key} onClick={() => setTab(t.key)} style={{
             background: 'none', border: 'none', padding: '8px 18px 10px', fontSize: 13,
@@ -494,6 +522,97 @@ export default function WhatsAppPage() {
           {templates.length === 0 && (
             <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--bs-secondary-color)', fontSize: 13 }}>
               No templates yet. Create one above.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Campaigns Tab ── */}
+      {tab === 'campaigns' && (
+        <div>
+          <div style={{ background: 'var(--bs-body-bg)', border: '1px solid var(--bs-border-color)', borderRadius: 12, padding: 20, marginBottom: 16 }}>
+            <h6 className="fw-bold mb-3" style={{ color: 'var(--bs-body-color)', fontSize: 14 }}>
+              <i className="bi bi-megaphone-fill me-2" style={{ color: '#364574' }} />
+              Queue Reminders
+            </h6>
+
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--bs-secondary-color)', display: 'block', marginBottom: 6 }}>Campaign Name</label>
+              <input type="text" className="form-control" value={campName}
+                onChange={e => setCampName(e.target.value)}
+                placeholder="e.g. Takhmeen Reminder May 2026"
+                style={{ borderRadius: 8, fontSize: 13 }} />
+            </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--bs-secondary-color)', display: 'block', marginBottom: 6 }}>Template</label>
+              <select className="form-select" value={campTemplate} onChange={e => setCampTemplate(e.target.value)}
+                style={{ borderRadius: 8, fontSize: 13 }}>
+                <option value="">— Select template —</option>
+                {templates.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
+              </select>
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--bs-secondary-color)', display: 'block', marginBottom: 6 }}>Segment</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {[
+                  { key: 'all',              label: 'All Active HOFs',        desc: 'All active HOFs with a WhatsApp number' },
+                  { key: 'takhmeen_pending', label: 'Pending Takhmeen',       desc: 'HOFs with pending takhmeen this fiscal year' },
+                ].map(s => (
+                  <label key={s.key} style={{
+                    display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer',
+                    padding: '10px 14px', borderRadius: 8, border: '1px solid',
+                    borderColor: campSegment === s.key ? '#364574' : 'var(--bs-border-color)',
+                    background: campSegment === s.key ? 'rgba(54,69,116,0.06)' : 'var(--bs-tertiary-bg)',
+                  }}>
+                    <input type="radio" name="segment" value={s.key} checked={campSegment === s.key}
+                      onChange={() => setCampSegment(s.key)} style={{ marginTop: 2 }} />
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--bs-body-color)' }}>{s.label}</div>
+                      <div style={{ fontSize: 12, color: 'var(--bs-secondary-color)' }}>{s.desc}</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <button onClick={queueCampaign} disabled={queuing} className="btn btn-sm"
+              style={{ background: '#25D366', color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600 }}>
+              {queuing
+                ? <><span className="spinner-border spinner-border-sm me-2" />Queuing...</>
+                : <><i className="bi bi-send-check me-1" />Queue Reminders</>}
+            </button>
+          </div>
+
+          {/* Result */}
+          {queueResult && (
+            <div style={{
+              padding: '16px 20px', borderRadius: 12, border: '1px solid #0ab39c',
+              background: 'rgba(10,179,156,0.08)',
+            }}>
+              <div style={{ fontWeight: 700, fontSize: 14, color: '#0ab39c', marginBottom: 10 }}>
+                <i className="bi bi-check-circle-fill me-2" />Campaign Queued
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+                {[
+                  { label: 'Queued',     value: queueResult.queued },
+                  { label: 'Skipped',    value: queueResult.skipped },
+                  { label: 'Recipients', value: queueResult.total_recipients },
+                ].map(({ label, value }) => (
+                  <div key={label} style={{ background: 'var(--bs-body-bg)', borderRadius: 8, padding: '8px 12px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--bs-body-color)' }}>{value ?? 0}</div>
+                    <div style={{ fontSize: 11, color: 'var(--bs-secondary-color)' }}>{label}</div>
+                  </div>
+                ))}
+              </div>
+              {queueResult.message && (
+                <div style={{ fontSize: 12, color: 'var(--bs-secondary-color)', marginTop: 10 }}>{queueResult.message}</div>
+              )}
+              <div style={{ fontSize: 12, color: 'var(--bs-secondary-color)', marginTop: 10 }}>
+                <i className="bi bi-info-circle me-1" />
+                n8n will pick up and send 200 messages/day at 10:00 AM PKT.
+              </div>
             </div>
           )}
         </div>
