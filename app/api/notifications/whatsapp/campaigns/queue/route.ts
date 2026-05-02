@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
   const auth = await requireAdminAuth()
   if (!auth.ok) return auth.response
 
-  const { template_id, campaign_name, segment } = await req.json()
+  const { template_id, campaign_name, segment, test_numbers } = await req.json()
 
   if (!template_id || !campaign_name?.trim()) {
     return NextResponse.json({ error: 'template_id and campaign_name are required' }, { status: 400 })
@@ -30,6 +30,38 @@ export async function POST(req: NextRequest) {
   }
 
   // 2. Fetch recipients based on segment
+
+  // Test mode — use provided numbers directly, no DB lookup
+  if (segment === 'test') {
+    const phones: string[] = String(test_numbers ?? '')
+      .split(',')
+      .map((p: string) => p.trim().replace(/\D/g, ''))
+      .filter((p: string) => p.length >= 10 && p.length <= 15)
+
+    if (!phones.length) {
+      return NextResponse.json({ error: 'No valid phone numbers provided' }, { status: 400 })
+    }
+
+    const rows = phones.map(phone => ({
+      campaign_name: campaign_name.trim(),
+      mumin_id:      null,
+      phone,
+      rendered_message: template.body
+        .replace(/\{\{mumin_name\}\}/g, 'Test User')
+        .replace(/\{\{sf_no\}\}/g, ''),
+      status:   'pending',
+      attempts: 0,
+    }))
+
+    const { data: inserted, error: insertError } = await supabase
+      .from('wa_broadcast_queue')
+      .insert(rows)
+      .select('id')
+
+    if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })
+    return NextResponse.json({ queued: inserted?.length ?? rows.length, skipped: 0, total_recipients: phones.length })
+  }
+
   let query = supabase
     .from('mumineen')
     .select('id, full_name, sf_no, whatsapp_no')

@@ -54,11 +54,12 @@ export default function WhatsAppPage() {
   const bodyRef                     = useRef<HTMLTextAreaElement>(null)
 
   // Campaigns
-  const [campName, setCampName]       = useState('')
+  const [campName, setCampName]         = useState('')
   const [campTemplate, setCampTemplate] = useState('')
-  const [campSegment, setCampSegment] = useState('all')
-  const [queuing, setQueuing]         = useState(false)
-  const [queueResult, setQueueResult] = useState<{ queued: number; skipped: number; total_recipients: number; message?: string } | null>(null)
+  const [campSegment, setCampSegment]   = useState('all')
+  const [testNumbers, setTestNumbers]   = useState('')
+  const [queuing, setQueuing]           = useState(false)
+  const [queueResult, setQueueResult]   = useState<{ queued: number; skipped: number; total_recipients: number; message?: string } | null>(null)
 
   // Toast
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'danger' } | null>(null)
@@ -132,21 +133,24 @@ export default function WhatsAppPage() {
   }
 
   const queueCampaign = async () => {
-    if (!campName.trim())    { showToast('Enter a campaign name', 'danger'); return }
-    if (!campTemplate)       { showToast('Select a template', 'danger'); return }
+    if (!campName.trim()) { showToast('Enter a campaign name', 'danger'); return }
+    if (!campTemplate)    { showToast('Select a template', 'danger'); return }
+    if (campSegment === 'test' && !testNumbers.trim()) { showToast('Enter at least one phone number', 'danger'); return }
     setQueuing(true)
     setQueueResult(null)
-    const res  = await fetch('/api/notifications/whatsapp/campaigns/queue', {
+    const res = await fetch('/api/notifications/whatsapp/campaigns/queue', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ template_id: campTemplate, campaign_name: campName, segment: campSegment }),
+      body: JSON.stringify({
+        template_id:   campTemplate,
+        campaign_name: campName,
+        segment:       campSegment,
+        test_numbers:  campSegment === 'test' ? testNumbers : undefined,
+      }),
     })
     const data = await res.json()
     if (!res.ok) showToast(data.error ?? 'Queue failed', 'danger')
-    else {
-      setQueueResult(data)
-      showToast(`${data.queued} messages queued`)
-    }
+    else { setQueueResult(data); showToast(`${data.queued} messages queued`) }
     setQueuing(false)
   }
 
@@ -559,6 +563,7 @@ export default function WhatsAppPage() {
                 {[
                   { key: 'all',              label: 'All Active HOFs',        desc: 'All active HOFs with a WhatsApp number' },
                   { key: 'takhmeen_pending', label: 'Pending Takhmeen',       desc: 'HOFs with pending takhmeen this fiscal year' },
+                  { key: 'test',             label: 'Test — Specific Numbers', desc: 'Send only to numbers you enter below' },
                 ].map(s => (
                   <label key={s.key} style={{
                     display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer',
@@ -576,6 +581,21 @@ export default function WhatsAppPage() {
                 ))}
               </div>
             </div>
+
+            {campSegment === 'test' && (
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--bs-secondary-color)', display: 'block', marginBottom: 6 }}>
+                  Phone Numbers
+                </label>
+                <textarea className="form-control" value={testNumbers}
+                  onChange={e => setTestNumbers(e.target.value)}
+                  rows={3} placeholder="923001234567, 923009876543"
+                  style={{ borderRadius: 8, fontSize: 13, resize: 'vertical' }} />
+                <div style={{ fontSize: 11, color: 'var(--bs-secondary-color)', marginTop: 4 }}>
+                  Comma separated. Country code required. No + or spaces.
+                </div>
+              </div>
+            )}
 
             <button onClick={queueCampaign} disabled={queuing} className="btn btn-sm"
               style={{ background: '#25D366', color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600 }}>
