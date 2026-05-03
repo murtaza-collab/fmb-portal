@@ -33,13 +33,15 @@ export async function POST(req: NextRequest) {
 
   // Test mode — use provided numbers directly, no DB lookup
   if (segment === 'test') {
-    const phones: string[] = String(test_numbers ?? '')
-      .split(',')
+    const raw = String(test_numbers ?? '').split(',')
+    const phones: string[] = raw
       .map((p: string) => p.trim().replace(/\D/g, ''))
       .filter((p: string) => p.length >= 10 && p.length <= 15)
 
     if (!phones.length) {
-      return NextResponse.json({ error: 'No valid phone numbers provided' }, { status: 400 })
+      return NextResponse.json({
+        error: `No valid phone numbers. Received: ${raw.map(p => p.trim()).join(' | ')}. Must be 10-15 digits with country code.`
+      }, { status: 400 })
     }
 
     const rows = phones.map(phone => ({
