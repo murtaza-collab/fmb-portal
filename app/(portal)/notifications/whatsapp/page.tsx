@@ -28,7 +28,7 @@ const VARIABLES = [
 ]
 
 export default function WhatsAppPage() {
-  const [tab, setTab] = useState<'session' | 'qr' | 'templates' | 'campaigns'>('session')
+  const [tab, setTab] = useState<'session' | 'qr' | 'templates' | 'campaigns' | 'logs'>('session')
 
   // Session status
   const [status, setStatus]     = useState<StatusResult | null>(null)
@@ -52,6 +52,11 @@ export default function WhatsAppPage() {
   const [savingTpl, setSavingTpl]   = useState(false)
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const bodyRef                     = useRef<HTMLTextAreaElement>(null)
+
+  // Logs
+  type CampaignLog = { campaign_name: string; total: number; sent: number; failed: number; pending: number; last_activity: string }
+  const [logs, setLogs]         = useState<CampaignLog[]>([])
+  const [logsLoading, setLogsLoading] = useState(false)
 
   // Campaigns
   const [campName, setCampName]         = useState('')
@@ -84,7 +89,16 @@ export default function WhatsAppPage() {
   useEffect(() => {
     if (tab === 'templates' || tab === 'campaigns') fetchTemplates()
     if (tab === 'campaigns') setQueueResult(null)
+    if (tab === 'logs') fetchLogs()
   }, [tab])
+
+  const fetchLogs = async () => {
+    setLogsLoading(true)
+    const res  = await fetch('/api/notifications/whatsapp/logs')
+    const data = await res.json()
+    if (data.campaigns) setLogs(data.campaigns)
+    setLogsLoading(false)
+  }
 
   const fetchTemplates = async () => {
     const res = await fetch('/api/notifications/whatsapp/templates')
@@ -254,6 +268,7 @@ export default function WhatsAppPage() {
           { key: 'qr',        label: 'Connect QR', icon: 'bi-qr-code'      },
           { key: 'templates', label: 'Templates',  icon: 'bi-file-text-fill'   },
           { key: 'campaigns', label: 'Campaigns',  icon: 'bi-megaphone-fill'   },
+          { key: 'logs',      label: 'Logs',       icon: 'bi-clock-history'    },
         ] as const).map(t => (
           <button key={t.key} onClick={() => setTab(t.key)} style={{
             background: 'none', border: 'none', padding: '8px 18px 10px', fontSize: 13,
@@ -633,6 +648,68 @@ export default function WhatsAppPage() {
                 <i className="bi bi-info-circle me-1" />
                 n8n will pick up and send 200 messages/day at 10:00 AM PKT.
               </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Logs Tab ── */}
+      {tab === 'logs' && (
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <h6 className="fw-bold mb-0" style={{ color: 'var(--bs-body-color)', fontSize: 14 }}>Campaign Logs</h6>
+            <button onClick={fetchLogs} disabled={logsLoading} className="btn btn-sm btn-outline-secondary"
+              style={{ borderRadius: 8, fontSize: 12 }}>
+              <i className="bi bi-arrow-clockwise me-1" />Refresh
+            </button>
+          </div>
+
+          {logsLoading && (
+            <div className="text-center py-5">
+              <div className="spinner-border" style={{ color: '#364574', width: '1.5rem', height: '1.5rem' }} />
+            </div>
+          )}
+
+          {!logsLoading && logs.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--bs-secondary-color)', fontSize: 13 }}>
+              No campaigns sent yet.
+            </div>
+          )}
+
+          {!logsLoading && logs.length > 0 && (
+            <div style={{ background: 'var(--bs-body-bg)', border: '1px solid var(--bs-border-color)', borderRadius: 12, overflow: 'hidden' }}>
+              {logs.map((log, i) => (
+                <div key={log.campaign_name} style={{
+                  padding: '14px 20px',
+                  borderBottom: i < logs.length - 1 ? '1px solid var(--bs-border-color)' : 'none',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--bs-body-color)' }}>{log.campaign_name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--bs-secondary-color)' }}>
+                      {new Date(log.last_activity).toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+                    {[
+                      { label: 'Total',   value: log.total,   color: '#364574' },
+                      { label: 'Sent',    value: log.sent,    color: '#0ab39c' },
+                      { label: 'Pending', value: log.pending, color: '#f7b84b' },
+                      { label: 'Failed',  value: log.failed,  color: '#f06548' },
+                    ].map(({ label, value, color }) => (
+                      <div key={label} style={{ background: 'var(--bs-tertiary-bg)', borderRadius: 8, padding: '8px', textAlign: 'center' }}>
+                        <div style={{ fontSize: 18, fontWeight: 700, color }}>{value}</div>
+                        <div style={{ fontSize: 11, color: 'var(--bs-secondary-color)' }}>{label}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Progress bar */}
+                  {log.total > 0 && (
+                    <div style={{ marginTop: 10, height: 4, background: 'var(--bs-tertiary-bg)', borderRadius: 4, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${(log.sent / log.total) * 100}%`, background: '#0ab39c', borderRadius: 4, transition: 'width 0.3s' }} />
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           )}
         </div>
