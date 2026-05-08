@@ -146,6 +146,7 @@ export default function MumineenPage() {
   const [niyyatFilter, setNiyyatFilter]   = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
   const [page, setPage]                   = useState(1)
+  const searchDebounce                    = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const [importing, setImporting]         = useState(false)
   const [importMsg, setImportMsg]         = useState('')
@@ -167,9 +168,27 @@ export default function MumineenPage() {
   const mf = (k: string, v: any) => setMemberForm(p => ({ ...p, [k]: v }))
 
   useEffect(() => { fetchAll() }, [])
-  useEffect(() => { setPage(1) }, [search, sectorFilter, niyyatFilter, categoryFilter, tab, hofSubTab, memberSubTab])
+
+  useEffect(() => {
+    setPage(1)
+    if (searchDebounce.current) clearTimeout(searchDebounce.current)
+    searchDebounce.current = setTimeout(() => fetchMumineen(search), 300)
+  }, [search, sectorFilter, niyyatFilter, categoryFilter, tab, hofSubTab, memberSubTab])
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
+
+  const MUMIN_COLS = 'id,sf_no,its_no,full_name,phone_no,whatsapp_no,email,dob,full_address,status,is_hof,hof_id,address_sector_id,address_block_id,address_type_id,address_category,address_number,address_floor,niyyat_status_id,mumin_category_id,remarks,total_adult,total_child,total_infant'
+
+  const fetchMumineen = async (q: string) => {
+    setLoading(true)
+    let query = supabase.from('mumineen').select(MUMIN_COLS).order('full_name')
+    if (q.trim()) {
+      query = query.or(`full_name.ilike.%${q.trim()}%,sf_no.ilike.%${q.trim()}%,its_no.ilike.%${q.trim()}%`)
+    }
+    const { data } = await query
+    setMumineen((data as any[]) || [])
+    setLoading(false)
+  }
 
   const fetchAll = async () => {
     setLoading(true)
@@ -180,7 +199,7 @@ export default function MumineenPage() {
       setIsAdmin(gn === 'super admin' || gn === 'admin' || gn === 'super_admin')
     }
     const [mRes, sRes, bRes, tRes, nRes, cRes] = await Promise.all([
-      supabase.from('mumineen').select('id,sf_no,its_no,full_name,phone_no,whatsapp_no,email,dob,full_address,status,is_hof,hof_id,address_sector_id,address_block_id,address_type_id,address_category,address_number,address_floor,niyyat_status_id,mumin_category_id,remarks,total_adult,total_child,total_infant').order('full_name'),
+      supabase.from('mumineen').select(MUMIN_COLS).order('full_name'),
       supabase.from('house_sectors').select('id,name').order('name'),
       supabase.from('house_blocks').select('id,name').order('name'),
       supabase.from('house_types').select('id,name').order('name'),

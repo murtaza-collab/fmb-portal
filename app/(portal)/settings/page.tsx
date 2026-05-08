@@ -366,6 +366,22 @@ export default function SettingsPage() {
     setGeneratingPDF(false)
   }
 
+  const seedBlocks = async () => {
+    setSaving(true)
+    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
+    const numbers = Array.from({ length: 20 }, (_, i) => String(i + 1))
+    const all = [...letters, ...numbers]
+    const existing = new Set(rows.map(r => r.name.toUpperCase()))
+    const toInsert = all.filter(v => !existing.has(v)).map(name => ({ name }))
+    if (toInsert.length > 0) {
+      const { error } = await supabase.from('house_blocks').insert(toInsert)
+      if (error) { showMsg(error.message, true); setSaving(false); return }
+    }
+    showMsg(`Seeded ${toInsert.length} blocks (${all.length - toInsert.length} already existed)`)
+    loadTab('blocks')
+    setSaving(false)
+  }
+
   const hasColour = activeTab === 'mumin_categories'
   const groups = [...new Set(TABS.map((t) => t.group))]
   const showAddButton = !['fiscal', 'kitchen', 'stickers'].includes(activeTab)
@@ -427,10 +443,18 @@ export default function SettingsPage() {
                   <h6 className="mb-0 fw-bold" style={{ color: 'var(--bs-body-color)' }}>{currentTab?.label}</h6>
                 </div>
                 {showAddButton && (
-                  <button onClick={() => (activeTab === 'thaali_numbers' ? setShowThaaliModal(true) : openAdd())}
-                    className="btn btn-sm" style={{ background: '#364574', color: '#fff', borderRadius: '8px', fontSize: '13px', fontWeight: 600 }}>
-                    <i className="bi bi-plus me-1" />Add New
-                  </button>
+                  <div className="d-flex gap-2">
+                    {activeTab === 'blocks' && (
+                      <button onClick={seedBlocks} disabled={saving} className="btn btn-sm btn-outline-success"
+                        style={{ borderRadius: '8px', fontSize: '13px', fontWeight: 600 }}>
+                        {saving ? <span className="spinner-border spinner-border-sm" /> : <><i className="bi bi-grid-3x3 me-1" />Seed A–Z & 1–20</>}
+                      </button>
+                    )}
+                    <button onClick={() => (activeTab === 'thaali_numbers' ? setShowThaaliModal(true) : openAdd())}
+                      className="btn btn-sm" style={{ background: '#364574', color: '#fff', borderRadius: '8px', fontSize: '13px', fontWeight: 600 }}>
+                      <i className="bi bi-plus me-1" />Add New
+                    </button>
+                  </div>
                 )}
               </div>
 

@@ -40,7 +40,7 @@ interface Takhmeen {
   id: number; mumin_id: number; fiscal_year_id: number
   niyyat_amount: number | null; approved_amount: number | null; approved_at: string | null
   remarks: string | null; status: string
-  fiscal_years?: { gregorian_year: number; hijri_year: string }
+  fiscal_years?: { gregorian_year: string; hijri_year: string }
   mumineen?: Mumin
 }
 
@@ -49,7 +49,7 @@ interface NiyyatLog {
   remarks: string | null; action: string; created_at: string
 }
 
-interface FiscalYear { id: number; gregorian_year: number; hijri_year: string; is_active: boolean }
+interface FiscalYear { id: number; gregorian_year: string; hijri_year: string; is_active: boolean }
 interface LookupItem { id: number; name: string }
 
 const PAGE_SIZE = 50
@@ -95,7 +95,7 @@ const cardStyle                         = { border: 'none', boxShadow: '0 1px 4p
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function TakhmeenPage() {
-  const [activeTab, setActiveTab]           = useState<'verification' | 'niyyat' | 'approval'>('verification')
+  const [activeTab, setActiveTab]           = useState<'verification' | 'niyyat' | 'approval' | 'import'>('verification')
   const [approvalSubTab, setApprovalSubTab] = useState<'pending' | 'approved'>('pending')
   const [approvedDateFilter, setApprovedDateFilter] = useState('')
 
@@ -136,6 +136,14 @@ export default function TakhmeenPage() {
   const [currentTakhmeem, setCurrentTakhmeem] = useState<Takhmeen | null>(null)
   const [niyyatForm, setNiyyatForm]         = useState({ niyyat_amount:'', remarks:'' })
   const [niyyatError, setNiyyatError]       = useState('')
+
+  // Import tab
+  const [importRaw, setImportRaw]           = useState('')
+  const [importRows, setImportRows]         = useState<{ sf_no: string; amounts: Record<string, number> }[]>([])
+  const [importYears, setImportYears]       = useState<string[]>([])
+  const [importParseError, setImportParseError] = useState('')
+  const [importing, setImporting]           = useState(false)
+  const [importReport, setImportReport]     = useState<{ total:number; inserted:number; updated:number; skipped:number; failed:{sf_no:string;reason:string}[] } | null>(null)
 
   // Approval tab
   const [approvalList, setApprovalList]     = useState<Takhmeen[]>([])
@@ -510,6 +518,7 @@ export default function TakhmeenPage() {
           { key:'verification', label:'1. Verification' },
           { key:'niyyat',       label:'2. Niyyat' },
           { key:'approval',     label:'3. Approval' },
+          { key:'import',       label:'Import Historical' },
         ].map(t => (
           <li key={t.key} className="nav-item">
             <button className={`nav-link ${activeTab===t.key?'active':''}`}
@@ -683,6 +692,197 @@ export default function TakhmeenPage() {
           </div>
         </>
       )}
+
+      {/* ── IMPORT TAB ── */}
+      {activeTab === 'import' && (() => {
+        const parseCSV = (raw: string) => {
+          setImportParseError(''); setImportReport(null)
+          const lines = raw.trim().split('\n').map(l => l.trim()).filter(Boolean)
+          if (lines.length < 2) { setImportParseError('Need at least a header row and one data row.'); setImportRows([]); return }
+
+          // Detect delimiter
+          const delim = lines[0].includes('\t') ? '\t' : ','
+          const headers = lines[0].split(delim).map(h => h.trim().replace(/^"|"$/g, ''))
+          const sfIdx = headers.findIndex(h => /sf.?no/i.test(h) || h.toLowerCase() === 'sf')
+          if (sfIdx === -1) { setImportParseError('No SF# column found. Header must contain "SF No" or "SF#".'); setImportRows([]); return }
+
+          // Year columns — any column whose value matches hijri year pattern (e.g. 1444, 1444H, 1444h)
+          const yearCols: { idx: number; year: string }[] = []
+          headers.forEach((h, i) => {
+            if (i === sfIdx) return
+            const m = h.replace(/[Hh]$/, '').trim()
+            if (/^\d{4}$/.test(m)) yearCols.push({ idx: i, year: m })
+          })
+          if (yearCols.length === 0) { setImportParseError('No Hijri year columns found. Columns should be named like "1444", "1445H", etc.'); setImportRows([]); return }
+
+          const rows: { sf_no: string; amounts: Record<string, number> }[] = []
+          for (let r = 1; r < lines.length; r++) {
+            const cols = lines[r].split(delim).map(c => c.trim().replace(/^"|"$/g, ''))
+            const sfNo = cols[sfIdx]?.trim()
+            if (!sfNo) continue
+            const amounts: Record<string, number> = {}
+            for (const yc of yearCols) {
+              const raw = cols[yc.idx] || '0'
+              amounts[yc.year] = Number(raw.replace(/,/g, '')) || 0
+            }
+            rows.push({ sf_no: sfNo, amounts })
+          }
+          setImportYears(yearCols.map(y => y.year))
+          setImportRows(rows)
+        }
+
+        const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+          const file = e.target.files?.[0]
+          if (!file) return
+          const reader = new FileReader()
+          reader.onload = ev => {
+            const text = ev.target?.result as string
+            setImportRaw(text)
+            parseCSV(text)
+          }
+          reader.readAsText(file)
+        }
+
+        const handleImport = async () => {
+          if (!importRows.length) return
+          setImporting(true); setImportReport(null)
+          try {
+            const res = await fetch('/api/takhmeen/import', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ rows: importRows }),
+            })
+            const json = await res.json()
+            if (json.report) setImportReport(json.report)
+            else setImportParseError(json.error || 'Unknown error')
+          } catch (e: any) {
+            setImportParseError(e.message)
+          } finally { setImporting(false) }
+        }
+
+        return (
+          <div className="card" style={{ ...cardStyle, borderRadius:'0 0 10px 10px' }}>
+            <div className="card-body">
+              <p className="mb-1 fw-semibold" style={{ fontSize:13, color:'var(--bs-body-color)' }}>Import Historical Takhmeen Data</p>
+              <p className="mb-3" style={{ fontSize:12, color:'var(--bs-secondary-color)' }}>
+                Upload a CSV or TSV with columns: <strong>SF No</strong>, then one column per Hijri year (e.g. <code>1444</code>, <code>1445H</code>).
+                Amount 0 or empty = skip. Existing records will be updated.
+              </p>
+
+              {/* Upload */}
+              <div className="mb-3">
+                <label className="form-label" style={{ fontSize:13, fontWeight:600 }}>Upload CSV / TSV</label>
+                <input type="file" className="form-control form-control-sm" accept=".csv,.tsv,.txt"
+                  onChange={handleFileUpload} />
+              </div>
+
+              <div className="mb-2 d-flex align-items-center gap-2">
+                <span style={{ fontSize:12, color:'var(--bs-secondary-color)' }}>or paste data below</span>
+              </div>
+
+              <textarea className="form-control form-control-sm mb-3" rows={6}
+                placeholder={'SF No,1444,1445,1446,1447\n10001,50000,55000,60000,0\n10002,30000,0,35000,40000'}
+                value={importRaw}
+                onChange={e => { setImportRaw(e.target.value); parseCSV(e.target.value) }}
+                style={{ fontFamily:'monospace', fontSize:12 }} />
+
+              {importParseError && (
+                <div className="alert alert-danger py-2 mb-3" style={{ fontSize:12 }}>{importParseError}</div>
+              )}
+
+              {/* Preview */}
+              {importRows.length > 0 && !importParseError && (
+                <>
+                  <div className="d-flex justify-content-between align-items-center mb-2">
+                    <span style={{ fontSize:13, fontWeight:600, color:'var(--bs-body-color)' }}>
+                      Preview — {importRows.length} rows · {importYears.length} year columns ({importYears.join(', ')})
+                    </span>
+                    <button className="btn btn-sm btn-primary" onClick={handleImport} disabled={importing}>
+                      {importing ? <><span className="spinner-border spinner-border-sm me-1" />Importing...</> : `Import ${importRows.length} Rows`}
+                    </button>
+                  </div>
+                  <div className="table-responsive" style={{ maxHeight:320, overflowY:'auto' }}>
+                    <table className="table table-sm table-hover mb-0" style={{ fontSize:12 }}>
+                      <thead style={{ background:'var(--bs-tertiary-bg)', position:'sticky', top:0 }}>
+                        <tr>
+                          <th style={th}>#</th>
+                          <th style={th}>SF#</th>
+                          {importYears.map(y => <th key={y} style={th}>{y}H</th>)}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {importRows.slice(0, 100).map((row, i) => (
+                          <tr key={i}>
+                            <td style={{ color:'var(--bs-secondary-color)' }}>{i+1}</td>
+                            <td style={{ fontWeight:600, color:'#364574' }}>{row.sf_no}</td>
+                            {importYears.map(y => (
+                              <td key={y} style={{ color: row.amounts[y] ? 'var(--bs-body-color)' : 'var(--bs-secondary-color)' }}>
+                                {row.amounts[y] ? `Rs. ${Number(row.amounts[y]).toLocaleString()}` : '—'}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                        {importRows.length > 100 && (
+                          <tr><td colSpan={2+importYears.length} className="text-center" style={{ color:'var(--bs-secondary-color)', fontSize:11 }}>
+                            ... and {importRows.length - 100} more rows
+                          </td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+
+              {/* Import Report */}
+              {importReport && (
+                <div className="mt-4">
+                  <p style={sectionLabel}>Import Report</p>
+                  <div className="row g-2 mb-3">
+                    {[
+                      { label:'Total Rows',  value: importReport.total,   color:'var(--bs-body-color)' },
+                      { label:'Inserted',    value: importReport.inserted, color:'#0ab39c' },
+                      { label:'Updated',     value: importReport.updated,  color:'#0d6efd' },
+                      { label:'Skipped (0)', value: importReport.skipped,  color:'#6c757d' },
+                      { label:'Failed',      value: importReport.failed.length, color: importReport.failed.length ? '#f06548' : '#6c757d' },
+                    ].map((s, i) => (
+                      <div key={i} className="col">
+                        <div className="p-2 rounded text-center" style={{ background:'var(--bs-secondary-bg)', border:'1px solid var(--bs-border-color)' }}>
+                          <div style={{ fontSize:11, color:'var(--bs-secondary-color)', marginBottom:2 }}>{s.label}</div>
+                          <div style={{ fontSize:22, fontWeight:700, color:s.color }}>{s.value}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {importReport.failed.length > 0 && (
+                    <>
+                      <p style={{ ...sectionLabel, color:'#f06548' }}>Failed Rows</p>
+                      <div className="table-responsive" style={{ maxHeight:200, overflowY:'auto' }}>
+                        <table className="table table-sm mb-0" style={{ fontSize:12 }}>
+                          <thead style={{ background:'var(--bs-tertiary-bg)' }}>
+                            <tr>
+                              <th style={th}>SF#</th>
+                              <th style={th}>Reason</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {importReport.failed.map((f, i) => (
+                              <tr key={i}>
+                                <td style={{ color:'#f06548', fontWeight:600 }}>{f.sf_no}</td>
+                                <td style={{ color:'var(--bs-secondary-color)' }}>{f.reason}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ── VERIFY MODAL ── */}
       {showVerifyModal && verifyingMumin && (
