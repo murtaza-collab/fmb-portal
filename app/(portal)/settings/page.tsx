@@ -1,7 +1,8 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { getFMBFiscalYear, gregorianToHijri } from '@/lib/hijri'
+import * as XLSX from 'xlsx'
 
 interface LookupRow { id: number; name: string; colour?: string; description?: string }
 interface ComputedFY { hijriYear: number; label: string; gregorianLabel: string; startGregorian: Date; endGregorian: Date; isCurrentFY: boolean }
@@ -67,6 +68,14 @@ export default function SettingsPage() {
   const [stickerSearch, setStickerSearch]               = useState('')
   const [generatingPDF, setGeneratingPDF]               = useState(false)
   const [previewUrl, setPreviewUrl]                     = useState<string | null>(null)
+
+  // Sector Excel import
+  const sectorFileRef                                   = useRef<HTMLInputElement>(null)
+  const [showSectorImport, setShowSectorImport]         = useState(false)
+  const [sectorImportRows, setSectorImportRows]         = useState<string[]>([])
+  const [sectorImportError, setSectorImportError]       = useState('')
+  const [sectorImporting, setSectorImporting]           = useState(false)
+  const [sectorImportDone, setSectorImportDone]         = useState<{ inserted: number; skipped: number } | null>(null)
 
   useEffect(() => { loadTab(activeTab) }, [activeTab])
 
@@ -366,6 +375,46 @@ export default function SettingsPage() {
     setGeneratingPDF(false)
   }
 
+  const handleSectorFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setSectorImportError(''); setSectorImportDone(null)
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      try {
+        const data = new Uint8Array(ev.target?.result as ArrayBuffer)
+        const wb = XLSX.read(data, { type: 'array' })
+        const ws = wb.Sheets[wb.SheetNames[0]]
+        const rows: string[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
+        const values: string[] = []
+        for (const row of rows) {
+          for (const cell of row) {
+            const val = String(cell).trim()
+            if (val && !/^(sector|name|sector.?name)$/i.test(val)) values.push(val)
+          }
+        }
+        if (values.length === 0) { setSectorImportError('No sector names found in the file.'); setSectorImportRows([]); return }
+        setSectorImportRows([...new Set(values)])
+      } catch { setSectorImportError('Could not read file. Use .xlsx, .xls, or .csv.'); setSectorImportRows([]) }
+    }
+    reader.readAsArrayBuffer(file)
+    e.target.value = ''
+  }
+
+  const handleSectorImport = async () => {
+    if (!sectorImportRows.length) return
+    setSectorImporting(true)
+    const existing = new Set(sectors.map(s => s.name.toLowerCase()))
+    const toInsert = sectorImportRows.filter(r => !existing.has(r.toLowerCase()))
+    if (toInsert.length > 0) {
+      await supabase.from('house_sectors').insert(toInsert.map(name => ({ name, status: 'active' })))
+    }
+    await loadTab('sectors')
+    setSectorImportDone({ inserted: toInsert.length, skipped: sectorImportRows.length - toInsert.length })
+    setSectorImporting(false)
+    setSectorImportRows([])
+  }
+
   const seedBlocks = async () => {
     setSaving(true)
     const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
@@ -444,6 +493,12 @@ export default function SettingsPage() {
                 </div>
                 {showAddButton && (
                   <div className="d-flex gap-2">
+                    {activeTab === 'sectors' && (
+                      <button onClick={() => { setSectorImportRows([]); setSectorImportError(''); setSectorImportDone(null); setShowSectorImport(true) }}
+                        className="btn btn-sm btn-outline-success" style={{ borderRadius: '8px', fontSize: '13px', fontWeight: 600 }}>
+                        <i className="bi bi-file-earmark-excel me-1" />Import Excel
+                      </button>
+                    )}
                     {activeTab === 'blocks' && (
                       <button onClick={seedBlocks} disabled={saving} className="btn btn-sm btn-outline-success"
                         style={{ borderRadius: '8px', fontSize: '13px', fontWeight: 600 }}>
@@ -858,6 +913,95 @@ export default function SettingsPage() {
               <button onClick={saveThaaliNumber} disabled={saving} className="btn btn-sm" style={{ background: '#364574', color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600 }}>
                 {saving ? <span className="spinner-border spinner-border-sm" /> : 'Add Numbers'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sector Import Modal */}
+      <input ref={sectorFileRef} type="file" accept=".xlsx,.xls,.csv" className="d-none" onChange={handleSectorFileChange} />
+      {showSectorImport && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '60px 16px' }}
+          onClick={() => { if (!sectorImporting) setShowSectorImport(false) }}>
+          <div style={{ background: 'var(--bs-body-bg)', borderRadius: '12px', width: '100%', maxWidth: '580px', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }}
+            onClick={(e) => e.stopPropagation()}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--bs-border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h6 className="mb-0 fw-bold" style={{ color: 'var(--bs-body-color)' }}>
+                <i className="bi bi-file-earmark-excel me-2 text-success" />Import Sectors from Excel
+              </h6>
+              <button onClick={() => setShowSectorImport(false)} disabled={sectorImporting}
+                style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: 'var(--bs-secondary-color)' }}>×</button>
+            </div>
+            <div style={{ padding: '20px' }}>
+              <div className="alert alert-info py-2 mb-3" style={{ fontSize: '13px' }}>
+                <strong>Format:</strong> One sector name per row (or column). Header row is skipped automatically. Supports <strong>.xlsx</strong>, <strong>.xls</strong>, <strong>.csv</strong>.
+              </div>
+              {!sectorImportDone && (
+                <div className="mb-3">
+                  <button className="btn btn-outline-secondary btn-sm" onClick={() => sectorFileRef.current?.click()}>
+                    <i className="bi bi-upload me-1" />Choose File
+                  </button>
+                  {sectorImportRows.length > 0 && (
+                    <span className="ms-3 text-muted" style={{ fontSize: '13px' }}>{sectorImportRows.length} sectors parsed</span>
+                  )}
+                </div>
+              )}
+              {sectorImportError && <div className="alert alert-danger py-2" style={{ fontSize: '13px' }}>{sectorImportError}</div>}
+              {sectorImportDone && (
+                <div className="alert alert-success py-2" style={{ fontSize: '13px' }}>
+                  <i className="bi bi-check-circle me-1" />
+                  <strong>{sectorImportDone.inserted}</strong> sectors imported.
+                  {sectorImportDone.skipped > 0 && <span className="ms-2 text-muted">({sectorImportDone.skipped} already existed — skipped)</span>}
+                </div>
+              )}
+              {sectorImportRows.length > 0 && !sectorImportDone && (
+                <>
+                  <p className="mb-2" style={{ fontSize: '13px', color: 'var(--bs-secondary-color)' }}>
+                    Preview ({sectorImportRows.length} rows) — duplicates will be skipped:
+                  </p>
+                  <div style={{ maxHeight: '300px', overflowY: 'auto', border: '1px solid var(--bs-border-color)', borderRadius: '6px' }}>
+                    <table className="table table-sm mb-0">
+                      <thead style={{ background: 'var(--bs-tertiary-bg)', position: 'sticky', top: 0 }}>
+                        <tr>
+                          <th style={{ fontSize: '12px', color: 'var(--bs-secondary-color)', width: 40 }}>#</th>
+                          <th style={{ fontSize: '12px', color: 'var(--bs-secondary-color)' }}>Sector Name</th>
+                          <th style={{ fontSize: '12px', color: 'var(--bs-secondary-color)', width: 80 }}>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sectorImportRows.map((row, i) => {
+                          const exists = sectors.some(s => s.name.toLowerCase() === row.toLowerCase())
+                          return (
+                            <tr key={i} style={exists ? { opacity: 0.45 } : {}}>
+                              <td style={{ fontSize: '13px', color: 'var(--bs-secondary-color)' }}>{i + 1}</td>
+                              <td style={{ fontSize: '13px' }}>{row}</td>
+                              <td>
+                                {exists
+                                  ? <span className="badge bg-secondary" style={{ fontSize: '11px' }}>Skip</span>
+                                  : <span className="badge bg-success" style={{ fontSize: '11px' }}>New</span>}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </div>
+            <div style={{ padding: '12px 20px', borderTop: '1px solid var(--bs-border-color)', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setShowSectorImport(false)} disabled={sectorImporting}
+                className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 8, fontSize: 13 }}>
+                {sectorImportDone ? 'Close' : 'Cancel'}
+              </button>
+              {!sectorImportDone && (
+                <button onClick={handleSectorImport} disabled={sectorImporting || sectorImportRows.length === 0}
+                  className="btn btn-sm btn-success" style={{ borderRadius: 8, fontSize: 13, fontWeight: 600 }}>
+                  {sectorImporting
+                    ? <><span className="spinner-border spinner-border-sm me-1" />Importing...</>
+                    : <>Import {sectorImportRows.length > 0 ? `${sectorImportRows.length} Sectors` : ''}</>}
+                </button>
+              )}
             </div>
           </div>
         </div>
