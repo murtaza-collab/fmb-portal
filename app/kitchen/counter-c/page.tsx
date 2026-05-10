@@ -309,7 +309,7 @@ export default function CounterC() {
                       {thaalis.map((t, i) => (
                         <tr key={t.thaali_id}>
                           <td className="ps-3" style={{ color: 'var(--bs-secondary-color)', fontSize: 13 }}>{i + 1}</td>
-                          <td className="fw-bold" style={{ color: '#364574', fontSize: 15 }}>#{t.thaali_number}</td>
+                          <td className="fw-bold" style={{ color: '#40798c', fontSize: 15 }}>#{t.thaali_number}</td>
                           <td style={{ color: 'var(--bs-body-color)' }}>{t.mumin_name}</td>
                           <td style={{ color: 'var(--bs-secondary-color)' }}>{t.sf_no}</td>
                         </tr>

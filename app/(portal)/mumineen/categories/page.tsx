@@ -110,7 +110,7 @@ export default function MuminCategoriesPage() {
                     </td>
                     <td>
                       <div className="d-flex gap-1 justify-content-end">
-                        <button className="btn btn-sm" title="Edit" style={{ padding: '2px 7px', color: '#364574' }} onClick={() => openEdit(c)}>
+                        <button className="btn btn-sm" title="Edit" style={{ padding: '2px 7px', color: '#40798c' }} onClick={() => openEdit(c)}>
                           <i className="bi bi-pencil" />
                         </button>
                         <button className="btn btn-sm" title={c.status === 'active' ? 'Deactivate' : 'Activate'} style={{ padding: '2px 7px', color: c.status === 'active' ? '#f06548' : '#0ab39c' }} onClick={() => toggleStatus(c)}>

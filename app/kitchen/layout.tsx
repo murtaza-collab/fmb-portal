@@ -130,7 +130,7 @@ export default function KitchenLayout({ children }: { children: React.ReactNode 
               width: 32,
               height: 32,
               borderRadius: 8,
-              background: '#364574',
+              background: '#40798c',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -229,7 +229,7 @@ export default function KitchenLayout({ children }: { children: React.ReactNode 
                     textAlign: 'left',
                   }}
                 >
-                  <span style={{ color: '#ffbf69', fontSize: 15 }}>{themeIcon(t)}</span>
+                  <span style={{ color: '#ffd97d', fontSize: 15 }}>{themeIcon(t)}</span>
                   <span style={{ flex: 1 }}>{themeLabel(t)}</span>
                   {theme === t && (
                     <i className="bi bi-check2" style={{ color: '#0ab39c', fontWeight: 700 }}></i>

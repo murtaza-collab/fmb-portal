@@ -127,18 +127,18 @@ export default function KitchenScanPage() {
               {distributors.map(d => (
                 <button key={d.id} onClick={() => setSelectedId(d.id)} style={{
                   padding: '14px 20px', borderRadius: 14, textAlign: 'left', cursor: 'pointer',
-                  border: selectedId === d.id ? '2px solid #ffbf69' : '2px solid #1e293b',
+                  border: selectedId === d.id ? '2px solid #ffd97d' : '2px solid #1e293b',
                   background: selectedId === d.id ? '#1e293b' : '#0f172a',
-                  color: selectedId === d.id ? '#ffbf69' : '#94a3b8',
+                  color: selectedId === d.id ? '#ffd97d' : '#94a3b8',
                   fontWeight: selectedId === d.id ? 700 : 400,
                   fontSize: 16, transition: 'all 0.15s',
                   display: 'flex', alignItems: 'center', gap: 14,
                 }}>
                   <div style={{
                     width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
-                    background: selectedId === d.id ? '#ffbf6920' : '#1e293b',
+                    background: selectedId === d.id ? '#ffd97d20' : '#1e293b',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 18, color: selectedId === d.id ? '#ffbf69' : '#475569',
+                    fontSize: 18, color: selectedId === d.id ? '#ffd97d' : '#475569',
                   }}>
                     {selectedId === d.id ? '✓' : '○'}
                   </div>
@@ -153,7 +153,7 @@ export default function KitchenScanPage() {
             <div style={{ width: '100%', maxWidth: 340, marginBottom: 24 }}>
               <button onClick={() => { setAutoDemo(true); setAutoDemoIdx(0); }} style={{
                 width: '100%', padding: 14, borderRadius: 14, border: '1px solid #334155',
-                background: '#1e293b', color: '#ffbf69', fontSize: 14, fontWeight: 700,
+                background: '#1e293b', color: '#ffd97d', fontSize: 14, fontWeight: 700,
                 cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               }}>
                 ▶ Auto Demo — check in all ({distributors.length}) with 8s gap
@@ -163,7 +163,7 @@ export default function KitchenScanPage() {
 
           {autoDemo && (
             <div style={{ width: '100%', maxWidth: 340, marginBottom: 24, textAlign: 'center' }}>
-              <div style={{ color: '#ffbf69', fontWeight: 700, fontSize: 15, marginBottom: 6 }}>
+              <div style={{ color: '#ffd97d', fontWeight: 700, fontSize: 15, marginBottom: 6 }}>
                 Auto Demo — {autoDemoIdx + 1} of {distributors.length + autoDemoIdx}
               </div>
               <div style={{ color: '#64748b', fontSize: 13 }}>
@@ -180,8 +180,8 @@ export default function KitchenScanPage() {
           <div style={{ position: 'relative' }}>
             {(tapping || autoDemo) && (
               <>
-                <div style={{ position: 'absolute', inset: -20, borderRadius: '50%', border: '2px solid #ffbf69', opacity: 0, animation: 'ripple 1s ease-out forwards' }} />
-                <div style={{ position: 'absolute', inset: -40, borderRadius: '50%', border: '2px solid #ffbf69', opacity: 0, animation: 'ripple 1s ease-out 0.2s forwards' }} />
+                <div style={{ position: 'absolute', inset: -20, borderRadius: '50%', border: '2px solid #ffd97d', opacity: 0, animation: 'ripple 1s ease-out forwards' }} />
+                <div style={{ position: 'absolute', inset: -40, borderRadius: '50%', border: '2px solid #ffd97d', opacity: 0, animation: 'ripple 1s ease-out 0.2s forwards' }} />
               </>
             )}
             <button
@@ -189,11 +189,11 @@ export default function KitchenScanPage() {
               disabled={!selectedId || tapping || autoDemo}
               style={{
                 width: 180, height: 180, borderRadius: '50%', border: 'none', cursor: 'pointer',
-                background: tapping ? 'radial-gradient(circle, #ffbf69, #f97316)' :
+                background: tapping ? 'radial-gradient(circle, #ffd97d, #f97316)' :
                   result === 'success' ? 'radial-gradient(circle, #22c55e, #16a34a)' :
                   result === 'error'   ? 'radial-gradient(circle, #ef4444, #dc2626)' :
-                  'radial-gradient(circle, #364574, #1e3a5f)',
-                boxShadow: tapping ? '0 0 60px #ffbf6980' : result === 'success' ? '0 0 60px #22c55e80' : '0 0 40px #36457440',
+                  'radial-gradient(circle, #40798c, #1e3a5f)',
+                boxShadow: tapping ? '0 0 60px #ffd97d80' : result === 'success' ? '0 0 60px #22c55e80' : '0 0 40px #40798c40',
                 transform: tapping ? 'scale(0.94)' : 'scale(1)',
                 transition: 'all 0.15s',
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8,

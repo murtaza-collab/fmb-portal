@@ -158,7 +158,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
               style={{ width: '100%', maxWidth: '180px', height: 'auto', display: 'block', margin: '0 auto 8px', filter: 'brightness(0) invert(1)' }}
             />
             <div style={{ color: '#fff', fontSize: '11px', fontWeight: 700, lineHeight: 1.4 }}>Faiz ul Mawaid il Burhaniyah</div>
-            <div style={{ color: '#ffbf69', fontSize: '10px', fontWeight: 500, marginTop: 2 }}></div>
+            <div style={{ color: '#ffd97d', fontSize: '10px', fontWeight: 500, marginTop: 2 }}></div>
           </div>
           <button
             onClick={() => setSidebarOpen(false)}
@@ -191,8 +191,8 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                     display: 'flex', alignItems: 'center', gap: '10px',
                     padding: '11px 16px', cursor: 'pointer',
                     background: isGroupActive ? 'rgba(255,191,105,0.15)' : 'transparent',
-                    borderLeft: isGroupActive ? '3px solid #ffbf69' : '3px solid transparent',
-                    color: isGroupActive ? '#ffbf69' : 'rgba(255,255,255,0.65)',
+                    borderLeft: isGroupActive ? '3px solid #ffd97d' : '3px solid transparent',
+                    color: isGroupActive ? '#ffd97d' : 'rgba(255,255,255,0.65)',
                     fontSize: '14px', transition: 'all 0.2s',
                   }}
                   onMouseEnter={e => { if (!isGroupActive) e.currentTarget.style.background = 'rgba(255,255,255,0.07)' }}
@@ -217,7 +217,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                         padding: '9px 16px 9px 40px', cursor: 'pointer',
                         background: isChildActive ? 'rgba(255,191,105,0.1)' : 'transparent',
                         borderLeft: isChildActive ? '3px solid rgba(255,191,105,0.6)' : '3px solid transparent',
-                        color: isChildActive ? '#ffbf69' : 'rgba(255,255,255,0.5)',
+                        color: isChildActive ? '#ffd97d' : 'rgba(255,255,255,0.5)',
                         fontSize: '13px', transition: 'all 0.15s',
                       }}
                       onMouseEnter={e => { if (!isChildActive) e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
@@ -244,8 +244,8 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                 display: 'flex', alignItems: 'center', gap: '10px',
                 padding: '11px 16px', cursor: 'pointer',
                 background: isActive ? 'rgba(255,191,105,0.15)' : 'transparent',
-                borderLeft: isActive ? '3px solid #ffbf69' : '3px solid transparent',
-                color: isActive ? '#ffbf69' : 'rgba(255,255,255,0.65)',
+                borderLeft: isActive ? '3px solid #ffd97d' : '3px solid transparent',
+                color: isActive ? '#ffd97d' : 'rgba(255,255,255,0.65)',
                 fontSize: '14px', transition: 'all 0.2s',
               }}
               onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'rgba(255,255,255,0.07)' }}
@@ -260,7 +260,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
 
       <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-          <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#ffbf69', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#364574', fontSize: '13px', fontWeight: 700, flexShrink: 0 }}>
+          <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#ffd97d', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#40798c', fontSize: '13px', fontWeight: 700, flexShrink: 0 }}>
             {adminUser?.full_name?.charAt(0).toUpperCase()}
           </div>
           <div style={{ overflow: 'hidden' }}>
@@ -293,7 +293,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         .fmb-sidebar-drawer {
           position: fixed; top: 0; left: 0;
           width: 270px; height: 100vh;
-          background: #364574; z-index: 1050;
+          background: #1f363d; z-index: 1050;
           transform: translateX(-100%);
           transition: transform 0.27s cubic-bezier(0.4, 0, 0.2, 1);
           display: flex; flex-direction: column;
@@ -320,7 +320,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       <script dangerouslySetInnerHTML={{ __html: `window.__fmbIsAdmin = ${isAdmin}` }} />
 
       <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bs-tertiary-bg)' }}>
-        <div className="fmb-sidebar-desktop" style={{ width: '240px', background: '#364574', flexDirection: 'column', flexShrink: 0, position: 'fixed', top: 0, left: 0, height: '100vh', zIndex: 100 }}>
+        <div className="fmb-sidebar-desktop" style={{ width: '240px', background: '#1f363d', flexDirection: 'column', flexShrink: 0, position: 'fixed', top: 0, left: 0, height: '100vh', zIndex: 100 }}>
           <SidebarContent />
         </div>
 
@@ -337,12 +337,12 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
             boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
             position: 'sticky', top: 0, zIndex: 50,
           }}>
-            <button className="fmb-hamburger" onClick={() => setSidebarOpen(true)} style={{ display: 'none', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 8px', borderRadius: '6px', color: '#364574' }}>
+            <button className="fmb-hamburger" onClick={() => setSidebarOpen(true)} style={{ display: 'none', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 8px', borderRadius: '6px', color: '#40798c' }}>
               <i className="bi bi-list" style={{ fontSize: '24px' }} />
             </button>
 
             <div className="d-lg-none" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '13px', fontWeight: 700, color: '#364574', marginLeft: '4px' }}>FMB Portal</span>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: '#40798c', marginLeft: '4px' }}>FMB Portal</span>
             </div>
 
             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -360,7 +360,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                     color: 'var(--bs-body-color)', fontSize: '13px', transition: 'all 0.15s',
                   }}
                 >
-                  <i className={`bi ${currentOpt.icon}`} style={{ fontSize: '14px', color: '#ffbf69' }} />
+                  <i className={`bi ${currentOpt.icon}`} style={{ fontSize: '14px', color: '#ffd97d' }} />
                   <span className="d-none d-sm-inline" style={{ fontSize: '12px', fontWeight: 500 }}>{currentOpt.label}</span>
                   <i className="bi bi-chevron-down" style={{ fontSize: '10px', opacity: 0.5 }} />
                 </button>
@@ -385,9 +385,9 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                           transition: 'background 0.12s',
                         }}
                       >
-                        <i className={`bi ${opt.icon}`} style={{ color: '#ffbf69', width: '16px', flexShrink: 0 }} />
+                        <i className={`bi ${opt.icon}`} style={{ color: '#ffd97d', width: '16px', flexShrink: 0 }} />
                         <span style={{ flex: 1 }}>{opt.label}</span>
-                        {theme === opt.val && <i className="bi bi-check2" style={{ color: '#364574' }} />}
+                        {theme === opt.val && <i className="bi bi-check2" style={{ color: '#40798c' }} />}
                       </div>
                     ))}
                   </div>
@@ -407,7 +407,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                   onMouseEnter={e => { if (!showProfileDropdown) e.currentTarget.style.background = 'var(--bs-secondary-bg)' }}
                   onMouseLeave={e => { if (!showProfileDropdown) e.currentTarget.style.background = 'transparent' }}
                 >
-                  <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#364574', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffbf69', fontSize: '13px', fontWeight: 700, flexShrink: 0 }}>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#40798c', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffd97d', fontSize: '13px', fontWeight: 700, flexShrink: 0 }}>
                     {adminUser?.full_name?.charAt(0).toUpperCase()}
                   </div>
                   <div className="d-none d-sm-block">

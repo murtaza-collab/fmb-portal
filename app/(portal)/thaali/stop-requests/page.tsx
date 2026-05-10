@@ -171,7 +171,7 @@ export default function StopRequestsPage() {
       {/* Stats */}
       <div className="row g-3 mb-4">
         {[
-          { label: 'Total',    value: counts.all,      color: '#364574' },
+          { label: 'Total',    value: counts.all,      color: '#40798c' },
           { label: 'Pending',  value: counts.pending,  color: '#856404' },
           { label: 'Approved', value: counts.approved, color: '#0ab39c' },
           { label: 'Rejected', value: counts.rejected, color: '#dc3545' },
@@ -198,8 +198,8 @@ export default function StopRequestsPage() {
               {(['all', 'pending', 'approved', 'rejected', 'expired'] as FilterStatus[]).map(s => (
                 <button key={s} onClick={() => setStatusFilter(s)} className="btn btn-sm"
                   style={{ borderRadius: 20, fontSize: 12, padding: '3px 12px',
-                    border: `1.5px solid ${statusFilter === s ? '#364574' : 'var(--bs-border-color)'}`,
-                    background: statusFilter === s ? '#364574' : 'transparent',
+                    border: `1.5px solid ${statusFilter === s ? '#40798c' : 'var(--bs-border-color)'}`,
+                    background: statusFilter === s ? '#40798c' : 'transparent',
                     color: statusFilter === s ? '#fff' : 'var(--bs-secondary-color)',
                     fontWeight: statusFilter === s ? 600 : 400 }}>
                   {s.charAt(0).toUpperCase() + s.slice(1)} ({counts[s] ?? 0})
@@ -237,7 +237,7 @@ export default function StopRequestsPage() {
                       const exp  = isExpired(r)
                       return (
                         <tr key={r.id} style={{ opacity: exp ? 0.6 : 1 }}>
-                          <td style={{ padding: '10px 12px', fontWeight: 700, color: exp ? 'var(--bs-secondary-color)' : '#364574' }}>
+                          <td style={{ padding: '10px 12px', fontWeight: 700, color: exp ? 'var(--bs-secondary-color)' : '#40798c' }}>
                             #{r.thaali_number}
                           </td>
                           <td style={{ padding: '10px 12px', fontWeight: 500, color: 'var(--bs-body-color)' }}>{r.mumin_name}</td>
@@ -328,7 +328,7 @@ export default function StopRequestsPage() {
                           onMouseEnter={e => (e.currentTarget.style.background = 'var(--bs-tertiary-bg)')}
                           onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                           onMouseDown={() => { setForm(f => ({ ...f, thaali_id: t.id })); setThaaliSearch(t.thaali_number); setShowThaaliDrop(false) }}>
-                          <span style={{ fontWeight: 700, color: '#364574', minWidth: 50, display: 'inline-block' }}>#{t.thaali_number}</span>
+                          <span style={{ fontWeight: 700, color: '#40798c', minWidth: 50, display: 'inline-block' }}>#{t.thaali_number}</span>
                           <span style={{ color: 'var(--bs-body-color)', marginLeft: 8 }}>{t.mumin_name}</span>
                           <span style={{ color: 'var(--bs-secondary-color)', fontSize: 11, marginLeft: 8 }}>{t.sf_no}</span>
                         </div>

@@ -238,7 +238,7 @@ export default function UsersPage() {
       {/* Stats */}
       <div className="row g-3 mb-4">
         {[
-          { label: 'Total Users', value: users.length, color: '#364574' },
+          { label: 'Total Users', value: users.length, color: '#40798c' },
           { label: 'Active', value: users.filter(u => u.status === 'active').length, color: '#0ab39c' },
           { label: 'User Groups', value: groups.length, color: '#f7b84b' },
         ].map((s, i) => (

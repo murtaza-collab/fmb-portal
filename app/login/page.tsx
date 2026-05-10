@@ -44,7 +44,7 @@ export default function LoginPage() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(to bottom, #364574, #233044)',
+      background: 'linear-gradient(to bottom, #40798c, #233044)',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
@@ -69,7 +69,7 @@ export default function LoginPage() {
           <div className="card-body p-4 p-md-5">
 
             <div className="text-center mb-4">
-              <h5 className="fw-bold mb-1" style={{ color: '#364574' }}>Welcome</h5>
+              <h5 className="fw-bold mb-1" style={{ color: '#40798c' }}>Welcome</h5>
               <p className="text-muted mb-0" style={{ fontSize: '0.9rem' }}>Sign in to continue</p>
             </div>
 
@@ -114,7 +114,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 className="btn btn-lg w-100 fw-bold text-white"
-                style={{ background: '#364574', border: 'none', borderRadius: 8 }}
+                style={{ background: '#40798c', border: 'none', borderRadius: 8 }}
                 disabled={loading}
               >
                 {loading

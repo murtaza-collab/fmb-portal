@@ -321,21 +321,21 @@ export default function Dispatch() {
               {atCounterASessions.length > 0 && (
                 <>
                   <h5 className="fw-bold mb-3" style={{ color: 'var(--bs-body-color)' }}>
-                    <i className="bi bi-stopwatch me-2" style={{ color: '#364574' }}></i>
+                    <i className="bi bi-stopwatch me-2" style={{ color: '#40798c' }}></i>
                     At Counter A
-                    <span className="badge ms-2" style={{ background: '#364574' }}>{atCounterASessions.length}</span>
+                    <span className="badge ms-2" style={{ background: '#40798c' }}>{atCounterASessions.length}</span>
                   </h5>
                   <div className="row g-3 mb-4">
                     {atCounterASessions.map(s => (
                       <div className="col-12 col-md-6 col-lg-4" key={s.id}>
                         <div className="card border-0 shadow-sm opacity-75 h-100"
-                          style={{ background: 'var(--bs-body-bg)', borderLeft: '3px solid #364574' }}>
+                          style={{ background: 'var(--bs-body-bg)', borderLeft: '3px solid #40798c' }}>
                           <div className="card-body p-3">
                             <div className="d-flex justify-content-between align-items-start mb-2">
                               <h6 className="fw-bold mb-0" style={{ color: 'var(--bs-body-color)' }}>
                                 {s.distributor_name}
                               </h6>
-                              <span className="badge text-white" style={{ background: '#364574' }}>
+                              <span className="badge text-white" style={{ background: '#40798c' }}>
                                 <i className="bi bi-hourglass-split me-1"></i>Counter A
                               </span>
                             </div>

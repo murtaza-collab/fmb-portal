@@ -194,7 +194,7 @@ export default function KitchenHome() {
           onMouseLeave={e => (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'}>
           <div className="card-body p-3">
             <div className="d-flex justify-content-between align-items-start mb-3">
-              <h6 className="mb-0 fw-bold" style={{ fontSize: 15, color: '#364574' }}>{dist?.full_name || 'Unknown'}</h6>
+              <h6 className="mb-0 fw-bold" style={{ fontSize: 15, color: '#40798c' }}>{dist?.full_name || 'Unknown'}</h6>
               <span className={`badge ${cls}`} style={{ fontSize: 11 }}>{label}</span>
             </div>
             <div className="row g-0 text-center mb-3" style={{ borderRadius: 8, overflow: 'hidden', border: '1px solid var(--bs-border-color)' }}>
@@ -216,7 +216,7 @@ export default function KitchenHome() {
                 <span style={{ fontSize: 12, color: 'var(--bs-secondary-color)' }}>
                   <i className="bi bi-clock me-1" />{arrivedTimeStr(session.arrived_at)}
                 </span>
-                {!done && <span style={{ fontSize: 12, color: '#364574', fontWeight: 600 }}>Tap to open →</span>}
+                {!done && <span style={{ fontSize: 12, color: '#40798c', fontWeight: 600 }}>Tap to open →</span>}
               </div>
             )}
           </div>
@@ -264,10 +264,10 @@ export default function KitchenHome() {
         {/* Demo Mode banner */}
         {demoMode && (
           <div className="mb-3 px-3 py-2 d-flex align-items-center justify-content-between flex-wrap gap-2"
-            style={{ background: '#36457415', border: '1px solid #36457430', borderRadius: 10 }}>
+            style={{ background: '#40798c15', border: '1px solid #40798c30', borderRadius: 10 }}>
             <div className="d-flex align-items-center gap-2">
               <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', display: 'inline-block', boxShadow: '0 0 8px #22c55e', animation: 'pulse 1.5s infinite' }} />
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#364574' }}>Demo Mode — Listening for scans</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#40798c' }}>Demo Mode — Listening for scans</span>
               <span style={{ fontSize: 12, color: 'var(--bs-secondary-color)' }}>
                 Open <code>/kitchen/scan</code> on your phone to simulate arrivals
               </span>
@@ -380,13 +380,13 @@ export default function KitchenHome() {
                           <div key={d.id} className="col-12 col-sm-6 col-md-4">
                             <button className="btn w-100 text-start p-3"
                               style={{ background: 'var(--bs-body-bg)', border: '2px solid var(--bs-border-color)', borderRadius: 12, transition: 'all 0.15s' }}
-                              onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = '#364574'}
+                              onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = '#40798c'}
                               onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--bs-border-color)'}
                               disabled={checkinLoading}
                               onClick={() => doCheckin(d.id)}>
                               <div className="d-flex align-items-center gap-3">
-                                <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#36457420', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                  <i className="bi bi-person-fill" style={{ color: '#364574', fontSize: 20 }} />
+                                <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#40798c20', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                  <i className="bi bi-person-fill" style={{ color: '#40798c', fontSize: 20 }} />
                                 </div>
                                 <div>
                                   <div className="fw-bold" style={{ color: 'var(--bs-body-color)', fontSize: 15 }}>{d.full_name}</div>
@@ -394,7 +394,7 @@ export default function KitchenHome() {
                                     {el > 0 ? `${el} eligible` : ''}{st > 0 ? `, ${st} stopped` : ''}{el === 0 && st === 0 ? 'No thaalis' : ''}
                                   </div>
                                 </div>
-                                <i className="bi bi-wifi ms-auto" style={{ color: '#364574', opacity: 0.4, fontSize: 18 }} />
+                                <i className="bi bi-wifi ms-auto" style={{ color: '#40798c', opacity: 0.4, fontSize: 18 }} />
                               </div>
                             </button>
                           </div>
@@ -470,7 +470,7 @@ export default function KitchenHome() {
                 {!demoMode && (
                   <button className="btn btn-sm"
                     onClick={() => setDemoMode(true)}
-                    style={{ background: '#36457415', color: '#364574', border: '1px solid #36457430', borderRadius: 8, fontSize: 12, fontWeight: 600 }}>
+                    style={{ background: '#40798c15', color: '#40798c', border: '1px solid #40798c30', borderRadius: 8, fontSize: 12, fontWeight: 600 }}>
                     <i className="bi bi-broadcast me-1" />Demo Mode
                   </button>
                 )}
@@ -498,9 +498,9 @@ export default function KitchenHome() {
             {startedSessions.length > 0 && (
               <>
                 <h2 className="h5 mb-3 fw-bold" style={{ color: 'var(--bs-body-color)' }}>
-                  <i className="bi bi-cup-hot me-2" style={{ color: '#ffbf69' }} />
+                  <i className="bi bi-cup-hot me-2" style={{ color: '#ffd97d' }} />
                   Being Filled
-                  <span className="badge ms-2" style={{ background: '#ffbf69', color: '#212529' }}>{startedSessions.length}</span>
+                  <span className="badge ms-2" style={{ background: '#ffd97d', color: '#212529' }}>{startedSessions.length}</span>
                 </h2>
                 <div className="row g-3 mb-4">
                   {startedSessions.map(s => (

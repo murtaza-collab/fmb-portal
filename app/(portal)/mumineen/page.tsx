@@ -226,8 +226,8 @@ export default function MumineenPage() {
     const n = name.toLowerCase()
     if (n.includes('approved'))                         return { bg: '#0ab39c20', color: '#0ab39c' }
     if (n.includes('no-show') || n.includes('no show')) return { bg: '#e6394620', color: '#e63946' }
-    if (n.includes('pending'))                          return { bg: '#ffbf6920', color: '#856404' }
-    return { bg: '#36457420', color: '#364574' }
+    if (n.includes('pending'))                          return { bg: '#ffd97d20', color: '#856404' }
+    return { bg: '#40798c20', color: '#40798c' }
   }
 
   const addressPreview = buildAddress(
@@ -503,7 +503,7 @@ export default function MumineenPage() {
           {/* FIX: Show total entries + HOFs + Members separately */}
           <p className="mb-0" style={{ fontSize: 13, color: 'var(--bs-secondary-color)' }}>
             <strong>{mumineen.length}</strong> Total Entries ·{' '}
-            <span style={{ color: '#364574', fontWeight: 600 }}>{hofs.filter(h => h.status === 'active').length}</span> Active HOFs ·{' '}
+            <span style={{ color: '#40798c', fontWeight: 600 }}>{hofs.filter(h => h.status === 'active').length}</span> Active HOFs ·{' '}
             <span style={{ color: '#0ab39c', fontWeight: 600 }}>{activeMembers.length}</span> Members
           </p>
         </div>
@@ -516,7 +516,7 @@ export default function MumineenPage() {
             {tab === 'all' ? 'Export All' : tab === 'hofs' ? 'Export HOFs' : 'Export Members'}
           </button>
           {!(tab === 'hofs' && hofSubTab === 'transferred') && tab !== 'all' && (
-            <button className="btn btn-sm" style={{ background: '#364574', color: '#fff' }} onClick={openAdd}><i className="bi bi-plus me-1" />Add HOF</button>
+            <button className="btn btn-sm" style={{ background: '#40798c', color: '#fff' }} onClick={openAdd}><i className="bi bi-plus me-1" />Add HOF</button>
           )}
         </div>
       </div>
@@ -535,9 +535,9 @@ export default function MumineenPage() {
               onClick={() => { setTab(key as any); setPage(1); setSearch('') }}
               style={{
                 border: 'none', background: 'none', padding: '12px 20px', fontSize: 14, cursor: 'pointer',
-                color: tab === key ? '#364574' : 'var(--bs-secondary-color)',
+                color: tab === key ? '#40798c' : 'var(--bs-secondary-color)',
                 fontWeight: tab === key ? 700 : 400,
-                borderBottom: tab === key ? '2px solid #364574' : '2px solid transparent',
+                borderBottom: tab === key ? '2px solid #40798c' : '2px solid transparent',
                 marginBottom: -1,
               }}>
               {label}
@@ -567,9 +567,9 @@ export default function MumineenPage() {
               <button key={key} onClick={() => setSubTab(key)}
                 style={{
                   border: 'none', background: 'none', padding: '7px 16px', fontSize: 12.5, cursor: 'pointer',
-                  color: curSubTab === key ? '#364574' : 'var(--bs-secondary-color)',
+                  color: curSubTab === key ? '#40798c' : 'var(--bs-secondary-color)',
                   fontWeight: curSubTab === key ? 600 : 400,
-                  borderBottom: curSubTab === key ? '2px solid #364574' : '2px solid transparent',
+                  borderBottom: curSubTab === key ? '2px solid #40798c' : '2px solid transparent',
                   marginBottom: -1,
                 }}>
                 {label}
@@ -667,15 +667,15 @@ export default function MumineenPage() {
                           <tr key={m.id} style={{ opacity: m.status === 'transferred' ? 0.6 : 1 }}>
                             <td>
                               {m.is_hof
-                                ? <span className="badge" style={{ background: '#364574', color: '#fff', fontSize: 11 }}>HOF</span>
+                                ? <span className="badge" style={{ background: '#40798c', color: '#fff', fontSize: 11 }}>HOF</span>
                                 : <span className="badge" style={{ background: '#0ab39c22', color: '#0ab39c', border: '1px solid #0ab39c44', fontSize: 11 }}>Member</span>
                               }
                             </td>
-                            <td style={{ fontWeight: 600, color: '#364574' }}>{m.sf_no || '—'}</td>
+                            <td style={{ fontWeight: 600, color: '#40798c' }}>{m.sf_no || '—'}</td>
                             <td style={{ color: 'var(--bs-secondary-color)' }}>{m.its_no || '—'}</td>
                             <td style={{ fontWeight: 500, color: 'var(--bs-body-color)' }}>
                               {m.full_name}
-                              {m.is_hof && <i className="bi bi-star-fill ms-1" style={{ fontSize: 9, color: '#ffbf69' }} />}
+                              {m.is_hof && <i className="bi bi-star-fill ms-1" style={{ fontSize: 9, color: '#ffd97d' }} />}
                             </td>
                             <td style={{ color: 'var(--bs-secondary-color)', fontSize: 12 }}>{calcAge(m.dob)}</td>
                             <td style={{ color: 'var(--bs-secondary-color)' }}>{m.phone_no || '—'}</td>
@@ -705,7 +705,7 @@ export default function MumineenPage() {
                         const nc = getNiyyatColor(niyyatName)
                         return (
                           <tr key={m.id} style={{ opacity: m.status === 'transferred' ? 0.65 : 1 }}>
-                            <td style={{ fontWeight: 600, color: '#364574' }}>{m.sf_no || '—'}</td>
+                            <td style={{ fontWeight: 600, color: '#40798c' }}>{m.sf_no || '—'}</td>
                             <td style={{ color: 'var(--bs-secondary-color)' }}>{m.its_no || '—'}</td>
                             <td style={{ fontWeight: 500, color: 'var(--bs-body-color)' }}>{m.full_name}</td>
                             <td style={{ color: 'var(--bs-secondary-color)', fontSize: 12 }}>{calcAge(m.dob)}</td>
@@ -718,7 +718,7 @@ export default function MumineenPage() {
                             <td>
                               <div className="d-flex gap-1 justify-content-end">
                                 <button className="btn btn-sm" title="View" style={{ padding: '2px 7px', color: '#299cdb' }} onClick={() => router.push(`/mumineen/${m.id}`)}><i className="bi bi-eye" /></button>
-                                <button className="btn btn-sm" title="Edit" style={{ padding: '2px 7px', color: '#364574' }} onClick={() => openEdit(m)}><i className="bi bi-pencil" /></button>
+                                <button className="btn btn-sm" title="Edit" style={{ padding: '2px 7px', color: '#40798c' }} onClick={() => openEdit(m)}><i className="bi bi-pencil" /></button>
                                 {hofSubTab === 'active' && <button className="btn btn-sm" title="Transfer" style={{ padding: '2px 7px', color: '#856404' }} onClick={() => { setShowTransfer(m); setTransferReason('') }}><i className="bi bi-box-arrow-right" /></button>}
                                 <button className="btn btn-sm" title="Delete" style={{ padding: '2px 7px', color: '#dc3545' }} onClick={() => setShowDelete(m)}><i className="bi bi-trash" /></button>
                               </div>
@@ -733,13 +733,13 @@ export default function MumineenPage() {
                           <tr key={m.id}>
                             <td style={{ color: 'var(--bs-secondary-color)' }}>{m.its_no || '—'}</td>
                             <td style={{ fontWeight: 500, color: 'var(--bs-body-color)' }}>{m.full_name}</td>
-                            <td style={{ color: '#364574', fontWeight: 600 }}>{m.sf_no || hof?.sf_no || '—'}</td>
+                            <td style={{ color: '#40798c', fontWeight: 600 }}>{m.sf_no || hof?.sf_no || '—'}</td>
                             <td style={{ color: 'var(--bs-secondary-color)', fontSize: 12 }}>{hof ? hof.full_name : '—'}</td>
                             <td style={{ color: 'var(--bs-secondary-color)', fontSize: 12 }}>{calcAge(m.dob)}</td>
                             <td style={{ color: 'var(--bs-secondary-color)' }}>{m.phone_no || '—'}</td>
                             <td>
                               <div className="d-flex gap-1 justify-content-end">
-                                {hof && memberSubTab === 'active' && <button className="btn btn-sm" title="Edit" style={{ padding: '2px 7px', color: '#364574' }} onClick={() => openEditMember(m as any, hof)}><i className="bi bi-pencil" /></button>}
+                                {hof && memberSubTab === 'active' && <button className="btn btn-sm" title="Edit" style={{ padding: '2px 7px', color: '#40798c' }} onClick={() => openEditMember(m as any, hof)}><i className="bi bi-pencil" /></button>}
                                 <button className="btn btn-sm" title="Delete" style={{ padding: '2px 7px', color: '#dc3545' }} onClick={() => setShowDelete(m as any)}><i className="bi bi-trash" /></button>
                               </div>
                             </td>
@@ -870,7 +870,7 @@ export default function MumineenPage() {
               </div>
               <div className="col-12">
                 <label style={labelStyle}>Full Address Preview</label>
-                <div style={{ background: 'var(--bs-secondary-bg)', borderRadius: 6, padding: '8px 12px', fontSize: 13, color: addressPreview ? '#364574' : 'var(--bs-secondary-color)', borderLeft: `3px solid ${addressPreview ? '#ffbf69' : 'var(--bs-border-color)'}`, minHeight: 36 }}>
+                <div style={{ background: 'var(--bs-secondary-bg)', borderRadius: 6, padding: '8px 12px', fontSize: 13, color: addressPreview ? '#40798c' : 'var(--bs-secondary-color)', borderLeft: `3px solid ${addressPreview ? '#ffd97d' : 'var(--bs-border-color)'}`, minHeight: 36 }}>
                   {addressPreview || 'Fill in fields above to preview…'}
                 </div>
               </div>
@@ -883,7 +883,7 @@ export default function MumineenPage() {
           </div>
           <div className="modal-footer" style={{ borderTop: '1px solid var(--bs-border-color)' }}>
             <button className="btn btn-light btn-sm" onClick={() => setShowModal(false)}>Cancel</button>
-            <button className="btn btn-sm" style={{ background: '#364574', color: '#fff' }} onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : editing ? 'Save Changes' : 'Save'}</button>
+            <button className="btn btn-sm" style={{ background: '#40798c', color: '#fff' }} onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : editing ? 'Save Changes' : 'Save'}</button>
           </div>
         </Modal>
       )}
@@ -967,7 +967,7 @@ export default function MumineenPage() {
           </div>
           <div className="modal-footer" style={{ borderTop: '1px solid var(--bs-border-color)' }}>
             <button className="btn btn-light btn-sm" onClick={() => setShowFamilyModal(false)}>Cancel</button>
-            <button className="btn btn-sm" style={{ background: '#364574', color: '#fff' }} onClick={handleSaveMember} disabled={savingMember}>{savingMember ? 'Saving...' : 'Save'}</button>
+            <button className="btn btn-sm" style={{ background: '#40798c', color: '#fff' }} onClick={handleSaveMember} disabled={savingMember}>{savingMember ? 'Saving...' : 'Save'}</button>
           </div>
         </Modal>
       )}

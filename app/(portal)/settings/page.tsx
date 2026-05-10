@@ -469,7 +469,7 @@ export default function SettingsPage() {
                   </div>
                   {TABS.filter((t) => t.group === group).map((tab) => (
                     <button key={tab.key} onClick={() => setActiveTab(tab.key)} className="w-100 text-start btn btn-sm"
-                      style={{ borderRadius: '8px', marginBottom: '2px', background: activeTab === tab.key ? '#364574' : 'transparent',
+                      style={{ borderRadius: '8px', marginBottom: '2px', background: activeTab === tab.key ? '#40798c' : 'transparent',
                         color: activeTab === tab.key ? '#fff' : 'var(--bs-body-color)', fontWeight: activeTab === tab.key ? 600 : 400,
                         fontSize: '13px', padding: '8px 12px', border: 'none' }}>
                       <i className={`bi ${tab.icon} me-2`} style={{ fontSize: '13px' }} />{tab.label}
@@ -488,7 +488,7 @@ export default function SettingsPage() {
               {/* Tab header */}
               <div className="d-flex align-items-center justify-content-between mb-3">
                 <div className="d-flex align-items-center gap-2">
-                  <i className={`bi ${currentTab?.icon}`} style={{ fontSize: '18px', color: '#364574' }} />
+                  <i className={`bi ${currentTab?.icon}`} style={{ fontSize: '18px', color: '#40798c' }} />
                   <h6 className="mb-0 fw-bold" style={{ color: 'var(--bs-body-color)' }}>{currentTab?.label}</h6>
                 </div>
                 {showAddButton && (
@@ -506,7 +506,7 @@ export default function SettingsPage() {
                       </button>
                     )}
                     <button onClick={() => (activeTab === 'thaali_numbers' ? setShowThaaliModal(true) : openAdd())}
-                      className="btn btn-sm" style={{ background: '#364574', color: '#fff', borderRadius: '8px', fontSize: '13px', fontWeight: 600 }}>
+                      className="btn btn-sm" style={{ background: '#40798c', color: '#fff', borderRadius: '8px', fontSize: '13px', fontWeight: 600 }}>
                       <i className="bi bi-plus me-1" />Add New
                     </button>
                   </div>
@@ -514,7 +514,7 @@ export default function SettingsPage() {
               </div>
 
               {loading ? (
-                <div className="text-center py-5"><div className="spinner-border spinner-border-sm" style={{ color: '#364574' }} /></div>
+                <div className="text-center py-5"><div className="spinner-border spinner-border-sm" style={{ color: '#40798c' }} /></div>
               ) : activeTab === 'fiscal' ? (
                 <div>
                   <p style={{ fontSize: '12px', color: 'var(--bs-secondary-color)' }} className="mb-3">
@@ -531,10 +531,10 @@ export default function SettingsPage() {
                       </thead>
                       <tbody>
                         {computedFYs.map((fy) => (
-                          <tr key={fy.hijriYear} style={{ background: fy.isCurrentFY ? '#36457408' : undefined }}>
+                          <tr key={fy.hijriYear} style={{ background: fy.isCurrentFY ? '#40798c08' : undefined }}>
                             <td>
-                              <span style={{ fontWeight: 700, color: fy.isCurrentFY ? '#364574' : 'var(--bs-body-color)' }}>{fy.hijriYear}H</span>
-                              {fy.isCurrentFY && <span className="badge ms-2" style={{ background: '#36457420', color: '#364574', fontSize: '10px' }}>Current</span>}
+                              <span style={{ fontWeight: 700, color: fy.isCurrentFY ? '#40798c' : 'var(--bs-body-color)' }}>{fy.hijriYear}H</span>
+                              {fy.isCurrentFY && <span className="badge ms-2" style={{ background: '#40798c20', color: '#40798c', fontSize: '10px' }}>Current</span>}
                             </td>
                             <td style={{ color: '#0ab39c', fontWeight: 600 }}>
                               {fy.startGregorian.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
@@ -547,7 +547,7 @@ export default function SettingsPage() {
                               {fy.isCurrentFY
                                 ? <span className="badge" style={{ background: '#0ab39c20', color: '#0ab39c', fontWeight: 600, fontSize: '11px' }}>Active</span>
                                 : fy.startGregorian > new Date()
-                                  ? <span className="badge" style={{ background: '#ffbf6920', color: '#856404', fontWeight: 600, fontSize: '11px' }}>Upcoming</span>
+                                  ? <span className="badge" style={{ background: '#ffd97d20', color: '#856404', fontWeight: 600, fontSize: '11px' }}>Upcoming</span>
                                   : <span className="badge" style={{ background: 'var(--bs-secondary-bg)', color: 'var(--bs-secondary-color)', fontWeight: 600, fontSize: '11px' }}>Past</span>}
                             </td>
                           </tr>
@@ -560,7 +560,7 @@ export default function SettingsPage() {
                 <div style={{ maxWidth: 800 }}>
                   {/* Customization Cutoff */}
                   <div className="card mb-4 border-0 shadow-sm">
-                    <div className="card-header" style={{ background: '#364574', color: '#fff', borderRadius: '8px 8px 0 0' }}>
+                    <div className="card-header" style={{ background: '#40798c', color: '#fff', borderRadius: '8px 8px 0 0' }}>
                       <h6 className="mb-0 fw-bold"><i className="bi bi-tune me-2" />Customization Cutoff</h6>
                     </div>
                     <div className="card-body p-4">
@@ -573,7 +573,7 @@ export default function SettingsPage() {
                           {CUTOFF_PRESETS.map((h) => (
                             <button key={h} onClick={() => setKitchenSettings({ ...kitchenSettings, customization_cutoff_hours: h })} className="btn btn-sm"
                               style={{ borderRadius: 20, fontSize: 13, fontWeight: 600, padding: '5px 16px',
-                                background: kitchenSettings.customization_cutoff_hours === h ? '#364574' : 'var(--bs-tertiary-bg)',
+                                background: kitchenSettings.customization_cutoff_hours === h ? '#40798c' : 'var(--bs-tertiary-bg)',
                                 color: kitchenSettings.customization_cutoff_hours === h ? '#fff' : 'var(--bs-body-color)',
                                 border: kitchenSettings.customization_cutoff_hours === h ? 'none' : '1px solid var(--bs-border-color)' }}>
                               {h}h
@@ -647,7 +647,7 @@ export default function SettingsPage() {
                   </div>
 
                   <button onClick={saveKitchenSettings} disabled={saving} className="btn btn-lg w-100"
-                    style={{ background: '#364574', color: '#fff', borderRadius: '8px', fontSize: '14px', fontWeight: 600 }}>
+                    style={{ background: '#40798c', color: '#fff', borderRadius: '8px', fontSize: '14px', fontWeight: 600 }}>
                     {saving ? <><span className="spinner-border spinner-border-sm me-2" />Saving Settings...</> : <><i className="bi bi-check-lg me-2" />Save All Cutoff Settings</>}
                   </button>
                   <div className="alert alert-warning mt-3 mb-0" style={{ fontSize: '12px' }}>
@@ -659,9 +659,9 @@ export default function SettingsPage() {
                   {/* ── Filter tabs ── */}
                   <div className="d-flex align-items-center gap-2 mb-3 flex-wrap">
                     {[
-                      { key: 'all',        label: `All (${thaaliNumbers.length})`,                                    color: '#364574' },
+                      { key: 'all',        label: `All (${thaaliNumbers.length})`,                                    color: '#40798c' },
                       { key: 'unassigned', label: `Unassigned (${thaaliNumbers.filter(t => !t.assigned).length})`,   color: '#0ab39c' },
-                      { key: 'assigned',   label: `Assigned (${thaaliNumbers.filter(t => t.assigned).length})`,      color: '#364574' },
+                      { key: 'assigned',   label: `Assigned (${thaaliNumbers.filter(t => t.assigned).length})`,      color: '#40798c' },
                     ].map(tab => (
                       <button key={tab.key} onClick={() => setThaaliFilter(tab.key as any)} className="btn btn-sm"
                         style={{ borderRadius: 20, fontSize: 12, fontWeight: 600, padding: '4px 14px',
@@ -690,7 +690,7 @@ export default function SettingsPage() {
                             <td className="fw-semibold" style={{ color: 'var(--bs-body-color)' }}>{t.thaali_number}</td>
                             <td>
                               {t.assigned
-                                ? <span className="badge" style={{ background: '#36457420', color: '#364574', fontWeight: 600, fontSize: '11px' }}>Assigned</span>
+                                ? <span className="badge" style={{ background: '#40798c20', color: '#40798c', fontWeight: 600, fontSize: '11px' }}>Assigned</span>
                                 : <span className="badge" style={{ background: '#0ab39c20', color: '#0ab39c', fontWeight: 600, fontSize: '11px' }}>Unassigned</span>}
                             </td>
                             <td>
@@ -718,8 +718,8 @@ export default function SettingsPage() {
                       <div className="d-flex align-items-center px-3 py-2" style={{ background: 'var(--bs-body-bg)' }}>
                         <span className="fw-semibold me-auto" style={{ color: 'var(--bs-body-color)' }}>{sec.name}</span>
                         <button className="btn btn-sm me-2"
-                          style={{ background: sec.distributors.length > 0 ? '#36457415' : 'var(--bs-tertiary-bg)',
-                            color: sec.distributors.length > 0 ? '#364574' : 'var(--bs-secondary-color)',
+                          style={{ background: sec.distributors.length > 0 ? '#40798c15' : 'var(--bs-tertiary-bg)',
+                            color: sec.distributors.length > 0 ? '#40798c' : 'var(--bs-secondary-color)',
                             border: 'none', borderRadius: 20, fontSize: 12, fontWeight: 600, padding: '3px 12px' }}
                           onClick={() => setExpandedSector(expandedSector === sec.id ? null : sec.id)}>
                           <i className="bi bi-person me-1" style={{ fontSize: 11 }} />
@@ -728,7 +728,7 @@ export default function SettingsPage() {
                         </button>
                         <div className="d-flex gap-1">
                           <button onClick={() => openEdit(sec)} className="btn btn-sm"
-                            style={{ padding: '3px 8px', background: '#36457415', color: '#364574', border: 'none', borderRadius: '6px' }}>
+                            style={{ padding: '3px 8px', background: '#40798c15', color: '#40798c', border: 'none', borderRadius: '6px' }}>
                             <i className="bi bi-pencil" style={{ fontSize: '11px' }} />
                           </button>
                           <button onClick={() => deleteRow(sec.id)} className="btn btn-sm"
@@ -767,7 +767,7 @@ export default function SettingsPage() {
                     <div className="d-flex gap-2 align-items-center">
                       <span style={{ fontSize: '12px', color: 'var(--bs-secondary-color)' }}>{selectedStickers.length} selected</span>
                       <button onClick={generateStickers} disabled={generatingPDF || !selectedStickers.length} className="btn btn-sm"
-                        style={{ background: '#364574', color: '#fff', borderRadius: '8px', fontSize: '13px', fontWeight: 600 }}>
+                        style={{ background: '#40798c', color: '#fff', borderRadius: '8px', fontSize: '13px', fontWeight: 600 }}>
                         {generatingPDF ? <><span className="spinner-border spinner-border-sm me-1" />Generating...</> : <><i className="bi bi-printer me-1" />Print Stickers</>}
                       </button>
                     </div>
@@ -827,7 +827,7 @@ export default function SettingsPage() {
                           <td>
                             <div className="d-flex gap-1">
                               <button onClick={() => openEdit(row)} className="btn btn-sm"
-                                style={{ padding: '3px 8px', background: '#36457415', color: '#364574', border: 'none', borderRadius: '6px' }}>
+                                style={{ padding: '3px 8px', background: '#40798c15', color: '#40798c', border: 'none', borderRadius: '6px' }}>
                                 <i className="bi bi-pencil" style={{ fontSize: '11px' }} />
                               </button>
                               <button onClick={() => deleteRow(row.id)} className="btn btn-sm"
@@ -884,7 +884,7 @@ export default function SettingsPage() {
             </div>
             <div style={{ padding: '12px 20px', borderTop: '1px solid var(--bs-border-color)', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button onClick={() => setShowModal(false)} className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 8, fontSize: 13 }}>Cancel</button>
-              <button onClick={saveRow} disabled={saving} className="btn btn-sm" style={{ background: '#364574', color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600 }}>
+              <button onClick={saveRow} disabled={saving} className="btn btn-sm" style={{ background: '#40798c', color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600 }}>
                 {saving ? <span className="spinner-border spinner-border-sm" /> : editRow ? 'Save Changes' : 'Add'}
               </button>
             </div>
@@ -910,7 +910,7 @@ export default function SettingsPage() {
             </div>
             <div style={{ padding: '12px 20px', borderTop: '1px solid var(--bs-border-color)', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button onClick={() => setShowThaaliModal(false)} className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 8, fontSize: 13 }}>Cancel</button>
-              <button onClick={saveThaaliNumber} disabled={saving} className="btn btn-sm" style={{ background: '#364574', color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600 }}>
+              <button onClick={saveThaaliNumber} disabled={saving} className="btn btn-sm" style={{ background: '#40798c', color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600 }}>
                 {saving ? <span className="spinner-border spinner-border-sm" /> : 'Add Numbers'}
               </button>
             </div>
@@ -1014,7 +1014,7 @@ export default function SettingsPage() {
             <span style={{ color: '#fff', fontWeight: 600, fontSize: 14 }}>Sticker Preview</span>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <a href={previewUrl} download={`thaali-stickers-${new Date().toISOString().slice(0,10)}.pdf`}
-                className="btn btn-sm" style={{ background: '#364574', color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>
+                className="btn btn-sm" style={{ background: '#40798c', color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>
                 Download PDF
               </a>
               <button onClick={() => { URL.revokeObjectURL(previewUrl); setPreviewUrl(null) }}
