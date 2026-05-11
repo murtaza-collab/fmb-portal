@@ -1,7 +1,11 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { requireAdminAuth } from '@/lib/api-auth'
 
 export async function POST(request: Request) {
+  const auth = await requireAdminAuth()
+  if (!auth.ok) return auth.response
+
   try {
     const { auth_id, new_password } = await request.json()
 

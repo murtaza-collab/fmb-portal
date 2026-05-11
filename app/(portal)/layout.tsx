@@ -107,9 +107,13 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
 
     setAdminUser(adminData)
     const groupName = adminData.user_groups?.name?.toLowerCase() || ''
-    setIsAdmin(groupName === 'super admin' || groupName === 'admin' || groupName === 'super_admin')
+    const isAdminUser = groupName === 'super admin' || groupName === 'admin' || groupName === 'super_admin'
+    setIsAdmin(isAdminUser)
 
-    if (adminData.user_group_id) {
+    // Super Admin / Admin see everything — skip permission filter
+    if (isAdminUser) {
+      setMenuItems(ALL_MENU_ITEMS)
+    } else if (adminData.user_group_id) {
       const { data: permsData } = await supabase
         .from('permissions')
         .select('module, can_view')
@@ -117,9 +121,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       const perms = permsData || []
       setPermissions(perms)
       const allowed = perms.filter(p => p.can_view).map(p => p.module)
-      setMenuItems(ALL_MENU_ITEMS.filter(m =>
-        allowed.includes(m.module) || m.module === 'settings' || m.module === 'address_requests'
-      ))
+      setMenuItems(ALL_MENU_ITEMS.filter(m => allowed.includes(m.module)))
     } else {
       setMenuItems(ALL_MENU_ITEMS.filter(m => m.module === 'dashboard'))
     }

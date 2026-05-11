@@ -30,15 +30,17 @@ interface Permission {
 }
 
 const MODULES = [
-  { key: 'dashboard', label: 'Dashboard' },
-  { key: 'mumineen', label: 'Mumineen' },
-  { key: 'thaali', label: 'Thaali' },
-  { key: 'distribution', label: 'Distribution' },
-  { key: 'distributors', label: 'Distributors' },
-  { key: 'sectors', label: 'Sectors' },
-  { key: 'takhmeem', label: 'Takhmeem' },
-  { key: 'calendar', label: 'Calendar' },
-  { key: 'users', label: 'Users' },
+  { key: 'dashboard',        label: 'Dashboard'         },
+  { key: 'mumineen',         label: 'Mumineen'          },
+  { key: 'address_requests', label: 'Address Requests'  },
+  { key: 'thaali',           label: 'Thaali'            },
+  { key: 'distribution',     label: 'Distribution'      },
+  { key: 'distributors',     label: 'Distributors'      },
+  { key: 'takhmeem',         label: 'Takhmeem'          },
+  { key: 'calendar',         label: 'Calendar'          },
+  { key: 'notifications',    label: 'Notifications'     },
+  { key: 'users',            label: 'Users'             },
+  { key: 'settings',         label: 'Settings'          },
 ]
 
 const PERM_KEYS = ['can_view', 'can_add', 'can_edit', 'can_deactivate']
@@ -68,11 +70,12 @@ export default function UsersPage() {
   useEffect(() => { fetchUsers(); fetchGroups(); checkIfSuperAdmin() }, [])
 
   const checkIfSuperAdmin = async () => {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session?.user) return
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
     const { data: adminUser } = await supabase.from('admin_users')
-      .select('user_groups(name)').eq('auth_id', session.user.id).single()
-    setIsSuperAdmin((adminUser?.user_groups as any)?.name === 'Super Admin')
+      .select('user_groups(name)').eq('auth_id', user.id).single()
+    const gn = (adminUser?.user_groups as any)?.name?.toLowerCase() || ''
+    setIsSuperAdmin(gn === 'super admin' || gn === 'super_admin')
   }
 
   const fetchUsers = async () => {
@@ -120,18 +123,15 @@ export default function UsersPage() {
           if (!res.ok) { setFormError(result.error || 'Password change failed'); setSaving(false); return }
         }
       } else {
-        const email = `${userForm.username}@fmb.internal`
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-          email, password: userForm.password,
-          options: { data: { username: userForm.username } }
+        const res = await fetch('/api/admin/create-admin-user', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: userForm.username, password: userForm.password,
+            full_name: userForm.full_name, user_group_id: userForm.user_group_id,
+          })
         })
-        if (authError) { setFormError(authError.message); setSaving(false); return }
-        await supabase.from('admin_users').insert({
-          auth_id: authData.user?.id, full_name: userForm.full_name,
-          username: userForm.username,
-          user_group_id: userForm.user_group_id ? parseInt(userForm.user_group_id) : null,
-          status: 'active'
-        })
+        const result = await res.json()
+        if (!res.ok) { setFormError(result.error || 'Failed to create user'); setSaving(false); return }
       }
       await fetchUsers(); setShowUserModal(false)
     } catch (e: any) { setFormError(e.message || 'Something went wrong') }
@@ -145,7 +145,15 @@ export default function UsersPage() {
 
   const deleteUser = async (u: AdminUser) => {
     if (!confirm(`Delete "${u.full_name}"? This cannot be undone.`)) return
-    await supabase.from('admin_users').delete().eq('id', u.id)
+    const res = await fetch('/api/admin/delete-admin-user', {
+      method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ auth_id: u.auth_id, admin_user_id: u.id })
+    })
+    if (!res.ok) {
+      const result = await res.json()
+      alert(result.error || 'Failed to delete user')
+      return
+    }
     await fetchUsers()
   }
 
