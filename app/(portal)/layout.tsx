@@ -62,6 +62,18 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   const [theme, setThemeState] = useState<Theme>('system')
   const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+
+  useEffect(() => {
+    setSidebarCollapsed(localStorage.getItem('fmb-sidebar') === 'collapsed')
+  }, [])
+
+  const toggleCollapse = () => {
+    setSidebarCollapsed(v => {
+      localStorage.setItem('fmb-sidebar', v ? 'expanded' : 'collapsed')
+      return !v
+    })
+  }
 
   useEffect(() => {
     const saved = loadTheme()
@@ -151,28 +163,32 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
 
   const SidebarContent = () => (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ padding: '16px 16px 14px', borderBottom: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-          <div style={{ flex: 1, minWidth: 0, textAlign: 'center' }}>
-            <img
-              src="/fmb-logo-2-2.svg"
-              alt="Faiz ul Mawaid il Burhaniyah"
-              style={{ width: '100%', maxWidth: '180px', height: 'auto', display: 'block', margin: '0 auto 8px', filter: 'brightness(0) invert(1)' }}
-            />
-            <div style={{ color: '#fff', fontSize: '11px', fontWeight: 700, lineHeight: 1.4 }}>Faiz ul Mawaid il Burhaniyah</div>
-            <div style={{ color: '#ffd97d', fontSize: '10px', fontWeight: 500, marginTop: 2 }}></div>
+
+      {/* Header */}
+      <div style={{ padding: sidebarCollapsed ? '14px 0' : '16px 16px 14px', borderBottom: '1px solid rgba(255,255,255,0.1)', flexShrink: 0, transition: 'padding 0.25s' }}>
+        {sidebarCollapsed ? (
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(255,217,125,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <i className="bi bi-cup-hot" style={{ color: '#ffd97d', fontSize: '18px' }} />
+            </div>
           </div>
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="d-lg-none"
-            style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', fontSize: '20px', cursor: 'pointer', padding: '0', lineHeight: 1, flexShrink: 0, marginLeft: 4 }}
-          >
-            <i className="bi bi-x" />
-          </button>
-        </div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+            <div style={{ flex: 1, minWidth: 0, textAlign: 'center' }}>
+              <img src="/fmb-logo-2-2.svg" alt="Faiz ul Mawaid il Burhaniyah"
+                style={{ width: '100%', maxWidth: '180px', height: 'auto', display: 'block', margin: '0 auto 8px', filter: 'brightness(0) invert(1)' }} />
+              <div style={{ color: '#fff', fontSize: '11px', fontWeight: 700, lineHeight: 1.4 }}>Faiz ul Mawaid il Burhaniyah</div>
+            </div>
+            <button onClick={() => setSidebarOpen(false)} className="d-lg-none"
+              style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', fontSize: '20px', cursor: 'pointer', padding: '0', lineHeight: 1, flexShrink: 0, marginLeft: 4 }}>
+              <i className="bi bi-x" />
+            </button>
+          </div>
+        )}
       </div>
 
-      <nav style={{ padding: '12px 0', flex: 1, overflowY: 'auto' }}>
+      {/* Nav */}
+      <nav style={{ padding: '12px 0', flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
         {menuItems.map((item) => {
           const hasChildren = !!(item as any).children
           const children = (item as any).children as { label: string; href: string; icon: string }[] | undefined
@@ -187,11 +203,14 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
           if (hasChildren) {
             return (
               <div key={item.href}>
-                <div
+                <div title={sidebarCollapsed ? item.label : undefined}
                   onClick={() => router.push(item.href)}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: '10px',
-                    padding: '11px 16px', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center',
+                    gap: sidebarCollapsed ? 0 : '10px',
+                    padding: sidebarCollapsed ? '11px 0' : '11px 16px',
+                    justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                    cursor: 'pointer',
                     background: isGroupActive ? 'rgba(255,191,105,0.15)' : 'transparent',
                     borderLeft: isGroupActive ? '3px solid #ffd97d' : '3px solid transparent',
                     color: isGroupActive ? '#ffd97d' : 'rgba(255,255,255,0.65)',
@@ -200,20 +219,19 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                   onMouseEnter={e => { if (!isGroupActive) e.currentTarget.style.background = 'rgba(255,255,255,0.07)' }}
                   onMouseLeave={e => { if (!isGroupActive) e.currentTarget.style.background = 'transparent' }}
                 >
-                  <i className={`bi ${item.icon}`} style={{ fontSize: '16px', width: '18px' }} />
-                  <span style={{ flex: 1 }}>{item.label}</span>
-                  <i className={`bi bi-chevron-${isGroupActive ? 'down' : 'right'}`} style={{ fontSize: '11px', opacity: 0.6 }} />
+                  <i className={`bi ${item.icon}`} style={{ fontSize: '16px', width: '18px', flexShrink: 0 }} />
+                  {!sidebarCollapsed && <>
+                    <span style={{ flex: 1, whiteSpace: 'nowrap' }}>{item.label}</span>
+                    <i className={`bi bi-chevron-${isGroupActive ? 'down' : 'right'}`} style={{ fontSize: '11px', opacity: 0.6 }} />
+                  </>}
                 </div>
 
-                {isGroupActive && children!.map(child => {
+                {isGroupActive && !sidebarCollapsed && children!.map(child => {
                   const isChildActive = child.href === item.href
                     ? pathname === child.href
                     : pathname === child.href || pathname.startsWith(child.href + '/')
-
                   return (
-                    <div
-                      key={child.href}
-                      onClick={() => router.push(child.href)}
+                    <div key={child.href} onClick={() => router.push(child.href)}
                       style={{
                         display: 'flex', alignItems: 'center', gap: '10px',
                         padding: '9px 16px 9px 40px', cursor: 'pointer',
@@ -234,17 +252,17 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
             )
           }
 
-          const isActive = item.href === '/dashboard'
-            ? pathname === '/dashboard'
-            : pathname.startsWith(item.href)
+          const isActive = item.href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(item.href)
 
           return (
-            <div
-              key={item.href}
+            <div key={item.href} title={sidebarCollapsed ? item.label : undefined}
               onClick={() => router.push(item.href)}
               style={{
-                display: 'flex', alignItems: 'center', gap: '10px',
-                padding: '11px 16px', cursor: 'pointer',
+                display: 'flex', alignItems: 'center',
+                gap: sidebarCollapsed ? 0 : '10px',
+                padding: sidebarCollapsed ? '11px 0' : '11px 16px',
+                justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                cursor: 'pointer',
                 background: isActive ? 'rgba(255,191,105,0.15)' : 'transparent',
                 borderLeft: isActive ? '3px solid #ffd97d' : '3px solid transparent',
                 color: isActive ? '#ffd97d' : 'rgba(255,255,255,0.65)',
@@ -253,26 +271,61 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
               onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'rgba(255,255,255,0.07)' }}
               onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent' }}
             >
-              <i className={`bi ${item.icon}`} style={{ fontSize: '16px', width: '18px' }} />
-              <span style={{ flex: 1 }}>{item.label}</span>
+              <i className={`bi ${item.icon}`} style={{ fontSize: '16px', width: '18px', flexShrink: 0 }} />
+              {!sidebarCollapsed && <span style={{ flex: 1, whiteSpace: 'nowrap' }}>{item.label}</span>}
             </div>
           )
         })}
       </nav>
 
-      <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-          <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#ffd97d', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#d4a032', fontSize: '13px', fontWeight: 700, flexShrink: 0 }}>
-            {adminUser?.full_name?.charAt(0).toUpperCase()}
+      {/* Collapse toggle — desktop only */}
+      <button
+        className="d-none d-lg-flex"
+        onClick={toggleCollapse}
+        title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        style={{
+          alignItems: 'center', justifyContent: 'center', gap: '8px',
+          margin: '6px 10px', padding: '8px',
+          background: 'rgba(255,255,255,0.07)', border: 'none', borderRadius: '8px',
+          color: 'rgba(255,255,255,0.55)', fontSize: '13px', cursor: 'pointer',
+          transition: 'background 0.15s', flexShrink: 0,
+        }}
+        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.13)')}
+        onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.07)')}
+      >
+        <i className={`bi bi-chevron-${sidebarCollapsed ? 'right' : 'left'}`} style={{ fontSize: '14px' }} />
+        {!sidebarCollapsed && <span style={{ whiteSpace: 'nowrap' }}>Collapse</span>}
+      </button>
+
+      {/* User footer */}
+      <div style={{ padding: sidebarCollapsed ? '12px 0' : '12px 16px', borderTop: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
+        {sidebarCollapsed ? (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+            <div title={adminUser?.full_name}
+              style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#ffd97d', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#d4a032', fontSize: '13px', fontWeight: 700, cursor: 'default' }}>
+              {adminUser?.full_name?.charAt(0).toUpperCase()}
+            </div>
+            <button onClick={handleLogout} title="Logout"
+              style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '6px', color: '#fff', width: '32px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+              <i className="bi bi-box-arrow-right" style={{ fontSize: '13px' }} />
+            </button>
           </div>
-          <div style={{ overflow: 'hidden' }}>
-            <div style={{ color: '#fff', fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{adminUser?.full_name}</div>
-            <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px' }}>{adminUser?.user_groups?.name || 'No Group'}</div>
-          </div>
-        </div>
-        <button onClick={handleLogout} className="btn btn-sm w-100" style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', fontSize: '13px' }}>
-          <i className="bi bi-box-arrow-right me-2" />Logout
-        </button>
+        ) : (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#ffd97d', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#d4a032', fontSize: '13px', fontWeight: 700, flexShrink: 0 }}>
+                {adminUser?.full_name?.charAt(0).toUpperCase()}
+              </div>
+              <div style={{ overflow: 'hidden' }}>
+                <div style={{ color: '#fff', fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{adminUser?.full_name}</div>
+                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px' }}>{adminUser?.user_groups?.name || 'No Group'}</div>
+              </div>
+            </div>
+            <button onClick={handleLogout} className="btn btn-sm w-100" style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', fontSize: '13px' }}>
+              <i className="bi bi-box-arrow-right me-2" />Logout
+            </button>
+          </>
+        )}
       </div>
     </div>
   )
@@ -283,7 +336,6 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       <style>{`
         @media (min-width: 992px) {
           .fmb-sidebar-desktop { display: flex !important; }
-          .fmb-main { margin-left: 240px !important; }
           .fmb-hamburger { display: none !important; }
           .fmb-mobile-overlay, .fmb-sidebar-drawer { display: none !important; }
         }
@@ -322,7 +374,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       <script dangerouslySetInnerHTML={{ __html: `window.__fmbIsAdmin = ${isAdmin}` }} />
 
       <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bs-tertiary-bg)' }}>
-        <div className="fmb-sidebar-desktop" style={{ width: '240px', background: '#6b4010', flexDirection: 'column', flexShrink: 0, position: 'fixed', top: 0, left: 0, height: '100vh', zIndex: 100 }}>
+        <div className="fmb-sidebar-desktop" style={{ width: sidebarCollapsed ? '60px' : '240px', background: '#6b4010', flexDirection: 'column', flexShrink: 0, position: 'fixed', top: 0, left: 0, height: '100vh', zIndex: 100, transition: 'width 0.25s cubic-bezier(0.4,0,0.2,1)', overflow: 'hidden' }}>
           <SidebarContent />
         </div>
 
@@ -331,7 +383,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
           <SidebarContent />
         </div>
 
-        <div className="fmb-main" style={{ flex: 1, overflow: 'auto', minHeight: '100vh', overflowX: 'hidden' }}>
+        <div className="fmb-main" style={{ flex: 1, overflow: 'auto', minHeight: '100vh', overflowX: 'hidden', marginLeft: sidebarCollapsed ? '60px' : '240px', transition: 'margin-left 0.25s cubic-bezier(0.4,0,0.2,1)' }}>
           <div className="fmb-topbar" style={{
             background: 'var(--bs-body-bg)', padding: '0 24px', height: '60px',
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
