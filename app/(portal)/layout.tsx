@@ -262,7 +262,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
 
       <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-          <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#ffd97d', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#40798c', fontSize: '13px', fontWeight: 700, flexShrink: 0 }}>
+          <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#ffd97d', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#d4a032', fontSize: '13px', fontWeight: 700, flexShrink: 0 }}>
             {adminUser?.full_name?.charAt(0).toUpperCase()}
           </div>
           <div style={{ overflow: 'hidden' }}>
@@ -295,7 +295,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         .fmb-sidebar-drawer {
           position: fixed; top: 0; left: 0;
           width: 270px; height: 100vh;
-          background: #1f363d; z-index: 1050;
+          background: #6b4010; z-index: 1050;
           transform: translateX(-100%);
           transition: transform 0.27s cubic-bezier(0.4, 0, 0.2, 1);
           display: flex; flex-direction: column;
@@ -322,7 +322,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       <script dangerouslySetInnerHTML={{ __html: `window.__fmbIsAdmin = ${isAdmin}` }} />
 
       <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bs-tertiary-bg)' }}>
-        <div className="fmb-sidebar-desktop" style={{ width: '240px', background: '#1f363d', flexDirection: 'column', flexShrink: 0, position: 'fixed', top: 0, left: 0, height: '100vh', zIndex: 100 }}>
+        <div className="fmb-sidebar-desktop" style={{ width: '240px', background: '#6b4010', flexDirection: 'column', flexShrink: 0, position: 'fixed', top: 0, left: 0, height: '100vh', zIndex: 100 }}>
           <SidebarContent />
         </div>
 
@@ -339,12 +339,12 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
             boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
             position: 'sticky', top: 0, zIndex: 50,
           }}>
-            <button className="fmb-hamburger" onClick={() => setSidebarOpen(true)} style={{ display: 'none', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 8px', borderRadius: '6px', color: '#40798c' }}>
+            <button className="fmb-hamburger" onClick={() => setSidebarOpen(true)} style={{ display: 'none', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 8px', borderRadius: '6px', color: '#d4a032' }}>
               <i className="bi bi-list" style={{ fontSize: '24px' }} />
             </button>
 
             <div className="d-lg-none" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '13px', fontWeight: 700, color: '#40798c', marginLeft: '4px' }}>FMB Portal</span>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: '#d4a032', marginLeft: '4px' }}>FMB Portal</span>
             </div>
 
             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -389,7 +389,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                       >
                         <i className={`bi ${opt.icon}`} style={{ color: '#ffd97d', width: '16px', flexShrink: 0 }} />
                         <span style={{ flex: 1 }}>{opt.label}</span>
-                        {theme === opt.val && <i className="bi bi-check2" style={{ color: '#40798c' }} />}
+                        {theme === opt.val && <i className="bi bi-check2" style={{ color: '#d4a032' }} />}
                       </div>
                     ))}
                   </div>
@@ -409,7 +409,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                   onMouseEnter={e => { if (!showProfileDropdown) e.currentTarget.style.background = 'var(--bs-secondary-bg)' }}
                   onMouseLeave={e => { if (!showProfileDropdown) e.currentTarget.style.background = 'transparent' }}
                 >
-                  <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#40798c', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffd97d', fontSize: '13px', fontWeight: 700, flexShrink: 0 }}>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#d4a032', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffd97d', fontSize: '13px', fontWeight: 700, flexShrink: 0 }}>
                     {adminUser?.full_name?.charAt(0).toUpperCase()}
                   </div>
                   <div className="d-none d-sm-block">

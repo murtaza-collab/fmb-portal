@@ -192,8 +192,8 @@ export default function KitchenScanPage() {
                 background: tapping ? 'radial-gradient(circle, #ffd97d, #f97316)' :
                   result === 'success' ? 'radial-gradient(circle, #22c55e, #16a34a)' :
                   result === 'error'   ? 'radial-gradient(circle, #ef4444, #dc2626)' :
-                  'radial-gradient(circle, #40798c, #1e3a5f)',
-                boxShadow: tapping ? '0 0 60px #ffd97d80' : result === 'success' ? '0 0 60px #22c55e80' : '0 0 40px #40798c40',
+                  'radial-gradient(circle, #d4a032, #1e3a5f)',
+                boxShadow: tapping ? '0 0 60px #ffd97d80' : result === 'success' ? '0 0 60px #22c55e80' : '0 0 40px #d4a03240',
                 transform: tapping ? 'scale(0.94)' : 'scale(1)',
                 transition: 'all 0.15s',
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8,

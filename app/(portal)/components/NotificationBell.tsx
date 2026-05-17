@@ -125,7 +125,7 @@ export default function NotificationBell() {
                 <button 
                   onClick={markAllAsRead}
                   className="btn btn-sm btn-link"
-                  style={{ fontSize: '12px', color: '#40798c' }}
+                  style={{ fontSize: '12px', color: '#d4a032' }}
                 >
                   Mark all read
                 </button>

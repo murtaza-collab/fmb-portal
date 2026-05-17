@@ -178,7 +178,7 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
 
   if (loading) return (
     <div className="d-flex justify-content-center align-items-center" style={{ minHeight:'60vh' }}>
-      <div className="spinner-border" style={{ color:'#40798c' }} />
+      <div className="spinner-border" style={{ color:'#d4a032' }} />
     </div>
   )
 
@@ -202,7 +202,7 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
     { label:'Ready',         value:kitchenStats.counterBDone + kitchenStats.counterCDone,
                                                               color:'#0ab39c', bg:'#0ab39c18', icon:'bi-check2-circle',
                                                               sub:`${kitchenStats.totalThaalisReady} thaalis` },
-    { label:'Dispatched',    value:kitchenStats.dispatched,   color:'#40798c', bg:'#40798c18', icon:'bi-truck',
+    { label:'Dispatched',    value:kitchenStats.dispatched,   color:'#d4a032', bg:'#d4a03218', icon:'bi-truck',
                                                               sub:`${kitchenStats.totalThaalisDispatched} thaalis` },
   ]
 
@@ -218,7 +218,7 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
         </div>
         <div className="d-flex gap-2">
           <button onClick={() => router.push('/kitchen')} className="btn btn-sm"
-            style={{ background:'#40798c', color:'#fff', borderRadius:8, fontSize:13, fontWeight:600 }}>
+            style={{ background:'#d4a032', color:'#fff', borderRadius:8, fontSize:13, fontWeight:600 }}>
             <i className="bi bi-grid-3x3-gap me-1" />Kitchen Portal
           </button>
           <button onClick={fetchStats} className="btn btn-sm btn-outline-secondary" style={{ borderRadius:8, fontSize:13 }}>
@@ -237,13 +237,13 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
               <div className="d-flex justify-content-between align-items-start">
                 <div>
                   <p style={{ fontSize:11, textTransform:'uppercase', letterSpacing:'0.6px', fontWeight:600, color:'var(--bs-secondary-color)', marginBottom:4 }}>Active HOFs</p>
-                  <h3 className="mb-0 fw-bold" style={{ color:'#40798c', fontSize:28 }}>{stats.activeHOFs}</h3>
+                  <h3 className="mb-0 fw-bold" style={{ color:'#d4a032', fontSize:28 }}>{stats.activeHOFs}</h3>
                   <p style={{ fontSize:12, color:'var(--bs-secondary-color)', marginTop:4, marginBottom:0 }}>
                     {stats.totalMumineen} total mumineen (incl. members)
                   </p>
                 </div>
-                <div style={{ width:44, height:44, borderRadius:10, background:'#40798c18', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                  <i className="bi bi-house-fill" style={{ fontSize:20, color:'#40798c' }} />
+                <div style={{ width:44, height:44, borderRadius:10, background:'#d4a03218', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                  <i className="bi bi-house-fill" style={{ fontSize:20, color:'#d4a032' }} />
                 </div>
               </div>
             </div>
@@ -326,7 +326,7 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
                       </span>
                     )}
                     {stats.pendingTakhmeem > 0 && (
-                      <span className="badge" style={{ background:'#40798c22', color:'#40798c', fontSize:10 }}>
+                      <span className="badge" style={{ background:'#d4a03222', color:'#d4a032', fontSize:10 }}>
                         {stats.pendingTakhmeem} niyyat
                       </span>
                     )}
@@ -391,8 +391,8 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
           <div className="card h-100" style={{ borderRadius:12, border:'none', boxShadow:'0 1px 6px rgba(0,0,0,0.07)' }}>
             <div className="card-body p-3">
               <div className="d-flex align-items-center gap-2 mb-3">
-                <div style={{ width:32, height:32, borderRadius:8, background:'#40798c18', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                  <i className="bi bi-grid-3x3-gap" style={{ color:'#40798c', fontSize:16 }} />
+                <div style={{ width:32, height:32, borderRadius:8, background:'#d4a03218', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                  <i className="bi bi-grid-3x3-gap" style={{ color:'#d4a032', fontSize:16 }} />
                 </div>
                 <div>
                   <h6 className="mb-0 fw-bold">Kitchen Operations</h6>
@@ -417,7 +417,7 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
                   { label:'Arrival',   href:'/kitchen',           icon:'bi-qr-code-scan',  color:'#299cdb' },
                   { label:'Counter B', href:'/kitchen/counter-b', icon:'bi-upc-scan',       color:'#ffd97d' },
                   { label:'Counter C', href:'/kitchen/counter-c', icon:'bi-check2-square',  color:'#0ab39c' },
-                  { label:'Dispatch',  href:'/kitchen/dispatch',  icon:'bi-truck',           color:'#40798c' },
+                  { label:'Dispatch',  href:'/kitchen/dispatch',  icon:'bi-truck',           color:'#d4a032' },
                 ].map((link, i) => (
                   <button key={i} onClick={() => router.push(link.href)} className="btn btn-sm"
                     style={{ background:link.color+'15', color:link.color, border:`1px solid ${link.color}33`, borderRadius:7, fontSize:12, fontWeight:600, padding:'4px 10px' }}>
@@ -509,8 +509,8 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
           <div className="card" style={{ borderRadius:12, border:'none', boxShadow:'0 1px 6px rgba(0,0,0,0.07)' }}>
             <div className="card-body p-3">
               <div className="d-flex align-items-center gap-2 mb-3">
-                <div style={{ width:32, height:32, borderRadius:8, background:'#40798c18', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                  <i className="bi bi-moon-stars" style={{ color:'#40798c', fontSize:16 }} />
+                <div style={{ width:32, height:32, borderRadius:8, background:'#d4a03218', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                  <i className="bi bi-moon-stars" style={{ color:'#d4a032', fontSize:16 }} />
                 </div>
                 <div>
                   <h6 className="mb-0 fw-bold">Fiscal Year (Hijri)</h6>
@@ -519,9 +519,9 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
               </div>
               <div className="row g-3">
                 <div className="col-md-4">
-                  <div style={{ background:'#40798c10', borderRadius:10, padding:14, border:'1px solid #40798c25' }}>
-                    <div style={{ fontSize:11, fontWeight:700, color:'#40798c', textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:6 }}>Current FY</div>
-                    <div style={{ fontSize:18, fontWeight:800, color:'#40798c' }}>{currentFY.hijriYear}H</div>
+                  <div style={{ background:'#d4a03210', borderRadius:10, padding:14, border:'1px solid #d4a03225' }}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'#d4a032', textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:6 }}>Current FY</div>
+                    <div style={{ fontSize:18, fontWeight:800, color:'#d4a032' }}>{currentFY.hijriYear}H</div>
                     <div style={{ fontSize:12, color:'var(--bs-secondary-color)', marginTop:4 }}>{fmtDateShort(currentFY.startGregorian)} → {fmtDateShort(currentFY.endGregorian)}</div>
                     <div style={{ fontSize:11, color:'#0ab39c', marginTop:4, fontWeight:600 }}>1 Ramadan {currentFY.hijriYear}H</div>
                     {rolloverDone && <div style={{ marginTop:8, fontSize:11, color:'#0ab39c', fontWeight:600 }}><i className="bi bi-check-circle-fill me-1" />Rollover done</div>}
@@ -560,7 +560,7 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
                     </div>
                     {!rolloverDone && (
                       <button onClick={() => setShowRolloverConfirm(true)} disabled={rolloverLoading} className="btn btn-sm mt-3 w-100"
-                        style={{ background: rolloverOverdue ? '#e63946' : '#40798c', color:'#fff', borderRadius:8, fontSize:13, fontWeight:600 }}>
+                        style={{ background: rolloverOverdue ? '#e63946' : '#d4a032', color:'#fff', borderRadius:8, fontSize:13, fontWeight:600 }}>
                         {rolloverLoading
                           ? <><span className="spinner-border spinner-border-sm me-1" />Rolling over...</>
                           : <><i className="bi bi-arrow-repeat me-1" />Rollover to {nextFY.hijriYear}H</>}
@@ -577,11 +577,11 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
       {/* Quick Links */}
       <div className="row g-3">
         {[
-          { label:'Mumineen',         sub:'Manage community members',         icon:'bi-people-fill',      color:'#40798c', href:'/mumineen' },
+          { label:'Mumineen',         sub:'Manage community members',         icon:'bi-people-fill',      color:'#d4a032', href:'/mumineen' },
           { label:'Thaali',           sub:'Registrations & stickers',         icon:'bi-cup-hot',          color:'#0ab39c', href:'/thaali' },
           { label:'Address Requests', sub:`${stats.pendingAddressRequests} pending`, icon:'bi-geo-alt-fill', color:'#299cdb', href:'/address-requests' },
           { label:'Takhmeen',         sub:`${stats.pendingTakhmeem} pending niyyat`, icon:'bi-clipboard-check', color:'#ffd97d', href:'/takhmeen' },
-          { label:'Distributors',     sub:'Manage distributors',              icon:'bi-truck',            color:'#40798c', href:'/distributors' },
+          { label:'Distributors',     sub:'Manage distributors',              icon:'bi-truck',            color:'#d4a032', href:'/distributors' },
           { label:'Calendar',         sub:'Events & daily menu',              icon:'bi-calendar3',        color:'#ffd97d', href:'/calendar' },
         ].map((item, i) => (
           <div key={i} className="col-xl-2 col-md-4 col-6">

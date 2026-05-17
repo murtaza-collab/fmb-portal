@@ -175,7 +175,7 @@ export default function DistributorsPage() {
           <p className="mb-0" style={{ fontSize: 13, color: 'var(--bs-secondary-color)' }}>Manage delivery distributors</p>
         </div>
         <button className="btn btn-sm" onClick={openAdd}
-          style={{ background: '#40798c', color: '#fff', borderRadius: 8, fontWeight: 600, fontSize: 13 }}>
+          style={{ background: '#d4a032', color: '#fff', borderRadius: 8, fontWeight: 600, fontSize: 13 }}>
           <i className="bi bi-plus me-1" />Add Distributor
         </button>
       </div>
@@ -218,7 +218,7 @@ export default function DistributorsPage() {
                       </td>
                       <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
                         <button className="btn btn-sm me-1" onClick={() => openEdit(d)}
-                          style={{ fontSize: 11, padding: '3px 10px', background: '#40798c15', color: '#40798c', border: 'none', borderRadius: 6 }}>
+                          style={{ fontSize: 11, padding: '3px 10px', background: '#d4a03215', color: '#d4a032', border: 'none', borderRadius: 6 }}>
                           <i className="bi bi-pencil me-1" />Edit
                         </button>
                         <button className="btn btn-sm me-1" onClick={() => openSectors(d)}
@@ -291,7 +291,7 @@ export default function DistributorsPage() {
                 <div>
                   <label className="form-label fw-semibold mb-2" style={{ fontSize: 13, color: 'var(--bs-body-color)' }}>
                     Assign Sectors
-                    <span className="ms-2 badge" style={{ background: '#40798c20', color: '#40798c', fontSize: 11 }}>
+                    <span className="ms-2 badge" style={{ background: '#d4a03220', color: '#d4a032', fontSize: 11 }}>
                       {formSectors.length} selected
                     </span>
                   </label>
@@ -305,9 +305,9 @@ export default function DistributorsPage() {
                           <div key={s.id} className="col-12 col-sm-6 col-md-4">
                             <div onClick={() => toggleFormSector(s.id)} style={{
                               padding: '8px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 13,
-                              background: active ? '#40798c' : 'var(--bs-tertiary-bg)',
+                              background: active ? '#d4a032' : 'var(--bs-tertiary-bg)',
                               color: active ? '#fff' : 'var(--bs-body-color)',
-                              border: `1px solid ${active ? '#40798c' : 'var(--bs-border-color)'}`,
+                              border: `1px solid ${active ? '#d4a032' : 'var(--bs-border-color)'}`,
                               transition: 'all 0.15s',
                             }}>
                               {active ? <i className="bi bi-check-circle-fill me-2" /> : <i className="bi bi-circle me-2" style={{ opacity: 0.4 }} />}
@@ -323,7 +323,7 @@ export default function DistributorsPage() {
               <div className="modal-footer" style={{ borderTop: '1px solid var(--bs-border-color)' }}>
                 <button className="btn btn-sm btn-outline-secondary" onClick={() => setShowModal(false)} style={{ borderRadius: 8 }}>Cancel</button>
                 <button className="btn btn-sm" onClick={handleSave} disabled={saving || !form.full_name.trim()}
-                  style={{ background: '#40798c', color: '#fff', borderRadius: 8, fontWeight: 600 }}>
+                  style={{ background: '#d4a032', color: '#fff', borderRadius: 8, fontWeight: 600 }}>
                   {saving ? <><span className="spinner-border spinner-border-sm me-1" />Saving...</> : 'Save'}
                 </button>
               </div>
@@ -355,9 +355,9 @@ export default function DistributorsPage() {
                       <div key={s.id} className="col-12 col-sm-6">
                         <div onClick={() => toggleAssignedSector(s.id)} style={{
                           padding: '8px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 13,
-                          background: active ? '#40798c' : 'var(--bs-tertiary-bg)',
+                          background: active ? '#d4a032' : 'var(--bs-tertiary-bg)',
                           color: active ? '#fff' : 'var(--bs-body-color)',
-                          border: `1px solid ${active ? '#40798c' : 'var(--bs-border-color)'}`,
+                          border: `1px solid ${active ? '#d4a032' : 'var(--bs-border-color)'}`,
                           transition: 'all 0.15s',
                         }}>
                           {active ? <i className="bi bi-check-circle-fill me-2" /> : <i className="bi bi-circle me-2" style={{ opacity: 0.4 }} />}
@@ -371,7 +371,7 @@ export default function DistributorsPage() {
               <div className="modal-footer" style={{ borderTop: '1px solid var(--bs-border-color)' }}>
                 <button className="btn btn-sm btn-outline-secondary" onClick={() => setShowSectorModal(false)} style={{ borderRadius: 8 }}>Cancel</button>
                 <button className="btn btn-sm" onClick={saveSectors} disabled={saving}
-                  style={{ background: '#40798c', color: '#fff', borderRadius: 8, fontWeight: 600 }}>
+                  style={{ background: '#d4a032', color: '#fff', borderRadius: 8, fontWeight: 600 }}>
                   {saving ? 'Saving...' : 'Save Sectors'}
                 </button>
               </div>

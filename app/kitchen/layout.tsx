@@ -130,7 +130,7 @@ export default function KitchenLayout({ children }: { children: React.ReactNode 
               width: 32,
               height: 32,
               borderRadius: 8,
-              background: '#40798c',
+              background: '#d4a032',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',

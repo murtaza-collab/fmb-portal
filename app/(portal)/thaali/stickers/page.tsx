@@ -270,9 +270,9 @@ export default function ThaaliStickersPage() {
                           onChange={() => toggleSelect(r.id)}
                           style={{ cursor: 'pointer', width: '16px', height: '16px' }} />
                       </td>
-                      <td style={{ fontWeight: 600, color: '#40798c' }}>{r.mumineen?.sf_no}</td>
+                      <td style={{ fontWeight: 600, color: '#d4a032' }}>{r.mumineen?.sf_no}</td>
                       <td style={{ whiteSpace: 'nowrap' }}>{r.mumineen?.full_name}</td>
-                      <td style={{ fontWeight: 700, color: '#40798c' }}>#{r.thaalis?.thaali_number}</td>
+                      <td style={{ fontWeight: 700, color: '#d4a032' }}>#{r.thaalis?.thaali_number}</td>
                       <td>{r.thaali_types?.name || '—'}</td>
                       <td>{r.thaali_categories?.name || '—'}</td>
                       <td style={{ fontSize: '12px' }}>{r.mumineen?.house_sectors?.name || '—'}</td>
