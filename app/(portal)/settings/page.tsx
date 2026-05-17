@@ -69,6 +69,11 @@ export default function SettingsPage() {
   const [generatingPDF, setGeneratingPDF]               = useState(false)
   const [previewUrl, setPreviewUrl]                     = useState<string | null>(null)
 
+  const [thaaliPage, setThaaliPage]     = useState(1)
+  const [thaaliSearch, setThaaliSearch] = useState('')
+  const [sectorPage, setSectorPage]     = useState(1)
+  const [sectorSearch, setSectorSearch] = useState('')
+
   // Sector Excel import
   const sectorFileRef                                   = useRef<HTMLInputElement>(null)
   const [showSectorImport, setShowSectorImport]         = useState(false)
@@ -436,10 +441,20 @@ export default function SettingsPage() {
   const showAddButton = !['fiscal', 'kitchen', 'stickers'].includes(activeTab)
   const currentTab = TABS.find((t) => t.key === activeTab)
 
-  // Filtered thaali numbers for display
-  const filteredThaaliNumbers = thaaliNumbers.filter(t =>
-    thaaliFilter === 'all' ? true : thaaliFilter === 'assigned' ? t.assigned : !t.assigned
-  )
+  const THAALI_PAGE_SIZE = 100
+  const SECTOR_PAGE_SIZE = 50
+
+  const filteredThaaliNumbers = thaaliNumbers.filter(t => {
+    const matchFilter = thaaliFilter === 'all' ? true : thaaliFilter === 'assigned' ? t.assigned : !t.assigned
+    const matchSearch = !thaaliSearch || String(t.thaali_number).includes(thaaliSearch.trim())
+    return matchFilter && matchSearch
+  })
+  const totalThaaliPages  = Math.max(1, Math.ceil(filteredThaaliNumbers.length / THAALI_PAGE_SIZE))
+  const pagedThaaliNumbers = filteredThaaliNumbers.slice((thaaliPage - 1) * THAALI_PAGE_SIZE, thaaliPage * THAALI_PAGE_SIZE)
+
+  const filteredSectorList = sectors.filter(s => !sectorSearch || s.name.toLowerCase().includes(sectorSearch.toLowerCase()))
+  const totalSectorPages   = Math.max(1, Math.ceil(filteredSectorList.length / SECTOR_PAGE_SIZE))
+  const pagedSectors       = filteredSectorList.slice((sectorPage - 1) * SECTOR_PAGE_SIZE, sectorPage * SECTOR_PAGE_SIZE)
 
   return (
     <>
@@ -656,14 +671,14 @@ export default function SettingsPage() {
                 </div>
               ) : activeTab === 'thaali_numbers' ? (
                 <>
-                  {/* ── Filter tabs ── */}
+                  {/* ── Filter + Search ── */}
                   <div className="d-flex align-items-center gap-2 mb-3 flex-wrap">
                     {[
-                      { key: 'all',        label: `All (${thaaliNumbers.length})`,                                    color: '#d4a032' },
-                      { key: 'unassigned', label: `Unassigned (${thaaliNumbers.filter(t => !t.assigned).length})`,   color: '#0ab39c' },
-                      { key: 'assigned',   label: `Assigned (${thaaliNumbers.filter(t => t.assigned).length})`,      color: '#d4a032' },
+                      { key: 'all',        label: `All (${thaaliNumbers.length})`,                                  color: '#d4a032' },
+                      { key: 'unassigned', label: `Unassigned (${thaaliNumbers.filter(t => !t.assigned).length})`, color: '#0ab39c' },
+                      { key: 'assigned',   label: `Assigned (${thaaliNumbers.filter(t => t.assigned).length})`,    color: '#d4a032' },
                     ].map(tab => (
-                      <button key={tab.key} onClick={() => setThaaliFilter(tab.key as any)} className="btn btn-sm"
+                      <button key={tab.key} onClick={() => { setThaaliFilter(tab.key as any); setThaaliPage(1) }} className="btn btn-sm"
                         style={{ borderRadius: 20, fontSize: 12, fontWeight: 600, padding: '4px 14px',
                           background: thaaliFilter === tab.key ? tab.color : 'var(--bs-tertiary-bg)',
                           color: thaaliFilter === tab.key ? '#fff' : 'var(--bs-body-color)',
@@ -671,21 +686,25 @@ export default function SettingsPage() {
                         {tab.label}
                       </button>
                     ))}
+                    <input type="text" placeholder="Search number…" value={thaaliSearch}
+                      onChange={e => { setThaaliSearch(e.target.value); setThaaliPage(1) }}
+                      className="form-control form-control-sm ms-auto"
+                      style={{ maxWidth: 160, borderRadius: 20, fontSize: 12 }} />
                   </div>
 
-                  <div className="table-responsive" style={{ maxHeight: '500px', overflowY: 'auto' }}>
+                  <div className="table-responsive">
                     <table className="table table-hover" style={{ fontSize: '13px' }}>
-                      <thead style={{ background: 'var(--bs-tertiary-bg)', position: 'sticky', top: 0, borderBottom: '2px solid var(--bs-border-color)' }}>
+                      <thead style={{ background: 'var(--bs-tertiary-bg)', borderBottom: '2px solid var(--bs-border-color)' }}>
                         <tr>
                           <th style={{ color: 'var(--bs-secondary-color)', fontWeight: 700 }}>Thaali Number</th>
-                          <th style={{ color: 'var(--bs-secondary-color)', fontWeight: 700 }}>Assigned</th>
+                          <th style={{ color: 'var(--bs-secondary-color)', fontWeight: 700 }}>Status</th>
                           <th style={{ width: 80 }}></th>
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredThaaliNumbers.length === 0 ? (
+                        {pagedThaaliNumbers.length === 0 ? (
                           <tr><td colSpan={3} className="text-center py-4" style={{ color: 'var(--bs-secondary-color)' }}>No thaali numbers found</td></tr>
-                        ) : filteredThaaliNumbers.map((t) => (
+                        ) : pagedThaaliNumbers.map((t) => (
                           <tr key={t.id}>
                             <td className="fw-semibold" style={{ color: 'var(--bs-body-color)' }}>{t.thaali_number}</td>
                             <td>
@@ -706,14 +725,52 @@ export default function SettingsPage() {
                       </tbody>
                     </table>
                   </div>
+                  {/* Thaali pagination */}
+                  <div className="d-flex align-items-center justify-content-between mt-2 flex-wrap gap-2">
+                    <span style={{ fontSize: '12px', color: 'var(--bs-secondary-color)' }}>
+                      Showing {filteredThaaliNumbers.length === 0 ? 0 : (thaaliPage - 1) * THAALI_PAGE_SIZE + 1}–{Math.min(thaaliPage * THAALI_PAGE_SIZE, filteredThaaliNumbers.length)} of {filteredThaaliNumbers.length}
+                    </span>
+                    {totalThaaliPages > 1 && (
+                      <div className="d-flex gap-1 flex-wrap">
+                        <button disabled={thaaliPage === 1} onClick={() => setThaaliPage(p => p - 1)} className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 6, fontSize: 12, padding: '3px 10px' }}>‹</button>
+                        {(() => {
+                          const pages: number[] = []
+                          if (totalThaaliPages <= 7) { for (let i = 1; i <= totalThaaliPages; i++) pages.push(i) }
+                          else {
+                            pages.push(1)
+                            if (thaaliPage > 3) pages.push(-1)
+                            for (let i = Math.max(2, thaaliPage - 1); i <= Math.min(totalThaaliPages - 1, thaaliPage + 1); i++) pages.push(i)
+                            if (thaaliPage < totalThaaliPages - 2) pages.push(-2)
+                            pages.push(totalThaaliPages)
+                          }
+                          return pages.map((p, i) => p < 0
+                            ? <span key={p + '_' + i} style={{ padding: '3px 6px', fontSize: 12, color: 'var(--bs-secondary-color)' }}>…</span>
+                            : <button key={p} onClick={() => setThaaliPage(p)} className="btn btn-sm" style={{ borderRadius: 6, fontSize: 12, minWidth: 32, padding: '3px 8px',
+                                background: thaaliPage === p ? '#d4a032' : 'var(--bs-tertiary-bg)',
+                                color: thaaliPage === p ? '#fff' : 'var(--bs-body-color)',
+                                border: thaaliPage === p ? 'none' : '1px solid var(--bs-border-color)' }}>{p}</button>
+                          )
+                        })()}
+                        <button disabled={thaaliPage === totalThaaliPages} onClick={() => setThaaliPage(p => p + 1)} className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 6, fontSize: 12, padding: '3px 10px' }}>›</button>
+                      </div>
+                    )}
+                  </div>
                 </>
               ) : activeTab === 'sectors' ? (
                 <div>
-                  {sectors.length === 0 ? (
-                    <div className="text-center py-5" style={{ color: 'var(--bs-secondary-color)' }}>
-                      <i className="bi bi-map fs-2 d-block mb-2" />No sectors added yet
+                  {sectors.length > 0 && (
+                    <div className="mb-3">
+                      <input type="text" placeholder="Search sectors…" value={sectorSearch}
+                        onChange={e => { setSectorSearch(e.target.value); setSectorPage(1) }}
+                        className="form-control form-control-sm"
+                        style={{ maxWidth: 280, borderRadius: 20, fontSize: 13 }} />
                     </div>
-                  ) : sectors.map((sec) => (
+                  )}
+                  {filteredSectorList.length === 0 ? (
+                    <div className="text-center py-5" style={{ color: 'var(--bs-secondary-color)' }}>
+                      <i className="bi bi-map fs-2 d-block mb-2" />{sectors.length === 0 ? 'No sectors added yet' : 'No sectors match your search'}
+                    </div>
+                  ) : pagedSectors.map((sec) => (
                     <div key={sec.id} className="mb-2" style={{ border: '1px solid var(--bs-border-color)', borderRadius: 10, overflow: 'hidden' }}>
                       <div className="d-flex align-items-center px-3 py-2" style={{ background: 'var(--bs-body-bg)' }}>
                         <span className="fw-semibold me-auto" style={{ color: 'var(--bs-body-color)' }}>{sec.name}</span>
@@ -757,6 +814,36 @@ export default function SettingsPage() {
                       )}
                     </div>
                   ))}
+                  {/* Sector pagination */}
+                  {totalSectorPages > 1 && (
+                    <div className="d-flex align-items-center justify-content-between mt-3 flex-wrap gap-2">
+                      <span style={{ fontSize: '12px', color: 'var(--bs-secondary-color)' }}>
+                        Showing {(sectorPage - 1) * SECTOR_PAGE_SIZE + 1}–{Math.min(sectorPage * SECTOR_PAGE_SIZE, filteredSectorList.length)} of {filteredSectorList.length}
+                      </span>
+                      <div className="d-flex gap-1 flex-wrap">
+                        <button disabled={sectorPage === 1} onClick={() => setSectorPage(p => p - 1)} className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 6, fontSize: 12, padding: '3px 10px' }}>‹</button>
+                        {(() => {
+                          const pages: number[] = []
+                          if (totalSectorPages <= 7) { for (let i = 1; i <= totalSectorPages; i++) pages.push(i) }
+                          else {
+                            pages.push(1)
+                            if (sectorPage > 3) pages.push(-1)
+                            for (let i = Math.max(2, sectorPage - 1); i <= Math.min(totalSectorPages - 1, sectorPage + 1); i++) pages.push(i)
+                            if (sectorPage < totalSectorPages - 2) pages.push(-2)
+                            pages.push(totalSectorPages)
+                          }
+                          return pages.map((p, i) => p < 0
+                            ? <span key={p + '_' + i} style={{ padding: '3px 6px', fontSize: 12, color: 'var(--bs-secondary-color)' }}>…</span>
+                            : <button key={p} onClick={() => setSectorPage(p)} className="btn btn-sm" style={{ borderRadius: 6, fontSize: 12, minWidth: 32, padding: '3px 8px',
+                                background: sectorPage === p ? '#d4a032' : 'var(--bs-tertiary-bg)',
+                                color: sectorPage === p ? '#fff' : 'var(--bs-body-color)',
+                                border: sectorPage === p ? 'none' : '1px solid var(--bs-border-color)' }}>{p}</button>
+                          )
+                        })()}
+                        <button disabled={sectorPage === totalSectorPages} onClick={() => setSectorPage(p => p + 1)} className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 6, fontSize: 12, padding: '3px 10px' }}>›</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : activeTab === 'stickers' ? (
                 <>
