@@ -474,7 +474,7 @@ export default function UsersPage() {
                           <th key={k} style={{ textAlign: 'center', cursor: 'pointer' }}
                             onClick={() => toggleAllPermission(k)}>
                             {PERM_LABELS[k]}
-                            <div style={{ fontSize: '10px', color: '#0d6efd' }}>all</div>
+                            <div style={{ fontSize: '10px', color: '#8a6318' }}>all</div>
                           </th>
                         ))}
                         <th style={{ textAlign: 'center' }}>

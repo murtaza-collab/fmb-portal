@@ -24,3 +24,121 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ==========================================================================
+   Bootstrap golden-theme overrides
+   --------------------------------------------------------------------------
+   Bootstrap 5.3.8 hardcodes #0d6efd in 23 selectors — most component blocks
+   set their own --bs-btn / --bs-pagination vars rather than reading
+   --bs-primary, so overriding the root vars alone is not enough. Loaded after
+   bootstrap.min.css (see app/layout.tsx), so equal-specificity rules win.
+
+   Palette: #d4a032 primary gold · #ffd97d accent · #6b4010 cinnamon brown
+   ========================================================================== */
+
+:root,
+[data-bs-theme="light"] {
+  --bs-primary: #d4a032;
+  --bs-primary-rgb: 212, 160, 50;
+  --bs-primary-text-emphasis: #6b4010;
+  --bs-primary-bg-subtle: #faf0dc;
+  --bs-primary-border-subtle: #ecd39b;
+
+  /* Links use a deeper gold: #d4a032 on white is only 2.4:1, this is 5.4:1 */
+  --bs-link-color: #8a6318;
+  --bs-link-color-rgb: 138, 99, 24;
+  --bs-link-hover-color: #6b4010;
+  --bs-link-hover-color-rgb: 107, 64, 16;
+
+  --bs-focus-ring-color: rgba(212, 160, 50, 0.25);
+}
+
+[data-bs-theme="dark"] {
+  --bs-primary-text-emphasis: #ffd97d;
+  --bs-primary-bg-subtle: #2b1d06;
+  --bs-primary-border-subtle: #6b4010;
+  --bs-link-color: #ffd97d;
+  --bs-link-color-rgb: 255, 217, 125;
+  --bs-link-hover-color: #ffe7a8;
+  --bs-link-hover-color-rgb: 255, 231, 168;
+}
+
+/* Buttons — white on gold matches the 24 inline-styled gold buttons already
+   in the app. Note this is 2.4:1; see the design note if that gets revisited. */
+.btn-primary {
+  --bs-btn-bg: #d4a032;
+  --bs-btn-border-color: #d4a032;
+  --bs-btn-hover-bg: #bd8d2a;
+  --bs-btn-hover-border-color: #a67a23;
+  --bs-btn-active-bg: #a67a23;
+  --bs-btn-active-border-color: #966d1f;
+  --bs-btn-disabled-bg: #d4a032;
+  --bs-btn-disabled-border-color: #d4a032;
+  --bs-btn-focus-shadow-rgb: 212, 160, 50;
+}
+
+.btn-outline-primary {
+  --bs-btn-color: #8a6318;
+  --bs-btn-border-color: #d4a032;
+  --bs-btn-hover-bg: #d4a032;
+  --bs-btn-hover-border-color: #d4a032;
+  --bs-btn-active-bg: #d4a032;
+  --bs-btn-active-border-color: #d4a032;
+  --bs-btn-disabled-color: #d4a032;
+  --bs-btn-disabled-border-color: #d4a032;
+  --bs-btn-focus-shadow-rgb: 212, 160, 50;
+}
+
+/* Form controls — border-color and focus ring are hardcoded, not var-driven */
+.form-control:focus,
+.form-select:focus,
+.form-check-input:focus {
+  border-color: #e2be6d;
+  box-shadow: 0 0 0 0.25rem rgba(212, 160, 50, 0.25);
+}
+
+.form-check-input:checked {
+  background-color: #d4a032;
+  border-color: #d4a032;
+}
+
+.form-check-input[type="checkbox"]:indeterminate {
+  background-color: #d4a032;
+  border-color: #d4a032;
+}
+
+.form-range::-webkit-slider-thumb { background-color: #d4a032; }
+.form-range::-moz-range-thumb { background-color: #d4a032; }
+.form-range:focus::-webkit-slider-thumb { box-shadow: 0 0 0 1px #fff, 0 0 0 0.25rem rgba(212, 160, 50, 0.25); }
+.form-range:focus::-moz-range-thumb { box-shadow: 0 0 0 1px #fff, 0 0 0 0.25rem rgba(212, 160, 50, 0.25); }
+
+/* Navigation */
+.nav-pills {
+  --bs-nav-pills-link-active-bg: #d4a032;
+}
+
+.nav-link:focus-visible {
+  box-shadow: 0 0 0 0.25rem rgba(212, 160, 50, 0.25);
+}
+
+.nav-tabs .nav-link.active {
+  color: #8a6318;
+}
+
+.pagination {
+  --bs-pagination-active-bg: #d4a032;
+  --bs-pagination-active-border-color: #d4a032;
+  --bs-pagination-focus-box-shadow: 0 0 0 0.25rem rgba(212, 160, 50, 0.25);
+}
+
+.dropdown-menu {
+  --bs-dropdown-link-active-bg: #d4a032;
+}
+
+.accordion {
+  --bs-accordion-btn-focus-box-shadow: 0 0 0 0.25rem rgba(212, 160, 50, 0.25);
+}
+
+.btn-close {
+  --bs-btn-close-focus-shadow: 0 0 0 0.25rem rgba(212, 160, 50, 0.25);
+}

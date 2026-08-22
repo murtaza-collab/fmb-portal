@@ -498,7 +498,7 @@ export default function TakhmeenPage() {
         {[
           { label:'No-Show',          value: stats.noShow,          color:'#6c757d' },
           { label:'Verified',         value: stats.verified,        color:'#0dcaf0' },
-          { label:'Pending Approval', value: stats.pendingApproval, color:'#0d6efd' },
+          { label:'Pending Approval', value: stats.pendingApproval, color:'#299cdb' },
           { label:'Approved',         value: stats.approved,        color:'#0ab39c' },
         ].map((s, i) => (
           <div key={i} className="col-md-3">
@@ -841,7 +841,7 @@ export default function TakhmeenPage() {
                     {[
                       { label:'Total Rows',  value: importReport.total,   color:'var(--bs-body-color)' },
                       { label:'Inserted',    value: importReport.inserted, color:'#0ab39c' },
-                      { label:'Updated',     value: importReport.updated,  color:'#0d6efd' },
+                      { label:'Updated',     value: importReport.updated,  color:'#299cdb' },
                       { label:'Skipped (0)', value: importReport.skipped,  color:'#6c757d' },
                       { label:'Failed',      value: importReport.failed.length, color: importReport.failed.length ? '#f06548' : '#6c757d' },
                     ].map((s, i) => (
