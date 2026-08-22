@@ -168,9 +168,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       <div style={{ padding: sidebarCollapsed ? '14px 0' : '16px 16px 14px', borderBottom: '1px solid rgba(255,255,255,0.1)', flexShrink: 0, transition: 'padding 0.25s' }}>
         {sidebarCollapsed ? (
           <div style={{ display: 'flex', justifyContent: 'center' }}>
-            <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(255,217,125,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <i className="bi bi-cup-hot" style={{ color: '#ffd97d', fontSize: '18px' }} />
-            </div>
+            <img src="/favicon.svg" alt="FMB" style={{ width: '36px', height: '36px', borderRadius: '8px' }} />
           </div>
         ) : (
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
