@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
+import { buildIlikeOr } from '@/lib/search'
 
 interface Thaali          { id: number; thaali_number: number }
 interface ThaaliType      { id: number; name: string; status: string }
@@ -263,7 +264,7 @@ function RegistrationsTab({ onStatsChange }: { onStatsChange: () => void }) {
       const { data: matchingMumin } = await supabase
         .from('mumineen')
         .select('id')
-        .or(`full_name.ilike.%${s}%,sf_no.ilike.%${s}%,its_no.ilike.%${s}%`)
+        .or(buildIlikeOr(['full_name', 'sf_no', 'its_no'], s))
       const muminIds = (matchingMumin || []).map((m: any) => m.id as number)
 
       // Thaali number search — use already-loaded allThaalis lookup (integers)

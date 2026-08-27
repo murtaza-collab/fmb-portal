@@ -2,6 +2,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { buildIlikeOr } from '@/lib/search'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -183,7 +184,7 @@ export default function MumineenPage() {
     setLoading(true)
     let query = supabase.from('mumineen').select(MUMIN_COLS).order('full_name')
     if (q.trim()) {
-      query = query.or(`full_name.ilike.%${q.trim()}%,sf_no.ilike.%${q.trim()}%,its_no.ilike.%${q.trim()}%`)
+      query = query.or(buildIlikeOr(['full_name', 'sf_no', 'its_no'], q))
     }
     const { data } = await query
     setMumineen((data as any[]) || [])
