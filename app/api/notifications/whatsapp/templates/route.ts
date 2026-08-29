@@ -60,12 +60,14 @@ export async function DELETE(req: NextRequest) {
   const { id } = await req.json()
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('notification_templates')
     .delete()
     .eq('id', id)
     .eq('is_whatsapp', true)
+    .select('id')
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (!data?.length) return NextResponse.json({ error: 'Template not found, or you do not have permission to delete it' }, { status: 404 })
   return NextResponse.json({ success: true })
 }

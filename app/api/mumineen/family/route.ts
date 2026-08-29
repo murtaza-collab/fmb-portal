@@ -151,7 +151,7 @@ export async function PUT(req: NextRequest) {
   }
 
   // Update family member
-  const { error } = await supabase
+  const { data: updatedMember, error } = await supabase
     .from('mumineen')
     .update({
       full_name: body.full_name,
@@ -161,9 +161,13 @@ export async function PUT(req: NextRequest) {
       whatsapp_no: body.whatsapp_no || null
     })
     .eq('id', body.id)
+    .select('id')
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 })
+  }
+  if (!updatedMember?.length) {
+    return NextResponse.json({ error: 'Member was not updated — record not found or not permitted' }, { status: 404 })
   }
 
   // Recalculate family counts
@@ -209,13 +213,17 @@ export async function DELETE(req: NextRequest) {
   }
 
   // Delete member
-  const { error } = await supabase
+  const { data: removed, error } = await supabase
     .from('mumineen')
     .delete()
     .eq('id', memberId)
+    .select('id')
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 })
+  }
+  if (!removed?.length) {
+    return NextResponse.json({ error: 'Member was not removed — record not found or not permitted' }, { status: 404 })
   }
 
   // Recalculate family counts
@@ -242,8 +250,14 @@ async function recalculateFamilyCounts(supabase: any, hofId: number) {
     else total_adult++
   })
 
-  await supabase
+  // Derived counts: a silent no-op here leaves the HOF totals stale while the
+  // caller has already returned success, so at least surface it in the log.
+  const { data, error } = await supabase
     .from('mumineen')
     .update({ total_adult, total_child, total_infant })
     .eq('id', hofId)
+    .select('id')
+  if (error || !data?.length) {
+    console.warn('recalculateFamilyCounts: totals not written for hof', hofId, error?.message ?? 'zero rows')
+  }
 }

@@ -41,7 +41,7 @@ export async function PUT(req: NextRequest) {
   const body: ProfileUpdateBody = await req.json()
 
   // Update allowed fields only (SF# and ITS# are immutable)
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from('mumineen')
     .update({
       phone_no: body.phone_no ?? null,
@@ -57,9 +57,13 @@ export async function PUT(req: NextRequest) {
       remarks: body.remarks ?? null
     })
     .eq('id', hof.id)
+    .select('id')
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 })
+  }
+  if (!updated?.length) {
+    return NextResponse.json({ error: 'Profile was not updated — record not found or not permitted' }, { status: 404 })
   }
 
   return NextResponse.json({ success: true })

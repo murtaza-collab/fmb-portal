@@ -44,12 +44,16 @@ export async function POST(request: Request) {
 
     const authId = authData.user.id
 
-    const { error: updateError } = await supabaseAdmin
+    // .select() matters here: a zero-row update leaves updateError null, so the
+    // route would return success with the auth user never linked — the exact
+    // orphaned-account case the rollback below exists to prevent.
+    const { data: linked, error: updateError } = await supabaseAdmin
       .from('mumineen')
       .update({ auth_id: authId })
       .eq('id', mumin_id)
+      .select('id')
 
-    if (updateError) {
+    if (updateError || !linked?.length) {
       // Rollback: delete the created auth user to avoid orphaned accounts
       await supabaseAdmin.auth.admin.deleteUser(authId)
       return NextResponse.json({ error: 'Failed to link auth account to member record' }, { status: 500 })

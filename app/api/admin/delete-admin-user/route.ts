@@ -25,12 +25,13 @@ export async function DELETE(request: Request) {
     )
 
     // Delete admin_users row first
-    const { error: dbError } = await supabaseAdmin
+    const { data: deleted, error: dbError } = await supabaseAdmin
       .from('admin_users')
       .delete()
       .eq('id', admin_user_id)
+      .select('id')
 
-    if (dbError) {
+    if (dbError || !deleted?.length) {
       return NextResponse.json({ error: 'Failed to delete user record' }, { status: 500 })
     }
 
