@@ -151,7 +151,20 @@ export default function MumineenPage() {
   const [page, setPage]                   = useState(1)
   const searchDebounce                    = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // Server-side paging state. `mumineen` now holds ONLY the current page, so
+  // anything that used to be derived by filtering the whole array is fetched
+  // explicitly below.
+  const [total, setTotal]         = useState(0)
+  const [counts, setCounts]       = useState({
+    all: 0, hofs: 0, members: 0,
+    hofsActive: 0, hofsTransferred: 0,
+    membersActive: 0, membersTransferred: 0,
+  })
+  const [hofMapState, setHofMapState]   = useState<Map<number, Mumin>>(new Map())
+  const [memberCounts, setMemberCounts] = useState<Map<number, number>>(new Map())
+
   const [importing, setImporting]         = useState(false)
+  const [exporting, setExporting]         = useState(false)
   const [importMsg, setImportMsg]         = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -172,25 +185,111 @@ export default function MumineenPage() {
 
   useEffect(() => { fetchAll() }, [])
 
+  // Filter/tab changes reset to page 1 and refetch (debounced for typing).
   useEffect(() => {
     setPage(1)
     if (searchDebounce.current) clearTimeout(searchDebounce.current)
     searchDebounce.current = setTimeout(() => fetchMumineen(search), 300)
   }, [search, sectorFilter, niyyatFilter, categoryFilter, tab, hofSubTab, memberSubTab])
 
+  // Paging itself refetches immediately — no debounce, nothing else changed.
+  const didMount = useRef(false)
+  useEffect(() => {
+    if (!didMount.current) { didMount.current = true; return }
+    fetchMumineen(search)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page])
+
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
   const MUMIN_COLS = 'id,sf_no,its_no,full_name,phone_no,whatsapp_no,email,dob,full_address,status,is_hof,hof_id,address_sector_id,address_block_id,address_type_id,address_category,address_number,address_floor,niyyat_status_id,mumin_category_id,remarks,total_adult,total_child,total_infant'
 
+  /**
+   * Apply the active tab/sub-tab/search/filter set to a query.
+   *
+   * Sector/niyyat/category only ever applied on the HOFs tab — that is where
+   * the controls render, and their state persists across tab switches.
+   *
+   * Members' transferred state reads the member's OWN status column.
+   * handleTransfer writes both the HOF and its members, so the two agree; the
+   * previous code also consulted the parent HOF as a belt-and-braces, which is
+   * not expressible in one PostgREST query.
+   */
+  const applyFilters = (query: any, q: string) => {
+    if (q.trim()) query = query.or(buildIlikeOr(['full_name', 'sf_no', 'its_no'], q))
+    if (tab === 'hofs') {
+      query = query.eq('is_hof', true).eq('status', hofSubTab)
+      if (sectorFilter)   query = query.eq('address_sector_id', Number(sectorFilter))
+      if (niyyatFilter)   query = query.eq('niyyat_status_id', Number(niyyatFilter))
+      if (categoryFilter) query = query.eq('mumin_category_id', Number(categoryFilter))
+    } else if (tab === 'members') {
+      query = query.eq('is_hof', false)
+      query = memberSubTab === 'transferred'
+        ? query.eq('status', 'transferred')
+        : query.neq('status', 'transferred')
+    }
+    return query
+  }
+
   const fetchMumineen = async (q: string) => {
     setLoading(true)
-    let query = supabase.from('mumineen').select(MUMIN_COLS).order('full_name')
-    if (q.trim()) {
-      query = query.or(buildIlikeOr(['full_name', 'sf_no', 'its_no'], q))
+    const from = (page - 1) * PAGE_SIZE
+
+    const { data, count } = await applyFilters(
+      supabase.from('mumineen').select(MUMIN_COLS, { count: 'exact' }).order('full_name'), q,
+    ).range(from, from + PAGE_SIZE - 1)
+
+    const rows = (data as Mumin[]) || []
+    setMumineen(rows)
+    setTotal(count ?? 0)
+
+    // Enrich only the rows on screen — both lookups are bounded by PAGE_SIZE.
+    const hofIdsForMembers = [...new Set(rows.filter(r => !r.is_hof && r.hof_id).map(r => r.hof_id as number))]
+    const hofIdsOnPage     = rows.filter(r => r.is_hof).map(r => r.id)
+
+    const [hofRes, memRes] = await Promise.all([
+      hofIdsForMembers.length
+        ? supabase.from('mumineen').select('id,full_name,sf_no,status').in('id', hofIdsForMembers)
+        : Promise.resolve({ data: [] as any[] }),
+      hofIdsOnPage.length
+        ? supabase.from('mumineen').select('hof_id').in('hof_id', hofIdsOnPage)
+        : Promise.resolve({ data: [] as any[] }),
+    ])
+    setHofMapState(new Map((hofRes.data || []).map((h: any) => [h.id, h as Mumin])))
+    const tally = new Map<number, number>()
+    for (const r of (memRes.data || []) as any[]) {
+      tally.set(r.hof_id, (tally.get(r.hof_id) || 0) + 1)
     }
-    const { data } = await query
-    setMumineen((data as any[]) || [])
+    setMemberCounts(tally)
+
     setLoading(false)
+    fetchCounts(q)
+  }
+
+  /** Header and tab badges — counts only, no rows transferred. */
+  const fetchCounts = async (q: string) => {
+    const head = () => supabase.from('mumineen').select('id', { count: 'exact', head: true })
+    const withSearch = (query: any) =>
+      q.trim() ? query.or(buildIlikeOr(['full_name', 'sf_no', 'its_no'], q)) : query
+
+    const [all, hofs, members, hofsA, hofsT, memA, memT] = await Promise.all([
+      withSearch(head()),
+      withSearch(head().eq('is_hof', true)),
+      withSearch(head().eq('is_hof', false)),
+      withSearch(head().eq('is_hof', true).eq('status', 'active')),
+      withSearch(head().eq('is_hof', true).eq('status', 'transferred')),
+      withSearch(head().eq('is_hof', false).neq('status', 'transferred')),
+      withSearch(head().eq('is_hof', false).eq('status', 'transferred')),
+    ])
+    setCounts({
+      all: all.count ?? 0,
+      hofs: hofs.count ?? 0,
+      members: members.count ?? 0,
+      hofsActive: hofsA.count ?? 0,
+      hofsTransferred: hofsT.count ?? 0,
+      membersActive: memA.count ?? 0,
+      membersTransferred: memT.count ?? 0,
+    })
   }
 
   const fetchAll = async () => {
@@ -201,15 +300,14 @@ export default function MumineenPage() {
       const gn = (adminData?.user_groups as any)?.name?.toLowerCase() || ''
       setIsAdmin(gn === 'super admin' || gn === 'admin' || gn === 'super_admin')
     }
-    const [mRes, sRes, bRes, tRes, nRes, cRes] = await Promise.all([
-      supabase.from('mumineen').select(MUMIN_COLS).order('full_name'),
+    // Lookups only — mumineen rows come from fetchMumineen, one page at a time.
+    const [sRes, bRes, tRes, nRes, cRes] = await Promise.all([
       supabase.from('house_sectors').select('id,name').order('name'),
       supabase.from('house_blocks').select('id,name').order('name'),
       supabase.from('house_types').select('id,name').order('name'),
       supabase.from('niyyat_statuses').select('id,name').order('name'),
       supabase.from('mumin_categories').select('id,name,colour').order('name'),
     ])
-    setMumineen((mRes.data as any[]) || [])
     setSectors(sRes.data || [])
     setBlocks(bRes.data || [])
     setHouseTypes(tRes.data || [])
@@ -218,6 +316,7 @@ export default function MumineenPage() {
     const ns = (nRes.data || []).find((n: NiyyatStatus) => n.name.toLowerCase().includes('no-show') || n.name.toLowerCase().includes('no show'))
     setNoShowId(ns?.id || null)
     setLoading(false)
+    fetchMumineen(search)
   }
 
   const getSector  = (id: number | null) => sectors.find(s => s.id === id)?.name || '—'
@@ -391,13 +490,35 @@ export default function MumineenPage() {
   // ── Import / Export ────────────────────────────────────────────────────────
 
   // FIX: Export supports 'all' tab — includes Type column, HOF name for members
-  const handleExport = () => {
+  const handleExport = async () => {
     const headers = ['Type', 'SF#', 'ITS#', 'Full Name', 'Phone', 'WhatsApp', 'Address', 'Sector', 'HOF Name', 'Niyyat Status', ...(isAdmin ? ['Category'] : []), 'Status']
-    const exportList = tab === 'all'
-      ? mumineen
-      : tab === 'hofs' ? mumineen.filter(m => m.is_hof) : mumineen.filter(m => !m.is_hof)
+
+    // `mumineen` is only the current page now, so re-run the active filter set
+    // unpaged. Fetched in chunks so a large community does not become one
+    // enormous request.
+    setExporting(true)
+    const CHUNK = 1000
+    const exportList: Mumin[] = []
+    for (let from = 0; ; from += CHUNK) {
+      const { data } = await applyFilters(
+        supabase.from('mumineen').select(MUMIN_COLS).order('full_name'), search,
+      ).range(from, from + CHUNK - 1)
+      const batch = (data as Mumin[]) || []
+      exportList.push(...batch)
+      if (batch.length < CHUNK) break
+    }
+
+    // HOF names for every exported member, not just the ones on screen.
+    const neededHofIds = [...new Set(exportList.filter(m => !m.is_hof && m.hof_id).map(m => m.hof_id as number))]
+    const exportHofMap = new Map<number, Mumin>()
+    for (let i = 0; i < neededHofIds.length; i += CHUNK) {
+      const { data } = await supabase.from('mumineen')
+        .select('id,full_name,sf_no').in('id', neededHofIds.slice(i, i + CHUNK))
+      for (const h of (data || []) as any[]) exportHofMap.set(h.id, h as Mumin)
+    }
+
     const rows = exportList.map(m => {
-      const hof = m.is_hof ? null : hofMap.get(m.hof_id!)
+      const hof = m.is_hof ? null : exportHofMap.get(m.hof_id!)
       return [
         m.is_hof ? 'HOF' : 'Member',
         m.sf_no || '', m.its_no || '', m.full_name,
@@ -414,6 +535,7 @@ export default function MumineenPage() {
     a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
     a.download = tab === 'all' ? 'mumineen_all.csv' : tab === 'hofs' ? 'mumineen_hofs.csv' : 'mumineen_members.csv'
     a.click()
+    setExporting(false)
   }
 
   const handleSample = () => {
@@ -461,46 +583,11 @@ export default function MumineenPage() {
 
   // ── Filtered lists ─────────────────────────────────────────────────────────
 
-  const hofs    = mumineen.filter(m => m.is_hof)
-  const members = mumineen.filter(m => !m.is_hof)
-  const hofMap  = new Map(hofs.map(h => [h.id, h]))
-
-  const activeMembers = members.filter(m => {
-    const hof = hofs.find(h => h.id === m.hof_id)
-    return m.status !== 'transferred' && hof?.status !== 'transferred'
-  })
-
-  const filteredHofs = hofs.filter(m => {
-    const q = search.toLowerCase()
-    return (
-      (!search || m.full_name?.toLowerCase().includes(q) || m.sf_no?.toLowerCase().includes(q) || m.its_no?.toLowerCase().includes(q)) &&
-      (!sectorFilter   || String(m.address_sector_id) === sectorFilter) &&
-      (!niyyatFilter   || String(m.niyyat_status_id)  === niyyatFilter) &&
-      (!categoryFilter || String(m.mumin_category_id) === categoryFilter) &&
-      m.status === hofSubTab
-    )
-  })
-
-  const filteredMembers = members.filter(m => {
-    const q = search.toLowerCase()
-    const hof = hofs.find(h => h.id === m.hof_id)
-    const isTransferred = m.status === 'transferred' || hof?.status === 'transferred'
-    return (
-      (!search || m.full_name?.toLowerCase().includes(q) || m.sf_no?.toLowerCase().includes(q) || m.its_no?.toLowerCase().includes(q)) &&
-      (memberSubTab === 'transferred' ? isTransferred : !isTransferred)
-    )
-  })
-
-  // FIX: filteredAll for 'all' tab — every mumin
-  const filteredAll = mumineen.filter(m => {
-    const q = search.toLowerCase()
-    return !search || m.full_name?.toLowerCase().includes(q) || m.sf_no?.toLowerCase().includes(q) || m.its_no?.toLowerCase().includes(q)
-  })
-
-  // FIX: currentList handles 'all' tab
-  const currentList = tab === 'hofs' ? filteredHofs : tab === 'members' ? filteredMembers : filteredAll
-  const totalPages  = Math.ceil(currentList.length / PAGE_SIZE)
-  const paginated   = currentList.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE)
+  // Filtering, sub-tab selection and paging all happen in SQL now (see
+  // applyFilters + fetchMumineen), so `mumineen` IS the current page.
+  const hofMap     = hofMapState
+  const paginated  = mumineen
+  const totalPages = Math.ceil(total / PAGE_SIZE)
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -512,18 +599,20 @@ export default function MumineenPage() {
           <h4 className="mb-0 fw-bold" style={{ color: 'var(--bs-body-color)' }}>Mumineen</h4>
           {/* FIX: Show total entries + HOFs + Members separately */}
           <p className="mb-0" style={{ fontSize: 13, color: 'var(--bs-secondary-color)' }}>
-            <strong>{mumineen.length}</strong> Total Entries ·{' '}
-            <span style={{ color: theme.gold, fontWeight: 600 }}>{hofs.filter(h => h.status === 'active').length}</span> Active HOFs ·{' '}
-            <span style={{ color: theme.success, fontWeight: 600 }}>{activeMembers.length}</span> Members
+            <strong>{counts.all}</strong> Total Entries ·{' '}
+            <span style={{ color: theme.gold, fontWeight: 600 }}>{counts.hofsActive}</span> Active HOFs ·{' '}
+            <span style={{ color: theme.success, fontWeight: 600 }}>{counts.membersActive}</span> Members
           </p>
         </div>
         <div className="d-flex gap-2 flex-wrap">
           <button className="btn btn-outline-secondary btn-sm" onClick={handleSample}><i className="bi bi-file-earmark-arrow-down me-1" />Sample</button>
           <button className="btn btn-outline-success btn-sm" onClick={() => fileInputRef.current?.click()} disabled={importing}><i className="bi bi-upload me-1" />{importing ? 'Importing...' : 'Import'}</button>
           <input ref={fileInputRef} type="file" accept=".csv" style={{ display: 'none' }} onChange={handleImport} />
-          <button className="btn btn-outline-primary btn-sm" onClick={handleExport}>
-            <i className="bi bi-download me-1" />
-            {tab === 'all' ? 'Export All' : tab === 'hofs' ? 'Export HOFs' : 'Export Members'}
+          <button className="btn btn-outline-primary btn-sm" onClick={handleExport} disabled={exporting}>
+            <i className={`bi ${exporting ? 'bi-hourglass-split' : 'bi-download'} me-1`} />
+            {exporting
+              ? 'Exporting…'
+              : tab === 'all' ? 'Export All' : tab === 'hofs' ? 'Export HOFs' : 'Export Members'}
           </button>
           {!(tab === 'hofs' && hofSubTab === 'transferred') && tab !== 'all' && (
             <button className="btn btn-sm" style={{ background: theme.gold, color: '#fff' }} onClick={openAdd}><i className="bi bi-plus me-1" />Add HOF</button>
@@ -537,9 +626,9 @@ export default function MumineenPage() {
       <div style={{ borderBottom: '1px solid var(--bs-border-color)' }}>
         <div className="d-flex">
           {([
-            ['hofs',    `HOFs (${hofs.length})`],
-            ['members', `Members (${members.length})`],
-            ['all',     `All (${mumineen.length})`],
+            ['hofs',    `HOFs (${counts.hofs})`],
+            ['members', `Members (${counts.members})`],
+            ['all',     `All (${counts.all})`],
           ] as [string, string][]).map(([key, label]) => (
             <button key={key}
               onClick={() => { setTab(key as any); setPage(1); setSearch('') }}
@@ -560,12 +649,12 @@ export default function MumineenPage() {
       {tab !== 'all' && (() => {
         const subItems: [string, string][] = tab === 'hofs'
           ? [
-              ['active',      `Active (${hofs.filter(h => h.status === 'active').length})`],
-              ['transferred', `Transferred (${hofs.filter(h => h.status === 'transferred').length})`],
+              ['active',      `Active (${counts.hofsActive})`],
+              ['transferred', `Transferred (${counts.hofsTransferred})`],
             ]
           : [
-              ['active',      `Active (${activeMembers.length})`],
-              ['transferred', `Transferred (${members.length - activeMembers.length})`],
+              ['active',      `Active (${counts.membersActive})`],
+              ['transferred', `Transferred (${counts.membersTransferred})`],
             ]
         const curSubTab = tab === 'hofs' ? hofSubTab : memberSubTab
         const setSubTab = tab === 'hofs'
@@ -672,7 +761,7 @@ export default function MumineenPage() {
                       /* FIX: 'all' tab rows — HOFs and members together */
                       (paginated as Mumin[]).map(m => {
                         const hof = m.is_hof ? null : hofMap.get(m.hof_id!)
-                        const memberCount = m.is_hof ? members.filter(x => x.hof_id === m.id).length : 0
+                        const memberCount = m.is_hof ? (memberCounts.get(m.id) || 0) : 0
                         return (
                           <tr key={m.id} style={{ opacity: m.status === 'transferred' ? 0.6 : 1 }}>
                             <td>
@@ -763,7 +852,7 @@ export default function MumineenPage() {
 
               <div className="d-flex justify-content-between align-items-center mt-3">
                 <small style={{ color: 'var(--bs-secondary-color)' }}>
-                  Showing {paginated.length ? (page-1)*PAGE_SIZE+1 : 0}–{Math.min(page*PAGE_SIZE, currentList.length)} of {currentList.length} records
+                  Showing {paginated.length ? (page-1)*PAGE_SIZE+1 : 0}–{Math.min(page*PAGE_SIZE, total)} of {total} records
                 </small>
                 {totalPages > 1 && (
                   <nav><ul className="pagination pagination-sm mb-0">
