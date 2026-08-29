@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { theme } from '@/lib/theme'
 
 export default function LoginPage() {
   const [username, setUsername] = useState('')
@@ -69,7 +70,7 @@ export default function LoginPage() {
           <div className="card-body p-4 p-md-5">
 
             <div className="text-center mb-4">
-              <h5 className="fw-bold mb-1" style={{ color: '#d4a032' }}>Welcome</h5>
+              <h5 className="fw-bold mb-1" style={{ color: theme.gold }}>Welcome</h5>
               <p className="text-muted mb-0" style={{ fontSize: '0.9rem' }}>Sign in to continue</p>
             </div>
 
@@ -114,7 +115,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 className="btn btn-lg w-100 fw-bold text-white"
-                style={{ background: '#d4a032', border: 'none', borderRadius: 8 }}
+                style={{ background: theme.gold, border: 'none', borderRadius: 8 }}
                 disabled={loading}
               >
                 {loading

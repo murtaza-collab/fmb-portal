@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
+import { theme } from '@/lib/theme'
 
 type SessionState = 'WORKING' | 'STOPPED' | 'UNKNOWN' | 'UNREACHABLE' | null
 
@@ -241,7 +242,7 @@ export default function WhatsAppPage() {
       {toast && (
         <div style={{
           position: 'fixed', top: 20, right: 20, zIndex: 9999,
-          background: toast.type === 'success' ? '#0ab39c' : '#f06548',
+          background: toast.type === 'success' ? theme.success : theme.danger,
           color: '#fff', borderRadius: 10, padding: '10px 18px',
           fontWeight: 600, fontSize: 13, boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
         }}>
@@ -273,11 +274,11 @@ export default function WhatsAppPage() {
           <button key={t.key} onClick={() => setTab(t.key)} style={{
             background: 'none', border: 'none', padding: '8px 18px 10px', fontSize: 13,
             fontWeight: tab === t.key ? 600 : 400, cursor: 'pointer',
-            color: tab === t.key ? '#d4a032' : 'var(--bs-secondary-color)',
+            color: tab === t.key ? theme.gold : 'var(--bs-secondary-color)',
             borderBottom: tab === t.key ? '2px solid #d4a032' : '2px solid transparent',
             marginBottom: '-1px', transition: 'all 0.15s',
           }}>
-            <i className={`bi ${t.icon} me-2`} style={{ color: tab === t.key ? '#ffd97d' : 'inherit' }} />
+            <i className={`bi ${t.icon} me-2`} style={{ color: tab === t.key ? theme.goldAccent : 'inherit' }} />
             {t.label}
           </button>
         ))}
@@ -291,7 +292,7 @@ export default function WhatsAppPage() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
               <h6 className="fw-bold mb-0" style={{ color: 'var(--bs-body-color)', fontSize: 14 }}>Session Status</h6>
               <button onClick={checkStatus} disabled={checking} className="btn btn-sm"
-                style={{ background: '#d4a032', color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600 }}>
+                style={{ background: theme.gold, color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600 }}>
                 {checking
                   ? <><span className="spinner-border spinner-border-sm me-2" />Checking...</>
                   : <><i className="bi bi-arrow-clockwise me-1" />Check Status</>}
@@ -309,7 +310,7 @@ export default function WhatsAppPage() {
                 <div style={{
                   display: 'inline-flex', alignItems: 'center', gap: 8,
                   background: status.is_connected ? 'rgba(10,179,156,0.12)' : 'rgba(240,101,72,0.12)',
-                  border: `1px solid ${status.is_connected ? '#0ab39c' : '#f06548'}`,
+                  border: `1px solid ${status.is_connected ? theme.success : theme.danger}`,
                   borderRadius: 20, padding: '6px 14px', marginBottom: 16,
                 }}>
                   <i className={`bi ${stateIcon(status.state)}`} style={{ color: stateColor(status.state), fontSize: 15 }} />
@@ -317,7 +318,7 @@ export default function WhatsAppPage() {
                     {status.state ?? 'UNKNOWN'}
                   </span>
                   {status.is_connected && (
-                    <span style={{ fontSize: 12, color: '#0ab39c' }}>— Connected</span>
+                    <span style={{ fontSize: 12, color: theme.success }}>— Connected</span>
                   )}
                 </div>
 
@@ -338,7 +339,7 @@ export default function WhatsAppPage() {
                 )}
 
                 {status.error && (
-                  <div style={{ marginTop: 12, fontSize: 12, color: '#f06548' }}>
+                  <div style={{ marginTop: 12, fontSize: 12, color: theme.danger }}>
                     <i className="bi bi-exclamation-triangle me-1" />{status.error}
                   </div>
                 )}
@@ -416,14 +417,14 @@ export default function WhatsAppPage() {
           }}>
             {qrLoading && !qrUrl && (
               <div className="text-center">
-                <div className="spinner-border" style={{ color: '#d4a032', width: '2rem', height: '2rem' }} />
+                <div className="spinner-border" style={{ color: theme.gold, width: '2rem', height: '2rem' }} />
                 <div style={{ fontSize: 13, color: '#888', marginTop: 12 }}>Loading QR...</div>
               </div>
             )}
             {qrError && (
               <div className="text-center">
-                <i className="bi bi-exclamation-triangle-fill" style={{ fontSize: 32, color: '#f7b84b' }} />
-                <div style={{ fontSize: 13, color: '#f06548', marginTop: 8 }}>{qrError}</div>
+                <i className="bi bi-exclamation-triangle-fill" style={{ fontSize: 32, color: theme.warning }} />
+                <div style={{ fontSize: 13, color: theme.danger, marginTop: 8 }}>{qrError}</div>
                 <button onClick={fetchQr} className="btn btn-sm btn-outline-secondary mt-3" style={{ borderRadius: 8, fontSize: 12 }}>
                   Try Again
                 </button>
@@ -450,7 +451,7 @@ export default function WhatsAppPage() {
           {/* New Template */}
           <div style={{ background: 'var(--bs-body-bg)', border: '1px solid var(--bs-border-color)', borderRadius: 12, padding: 20, marginBottom: 20 }}>
             <h6 className="fw-bold mb-3" style={{ color: 'var(--bs-body-color)', fontSize: 14 }}>
-              <i className="bi bi-plus-circle-fill me-2" style={{ color: '#d4a032' }} />
+              <i className="bi bi-plus-circle-fill me-2" style={{ color: theme.gold }} />
               New Template
             </h6>
 
@@ -479,9 +480,9 @@ export default function WhatsAppPage() {
                     disabled={!v.available}
                     style={{
                       border: '1px solid',
-                      borderColor: v.available ? '#d4a032' : 'var(--bs-border-color)',
+                      borderColor: v.available ? theme.gold : 'var(--bs-border-color)',
                       background: v.available ? 'rgba(54,69,116,0.08)' : 'var(--bs-tertiary-bg)',
-                      color: v.available ? '#d4a032' : 'var(--bs-secondary-color)',
+                      color: v.available ? theme.gold : 'var(--bs-secondary-color)',
                       borderRadius: 16, padding: '3px 10px', fontSize: 12, cursor: v.available ? 'pointer' : 'not-allowed',
                     }}>
                     {`{{${v.key}}}`}
@@ -492,7 +493,7 @@ export default function WhatsAppPage() {
             </div>
 
             <button onClick={saveTemplate} disabled={savingTpl} className="btn btn-sm"
-              style={{ background: '#d4a032', color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600 }}>
+              style={{ background: theme.gold, color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600 }}>
               {savingTpl
                 ? <><span className="spinner-border spinner-border-sm me-2" />Saving...</>
                 : <><i className="bi bi-check-lg me-1" />Save Template</>}
@@ -519,7 +520,7 @@ export default function WhatsAppPage() {
                       {t.variables?.length > 0 && (
                         <div style={{ marginTop: 6, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                           {t.variables.map(v => (
-                            <span key={v} style={{ fontSize: 11, background: 'rgba(54,69,116,0.1)', color: '#d4a032', borderRadius: 10, padding: '2px 8px' }}>
+                            <span key={v} style={{ fontSize: 11, background: 'rgba(54,69,116,0.1)', color: theme.gold, borderRadius: 10, padding: '2px 8px' }}>
                               {`{{${v}}}`}
                             </span>
                           ))}
@@ -527,7 +528,7 @@ export default function WhatsAppPage() {
                       )}
                     </div>
                     <button onClick={() => deleteTemplate(t.id)} disabled={deletingId === t.id}
-                      style={{ background: 'none', border: 'none', color: '#f06548', cursor: 'pointer', fontSize: 16, padding: 4 }}>
+                      style={{ background: 'none', border: 'none', color: theme.danger, cursor: 'pointer', fontSize: 16, padding: 4 }}>
                       {deletingId === t.id
                         ? <span className="spinner-border spinner-border-sm" />
                         : <i className="bi bi-trash3" />}
@@ -551,7 +552,7 @@ export default function WhatsAppPage() {
         <div>
           <div style={{ background: 'var(--bs-body-bg)', border: '1px solid var(--bs-border-color)', borderRadius: 12, padding: 20, marginBottom: 16 }}>
             <h6 className="fw-bold mb-3" style={{ color: 'var(--bs-body-color)', fontSize: 14 }}>
-              <i className="bi bi-megaphone-fill me-2" style={{ color: '#d4a032' }} />
+              <i className="bi bi-megaphone-fill me-2" style={{ color: theme.gold }} />
               Queue Reminders
             </h6>
 
@@ -583,7 +584,7 @@ export default function WhatsAppPage() {
                   <label key={s.key} style={{
                     display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer',
                     padding: '10px 14px', borderRadius: 8, border: '1px solid',
-                    borderColor: campSegment === s.key ? '#d4a032' : 'var(--bs-border-color)',
+                    borderColor: campSegment === s.key ? theme.gold : 'var(--bs-border-color)',
                     background: campSegment === s.key ? 'rgba(54,69,116,0.06)' : 'var(--bs-tertiary-bg)',
                   }}>
                     <input type="radio" name="segment" value={s.key} checked={campSegment === s.key}
@@ -626,7 +627,7 @@ export default function WhatsAppPage() {
               padding: '16px 20px', borderRadius: 12, border: '1px solid #0ab39c',
               background: 'rgba(10,179,156,0.08)',
             }}>
-              <div style={{ fontWeight: 700, fontSize: 14, color: '#0ab39c', marginBottom: 10 }}>
+              <div style={{ fontWeight: 700, fontSize: 14, color: theme.success, marginBottom: 10 }}>
                 <i className="bi bi-check-circle-fill me-2" />Campaign Queued
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
@@ -666,7 +667,7 @@ export default function WhatsAppPage() {
 
           {logsLoading && (
             <div className="text-center py-5">
-              <div className="spinner-border" style={{ color: '#d4a032', width: '1.5rem', height: '1.5rem' }} />
+              <div className="spinner-border" style={{ color: theme.gold, width: '1.5rem', height: '1.5rem' }} />
             </div>
           )}
 
@@ -705,7 +706,7 @@ export default function WhatsAppPage() {
                   {/* Progress bar */}
                   {log.total > 0 && (
                     <div style={{ marginTop: 10, height: 4, background: 'var(--bs-tertiary-bg)', borderRadius: 4, overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${(log.sent / log.total) * 100}%`, background: '#0ab39c', borderRadius: 4, transition: 'width 0.3s' }} />
+                      <div style={{ height: '100%', width: `${(log.sent / log.total) * 100}%`, background: theme.success, borderRadius: 4, transition: 'width 0.3s' }} />
                     </div>
                   )}
                 </div>

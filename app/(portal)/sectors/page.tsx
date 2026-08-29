@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import * as XLSX from 'xlsx'
+import { theme } from '@/lib/theme'
 
 interface Sector {
   id: number
@@ -153,14 +154,14 @@ export default function SectorsPage() {
                 <thead style={{ background: '#f8f9fa' }}>
                   <tr>
                     {['#', 'Sector Name', 'Status', 'Actions'].map(h => (
-                      <th key={h} style={{ fontSize: '13px', color: '#6c757d', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
+                      <th key={h} style={{ fontSize: '13px', color: theme.muted, fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.map((sector, i) => (
                     <tr key={sector.id}>
-                      <td style={{ fontSize: '13px', color: '#6c757d' }}>{i + 1}</td>
+                      <td style={{ fontSize: '13px', color: theme.muted }}>{i + 1}</td>
                       <td style={{ fontSize: '14px' }}>{sector.name}</td>
                       <td>
                         <span className={`badge ${sector.status === 'active' ? 'bg-success' : 'bg-secondary'}`}
@@ -256,14 +257,14 @@ export default function SectorsPage() {
                 {/* Preview table */}
                 {importRows.length > 0 && !importDone && (
                   <>
-                    <p className="mb-2" style={{ fontSize: '13px', color: '#6c757d' }}>Preview ({importRows.length} rows) — duplicates already in database will be skipped:</p>
+                    <p className="mb-2" style={{ fontSize: '13px', color: theme.muted }}>Preview ({importRows.length} rows) — duplicates already in database will be skipped:</p>
                     <div style={{ maxHeight: '320px', overflowY: 'auto', border: '1px solid #dee2e6', borderRadius: '6px' }}>
                       <table className="table table-sm mb-0">
                         <thead style={{ background: '#f8f9fa', position: 'sticky', top: 0 }}>
                           <tr>
-                            <th style={{ fontSize: '12px', color: '#6c757d', width: '50px' }}>#</th>
-                            <th style={{ fontSize: '12px', color: '#6c757d' }}>Sector Name</th>
-                            <th style={{ fontSize: '12px', color: '#6c757d', width: '100px' }}>Status</th>
+                            <th style={{ fontSize: '12px', color: theme.muted, width: '50px' }}>#</th>
+                            <th style={{ fontSize: '12px', color: theme.muted }}>Sector Name</th>
+                            <th style={{ fontSize: '12px', color: theme.muted, width: '100px' }}>Status</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -271,7 +272,7 @@ export default function SectorsPage() {
                             const exists = sectors.some(s => s.name.toLowerCase() === row.toLowerCase())
                             return (
                               <tr key={i} style={exists ? { opacity: 0.5 } : {}}>
-                                <td style={{ fontSize: '13px', color: '#6c757d' }}>{i + 1}</td>
+                                <td style={{ fontSize: '13px', color: theme.muted }}>{i + 1}</td>
                                 <td style={{ fontSize: '13px' }}>{row}</td>
                                 <td>
                                   {exists

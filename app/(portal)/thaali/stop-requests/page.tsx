@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { theme } from '@/lib/theme'
 
 interface StopRequest {
   id: number
@@ -198,8 +199,8 @@ export default function StopRequestsPage() {
               {(['all', 'pending', 'approved', 'rejected', 'expired'] as FilterStatus[]).map(s => (
                 <button key={s} onClick={() => setStatusFilter(s)} className="btn btn-sm"
                   style={{ borderRadius: 20, fontSize: 12, padding: '3px 12px',
-                    border: `1.5px solid ${statusFilter === s ? '#d4a032' : 'var(--bs-border-color)'}`,
-                    background: statusFilter === s ? '#d4a032' : 'transparent',
+                    border: `1.5px solid ${statusFilter === s ? theme.gold : 'var(--bs-border-color)'}`,
+                    background: statusFilter === s ? theme.gold : 'transparent',
                     color: statusFilter === s ? '#fff' : 'var(--bs-secondary-color)',
                     fontWeight: statusFilter === s ? 600 : 400 }}>
                   {s.charAt(0).toUpperCase() + s.slice(1)} ({counts[s] ?? 0})
@@ -237,7 +238,7 @@ export default function StopRequestsPage() {
                       const exp  = isExpired(r)
                       return (
                         <tr key={r.id} style={{ opacity: exp ? 0.6 : 1 }}>
-                          <td style={{ padding: '10px 12px', fontWeight: 700, color: exp ? 'var(--bs-secondary-color)' : '#d4a032' }}>
+                          <td style={{ padding: '10px 12px', fontWeight: 700, color: exp ? 'var(--bs-secondary-color)' : theme.gold }}>
                             #{r.thaali_number}
                           </td>
                           <td style={{ padding: '10px 12px', fontWeight: 500, color: 'var(--bs-body-color)' }}>{r.mumin_name}</td>
@@ -259,7 +260,7 @@ export default function StopRequestsPage() {
                               {r.status === 'pending' && (
                                 <>
                                   <button className="btn btn-sm" title="Approve"
-                                    style={{ padding: '2px 10px', background: '#0ab39c', color: '#fff', fontSize: 12, borderRadius: 6 }}
+                                    style={{ padding: '2px 10px', background: theme.success, color: '#fff', fontSize: 12, borderRadius: 6 }}
                                     onClick={() => handleApprove(r.id)}>
                                     <i className="bi bi-check-lg me-1" />Approve
                                   </button>
@@ -319,7 +320,7 @@ export default function StopRequestsPage() {
                       onFocus={() => setShowThaaliDrop(true)}
                       onBlur={() => setTimeout(() => setShowThaaliDrop(false), 150)}
                       style={{ background: 'var(--bs-body-bg)', color: 'var(--bs-body-color)', border: '1px solid var(--bs-border-color)' }} />
-                    {form.thaali_id && <span className="input-group-text" style={{ background: '#0ab39c18', borderColor: '#0ab39c', color: '#0ab39c' }}><i className="bi bi-check-circle-fill" /></span>}
+                    {form.thaali_id && <span className="input-group-text" style={{ background: '#0ab39c18', borderColor: theme.success, color: theme.success }}><i className="bi bi-check-circle-fill" /></span>}
                   </div>
                   {showThaaliDrop && !form.thaali_id && filteredThaalis.length > 0 && (
                     <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 1060, background: 'var(--bs-body-bg)', border: '1px solid var(--bs-border-color)', borderRadius: 6, boxShadow: '0 4px 16px rgba(0,0,0,0.12)', maxHeight: 200, overflowY: 'auto' }}>
@@ -328,7 +329,7 @@ export default function StopRequestsPage() {
                           onMouseEnter={e => (e.currentTarget.style.background = 'var(--bs-tertiary-bg)')}
                           onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                           onMouseDown={() => { setForm(f => ({ ...f, thaali_id: t.id })); setThaaliSearch(t.thaali_number); setShowThaaliDrop(false) }}>
-                          <span style={{ fontWeight: 700, color: '#d4a032', minWidth: 50, display: 'inline-block' }}>#{t.thaali_number}</span>
+                          <span style={{ fontWeight: 700, color: theme.gold, minWidth: 50, display: 'inline-block' }}>#{t.thaali_number}</span>
                           <span style={{ color: 'var(--bs-body-color)', marginLeft: 8 }}>{t.mumin_name}</span>
                           <span style={{ color: 'var(--bs-secondary-color)', fontSize: 11, marginLeft: 8 }}>{t.sf_no}</span>
                         </div>
@@ -337,7 +338,7 @@ export default function StopRequestsPage() {
                   )}
                   {form.thaali_id && selectedThaali && (
                     <div className="mt-2 px-3 py-2 rounded d-flex align-items-center gap-2" style={{ background: '#0ab39c12', border: '1px solid #0ab39c30', fontSize: 13 }}>
-                      <i className="bi bi-person-fill" style={{ color: '#0ab39c' }} />
+                      <i className="bi bi-person-fill" style={{ color: theme.success }} />
                       <span style={{ color: 'var(--bs-body-color)', fontWeight: 500 }}>{selectedThaali.mumin_name}</span>
                       <span style={{ color: 'var(--bs-secondary-color)' }}>· SF# {selectedThaali.sf_no}</span>
                       <button className="btn btn-sm ms-auto p-0" style={{ background: 'none', border: 'none', color: 'var(--bs-secondary-color)' }}

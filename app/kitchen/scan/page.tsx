@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { todayISO } from '@/lib/kitchen-eligible';
+import { theme } from '@/lib/theme'
 
 export default function KitchenScanPage() {
   const [distributors, setDistributors] = useState<{ id: number; full_name: string }[]>([]);
@@ -129,7 +130,7 @@ export default function KitchenScanPage() {
                   padding: '14px 20px', borderRadius: 14, textAlign: 'left', cursor: 'pointer',
                   border: selectedId === d.id ? '2px solid #ffd97d' : '2px solid #1e293b',
                   background: selectedId === d.id ? '#1e293b' : '#0f172a',
-                  color: selectedId === d.id ? '#ffd97d' : '#94a3b8',
+                  color: selectedId === d.id ? theme.goldAccent : '#94a3b8',
                   fontWeight: selectedId === d.id ? 700 : 400,
                   fontSize: 16, transition: 'all 0.15s',
                   display: 'flex', alignItems: 'center', gap: 14,
@@ -138,7 +139,7 @@ export default function KitchenScanPage() {
                     width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
                     background: selectedId === d.id ? '#ffd97d20' : '#1e293b',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 18, color: selectedId === d.id ? '#ffd97d' : '#475569',
+                    fontSize: 18, color: selectedId === d.id ? theme.goldAccent : '#475569',
                   }}>
                     {selectedId === d.id ? '✓' : '○'}
                   </div>
@@ -153,7 +154,7 @@ export default function KitchenScanPage() {
             <div style={{ width: '100%', maxWidth: 340, marginBottom: 24 }}>
               <button onClick={() => { setAutoDemo(true); setAutoDemoIdx(0); }} style={{
                 width: '100%', padding: 14, borderRadius: 14, border: '1px solid #334155',
-                background: '#1e293b', color: '#ffd97d', fontSize: 14, fontWeight: 700,
+                background: '#1e293b', color: theme.goldAccent, fontSize: 14, fontWeight: 700,
                 cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               }}>
                 ▶ Auto Demo — check in all ({distributors.length}) with 8s gap
@@ -163,7 +164,7 @@ export default function KitchenScanPage() {
 
           {autoDemo && (
             <div style={{ width: '100%', maxWidth: 340, marginBottom: 24, textAlign: 'center' }}>
-              <div style={{ color: '#ffd97d', fontWeight: 700, fontSize: 15, marginBottom: 6 }}>
+              <div style={{ color: theme.goldAccent, fontWeight: 700, fontSize: 15, marginBottom: 6 }}>
                 Auto Demo — {autoDemoIdx + 1} of {distributors.length + autoDemoIdx}
               </div>
               <div style={{ color: '#64748b', fontSize: 13 }}>

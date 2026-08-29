@@ -329,13 +329,13 @@ export default function CalendarPage() {
       <div onClick={() => openDay(dateStr)} style={{
         minHeight: '88px', padding: '6px 8px', cursor: 'pointer',
         borderRight: '1px solid var(--bs-border-color)', borderBottom: '1px solid var(--bs-border-color)',
-        background: isTod ? '#d4a032' : 'var(--bs-body-bg)', transition: 'background 0.1s',
+        background: isTod ? theme.gold : 'var(--bs-body-bg)', transition: 'background 0.1s',
       }}
         onMouseEnter={e => { if (!isTod) (e.currentTarget as HTMLElement).style.background = 'var(--bs-tertiary-bg)' }}
         onMouseLeave={e => { if (!isTod) (e.currentTarget as HTMLElement).style.background = 'var(--bs-body-bg)' }}>
         <div style={{ fontSize: '14px', fontWeight: 700, color: isTod ? '#fff' : 'var(--bs-body-color)', marginBottom: '1px' }}>{label}</div>
         {hijriOverlay && (
-          <div style={{ fontSize: '10px', color: isTod ? 'rgba(255,255,255,0.7)' : hijriOverlay.isFirst ? '#d4a032' : 'var(--bs-secondary-color)', fontWeight: hijriOverlay.isFirst ? 700 : 400, marginBottom: '3px' }}>
+          <div style={{ fontSize: '10px', color: isTod ? 'rgba(255,255,255,0.7)' : hijriOverlay.isFirst ? theme.gold : 'var(--bs-secondary-color)', fontWeight: hijriOverlay.isFirst ? 700 : 400, marginBottom: '3px' }}>
             {hijriOverlay.isFirst ? `1 ${HIJRI_MONTHS_SHORT[hijriOverlay.month - 1]}` : hijriOverlay.day}
           </div>
         )}
@@ -343,7 +343,7 @@ export default function CalendarPage() {
           <div style={{ fontSize: '10px', color: isTod ? 'rgba(255,255,255,0.7)' : 'var(--bs-secondary-color)', marginBottom: '3px' }}>{gregOverlay}</div>
         )}
         <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap', marginBottom: '2px' }}>
-          {hasM && <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: isTod ? '#ffd97d' : '#0ab39c' }} title="Menu set" />}
+          {hasM && <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: isTod ? theme.goldAccent : theme.success }} title="Menu set" />}
           {sch && <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: sch.thaali_enabled ? (isTod ? '#90ee90' : '#28a745') : (isTod ? '#ffaaaa' : '#e63946') }} title={sch.thaali_enabled ? 'Thaali day' : 'No thaali'} />}
         </div>
         {sch?.thaali_enabled && count && (
@@ -377,7 +377,7 @@ export default function CalendarPage() {
             {(['gregorian', 'hijri'] as ViewMode[]).map(mode => (
               <button key={mode} onClick={() => setViewMode(mode)} style={{
                 padding: '5px 14px', borderRadius: '6px', border: 'none', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
-                background: viewMode === mode ? '#d4a032' : 'transparent',
+                background: viewMode === mode ? theme.gold : 'transparent',
                 color: viewMode === mode ? '#fff' : 'var(--bs-secondary-color)',
               }}>
                 {mode === 'gregorian' ? 'Gregorian' : 'Hijri (Misri)'}
@@ -386,8 +386,8 @@ export default function CalendarPage() {
           </div>
           <button onClick={goToday} className="btn btn-sm btn-outline-secondary" style={{ borderRadius: '8px', fontSize: '12px' }}>Today</button>
           <div className="d-flex gap-1">
-            <button onClick={navPrev} className="btn btn-sm" style={{ background: 'var(--bs-secondary-bg)', border: 'none', borderRadius: '8px', color: '#d4a032' }}><i className="bi bi-chevron-left" /></button>
-            <button onClick={navNext} className="btn btn-sm" style={{ background: 'var(--bs-secondary-bg)', border: 'none', borderRadius: '8px', color: '#d4a032' }}><i className="bi bi-chevron-right" /></button>
+            <button onClick={navPrev} className="btn btn-sm" style={{ background: 'var(--bs-secondary-bg)', border: 'none', borderRadius: '8px', color: theme.gold }}><i className="bi bi-chevron-left" /></button>
+            <button onClick={navNext} className="btn btn-sm" style={{ background: 'var(--bs-secondary-bg)', border: 'none', borderRadius: '8px', color: theme.gold }}><i className="bi bi-chevron-right" /></button>
           </div>
         </div>
       </div>
@@ -397,7 +397,7 @@ export default function CalendarPage() {
 
       <div className="card" style={{ borderRadius: '12px', border: 'none', boxShadow: '0 1px 6px rgba(0,0,0,0.07)' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--bs-border-color)' }}>
-          <h5 className="mb-0 fw-bold" style={{ color: '#d4a032' }}>{getTitle()}</h5>
+          <h5 className="mb-0 fw-bold" style={{ color: theme.gold }}>{getTitle()}</h5>
         </div>
         <div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: '1px solid var(--bs-border-color)' }}>
@@ -406,7 +406,7 @@ export default function CalendarPage() {
             ))}
           </div>
           {loading ? (
-            <div className="text-center py-5"><div className="spinner-border spinner-border-sm" style={{ color: '#d4a032' }} /></div>
+            <div className="text-center py-5"><div className="spinner-border spinner-border-sm" style={{ color: theme.gold }} /></div>
           ) : viewMode === 'gregorian' ? (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
               {gregCells.map((cell, i) => {
@@ -437,7 +437,7 @@ export default function CalendarPage() {
       {viewMode === 'gregorian' && (
         <div className="card mt-3" style={{ borderRadius: '12px', border: 'none', boxShadow: '0 1px 6px rgba(0,0,0,0.07)' }}>
           <div className="card-body p-3">
-            <p className="mb-2 fw-bold" style={{ fontSize: '13px', color: '#d4a032' }}><i className="bi bi-moon-stars me-2" />Hijri months in view</p>
+            <p className="mb-2 fw-bold" style={{ fontSize: '13px', color: theme.gold }}><i className="bi bi-moon-stars me-2" />Hijri months in view</p>
             <div className="d-flex gap-2 flex-wrap">
               {(() => {
                 const first = new Date(gYear, gMonth, 1); const last = new Date(gYear, gMonth + 1, 0)
@@ -450,7 +450,7 @@ export default function CalendarPage() {
                 }
                 return months.map((mo, i) => (
                   <div key={i} style={{ background: 'var(--bs-secondary-bg)', borderRadius: '8px', padding: '6px 12px', fontSize: '12px' }}>
-                    <span style={{ fontWeight: 700, color: '#d4a032' }}>{HIJRI_MONTHS[mo.m - 1]}</span>
+                    <span style={{ fontWeight: 700, color: theme.gold }}>{HIJRI_MONTHS[mo.m - 1]}</span>
                     <span style={{ color: 'var(--bs-secondary-color)', marginLeft: '6px' }}>{mo.start.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })} – {mo.end.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}</span>
                     <span style={{ color: 'var(--bs-secondary-color)', marginLeft: '6px' }}>({mo.days}d)</span>
                   </div>
@@ -491,7 +491,7 @@ export default function CalendarPage() {
                     <button key={tab.key} onClick={() => setModalTab(tab.key)} style={{
                       flex: 1, padding: '7px 4px', borderRadius: '6px', border: 'none', fontSize: '13px',
                       fontWeight: 600, cursor: 'pointer',
-                      background: modalTab === tab.key ? '#d4a032' : 'transparent',
+                      background: modalTab === tab.key ? theme.gold : 'transparent',
                       color: modalTab === tab.key ? '#fff' : 'var(--bs-secondary-color)',
                     }}>
                       <i className={`bi ${tab.icon} me-1`} />{tab.label}
@@ -610,7 +610,7 @@ export default function CalendarPage() {
                             return (
                               <button key={ns.id} onClick={() => !locked && toggleNiyyat(ns.id)} disabled={locked} style={{
                                 padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: 'none',
-                                background: sel ? '#d4a032' : 'var(--bs-secondary-bg)',
+                                background: sel ? theme.gold : 'var(--bs-secondary-bg)',
                                 color: sel ? '#fff' : 'var(--bs-body-color)', transition: 'all 0.15s',
                               }}>{ns.name}</button>
                             )
@@ -654,7 +654,7 @@ export default function CalendarPage() {
                             disabled={locked}
                             style={{ borderRadius: '8px', fontSize: '13px', maxWidth: '120px' }} />
                           {selectedCount && (
-                            <div style={{ fontSize: '13px', color: '#d4a032', fontWeight: 700 }}>
+                            <div style={{ fontSize: '13px', color: theme.gold, fontWeight: 700 }}>
                               {selectedCount.approved} approved + {scheduleForm.extra_thaali_count} extra
                               = <span style={{ color: '#28a745' }}>{selectedCount.approved + scheduleForm.extra_thaali_count} total</span>
                             </div>
@@ -672,7 +672,7 @@ export default function CalendarPage() {
                               return (
                                 <div key={catId} style={{ background: 'var(--bs-body-bg)', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', border: '1px solid var(--bs-border-color)' }}>
                                   <span style={{ color: 'var(--bs-secondary-color)' }}>{cat?.name || catId}:</span>
-                                  <span style={{ fontWeight: 700, color: '#d4a032', marginLeft: '4px' }}>{count}</span>
+                                  <span style={{ fontWeight: 700, color: theme.gold, marginLeft: '4px' }}>{count}</span>
                                 </div>
                               )
                             })}
@@ -726,7 +726,7 @@ export default function CalendarPage() {
                       {!locked && (
                         <button onClick={() => setExtraItems(p => [...p, { name: '', value: '' }])}
                           className="btn btn-sm"
-                          style={{ fontSize: 11, padding: '3px 10px', background: '#d4a03215', color: '#d4a032', border: 'none', borderRadius: 6, fontWeight: 600 }}>
+                          style={{ fontSize: 11, padding: '3px 10px', background: '#d4a03215', color: theme.gold, border: 'none', borderRadius: 6, fontWeight: 600 }}>
                           <i className="bi bi-plus me-1" />Add Extra
                         </button>
                       )}
@@ -790,7 +790,7 @@ export default function CalendarPage() {
                   <button onClick={() => setShowModal(false)} className="btn btn-sm btn-outline-secondary" style={{ borderRadius: '8px', fontSize: '13px' }}>Cancel</button>
                   {!locked && (
                     <button onClick={modalTab === 'menu' ? saveMenu : saveSchedule} disabled={saving} className="btn btn-sm"
-                      style={{ background: '#d4a032', color: '#fff', borderRadius: '8px', fontSize: '13px', fontWeight: 600 }}>
+                      style={{ background: theme.gold, color: '#fff', borderRadius: '8px', fontSize: '13px', fontWeight: 600 }}>
                       {saving ? <span className="spinner-border spinner-border-sm" /> : 'Save'}
                     </button>
                   )}

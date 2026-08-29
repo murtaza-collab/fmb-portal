@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { loadKitchenDayData, getStoppedMuminIds, todayISO } from '@/lib/kitchen-eligible';
+import { theme } from '@/lib/theme'
 
 export default function KitchenHome() {
   const [arrivedSessions, setArrivedSessions]     = useState<any[]>([]);
@@ -194,7 +195,7 @@ export default function KitchenHome() {
           onMouseLeave={e => (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'}>
           <div className="card-body p-3">
             <div className="d-flex justify-content-between align-items-start mb-3">
-              <h6 className="mb-0 fw-bold" style={{ fontSize: 15, color: '#d4a032' }}>{dist?.full_name || 'Unknown'}</h6>
+              <h6 className="mb-0 fw-bold" style={{ fontSize: 15, color: theme.gold }}>{dist?.full_name || 'Unknown'}</h6>
               <span className={`badge ${cls}`} style={{ fontSize: 11 }}>{label}</span>
             </div>
             <div className="row g-0 text-center mb-3" style={{ borderRadius: 8, overflow: 'hidden', border: '1px solid var(--bs-border-color)' }}>
@@ -203,11 +204,11 @@ export default function KitchenHome() {
                 <div style={{ fontSize: 10, color: 'var(--bs-secondary-color)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Eligible</div>
               </div>
               <div className="col-4 py-2" style={{ borderRight: '1px solid var(--bs-border-color)' }}>
-                <div className="fw-bold" style={{ fontSize: 18, color: stopped > 0 ? '#f06548' : 'var(--bs-body-color)' }}>{stopped}</div>
+                <div className="fw-bold" style={{ fontSize: 18, color: stopped > 0 ? theme.danger : 'var(--bs-body-color)' }}>{stopped}</div>
                 <div style={{ fontSize: 10, color: 'var(--bs-secondary-color)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Stopped</div>
               </div>
               <div className="col-4 py-2" style={{ background: toDispatch > 0 ? '#0ab39c12' : undefined }}>
-                <div className="fw-bold" style={{ fontSize: 18, color: '#0ab39c' }}>{toDispatch}</div>
+                <div className="fw-bold" style={{ fontSize: 18, color: theme.success }}>{toDispatch}</div>
                 <div style={{ fontSize: 10, color: 'var(--bs-secondary-color)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>To Dispatch</div>
               </div>
             </div>
@@ -216,7 +217,7 @@ export default function KitchenHome() {
                 <span style={{ fontSize: 12, color: 'var(--bs-secondary-color)' }}>
                   <i className="bi bi-clock me-1" />{arrivedTimeStr(session.arrived_at)}
                 </span>
-                {!done && <span style={{ fontSize: 12, color: '#d4a032', fontWeight: 600 }}>Tap to open →</span>}
+                {!done && <span style={{ fontSize: 12, color: theme.gold, fontWeight: 600 }}>Tap to open →</span>}
               </div>
             )}
           </div>
@@ -236,7 +237,7 @@ export default function KitchenHome() {
           <div>
             <span className="fw-semibold" style={{ color: 'var(--bs-body-color)', fontSize: 14 }}>{dist.full_name}</span>
             {total > 0 ? (
-              <span className="ms-2" style={{ fontSize: 12, color: '#0ab39c' }}>
+              <span className="ms-2" style={{ fontSize: 12, color: theme.success }}>
                 {eligible} eligible{stopped > 0 ? `, ${stopped} stopped` : ''}
               </span>
             ) : (
@@ -267,7 +268,7 @@ export default function KitchenHome() {
             style={{ background: '#d4a03215', border: '1px solid #d4a03230', borderRadius: 10 }}>
             <div className="d-flex align-items-center gap-2">
               <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', display: 'inline-block', boxShadow: '0 0 8px #22c55e', animation: 'pulse 1.5s infinite' }} />
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#d4a032' }}>Demo Mode — Listening for scans</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: theme.gold }}>Demo Mode — Listening for scans</span>
               <span style={{ fontSize: 12, color: 'var(--bs-secondary-color)' }}>
                 Open <code>/kitchen/scan</code> on your phone to simulate arrivals
               </span>
@@ -283,9 +284,9 @@ export default function KitchenHome() {
           <div className="mb-3 px-3 py-2 rounded d-flex align-items-center gap-3 flex-wrap"
             style={{ background: scheduleInfo.enabled ? '#0ab39c12' : '#f0654812', border: `1px solid ${scheduleInfo.enabled ? '#0ab39c30' : '#f0654830'}`, borderRadius: 10 }}>
             <i className={`bi ${scheduleInfo.enabled ? 'bi-check-circle-fill' : 'bi-x-circle-fill'}`}
-              style={{ color: scheduleInfo.enabled ? '#0ab39c' : '#f06548', fontSize: 18 }} />
+              style={{ color: scheduleInfo.enabled ? theme.success : theme.danger, fontSize: 18 }} />
             <div>
-              <span style={{ fontWeight: 700, color: scheduleInfo.enabled ? '#0ab39c' : '#f06548', fontSize: 14 }}>
+              <span style={{ fontWeight: 700, color: scheduleInfo.enabled ? theme.success : theme.danger, fontSize: 14 }}>
                 {scheduleInfo.enabled ? `Thaali Day — ${scheduleInfo.total} eligible thaalis` : 'No Thaali Today'}
               </span>
               {scheduleInfo.eventName && (
@@ -386,15 +387,15 @@ export default function KitchenHome() {
                               onClick={() => doCheckin(d.id)}>
                               <div className="d-flex align-items-center gap-3">
                                 <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#d4a03220', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                  <i className="bi bi-person-fill" style={{ color: '#d4a032', fontSize: 20 }} />
+                                  <i className="bi bi-person-fill" style={{ color: theme.gold, fontSize: 20 }} />
                                 </div>
                                 <div>
                                   <div className="fw-bold" style={{ color: 'var(--bs-body-color)', fontSize: 15 }}>{d.full_name}</div>
-                                  <div style={{ fontSize: 12, color: '#0ab39c' }}>
+                                  <div style={{ fontSize: 12, color: theme.success }}>
                                     {el > 0 ? `${el} eligible` : ''}{st > 0 ? `, ${st} stopped` : ''}{el === 0 && st === 0 ? 'No thaalis' : ''}
                                   </div>
                                 </div>
-                                <i className="bi bi-wifi ms-auto" style={{ color: '#d4a032', opacity: 0.4, fontSize: 18 }} />
+                                <i className="bi bi-wifi ms-auto" style={{ color: theme.gold, opacity: 0.4, fontSize: 18 }} />
                               </div>
                             </button>
                           </div>
@@ -470,7 +471,7 @@ export default function KitchenHome() {
                 {!demoMode && (
                   <button className="btn btn-sm"
                     onClick={() => setDemoMode(true)}
-                    style={{ background: '#d4a03215', color: '#d4a032', border: '1px solid #d4a03230', borderRadius: 8, fontSize: 12, fontWeight: 600 }}>
+                    style={{ background: '#d4a03215', color: theme.gold, border: '1px solid #d4a03230', borderRadius: 8, fontSize: 12, fontWeight: 600 }}>
                     <i className="bi bi-broadcast me-1" />Demo Mode
                   </button>
                 )}
@@ -498,9 +499,9 @@ export default function KitchenHome() {
             {startedSessions.length > 0 && (
               <>
                 <h2 className="h5 mb-3 fw-bold" style={{ color: 'var(--bs-body-color)' }}>
-                  <i className="bi bi-cup-hot me-2" style={{ color: '#ffd97d' }} />
+                  <i className="bi bi-cup-hot me-2" style={{ color: theme.goldAccent }} />
                   Being Filled
-                  <span className="badge ms-2" style={{ background: '#ffd97d', color: '#212529' }}>{startedSessions.length}</span>
+                  <span className="badge ms-2" style={{ background: theme.goldAccent, color: '#212529' }}>{startedSessions.length}</span>
                 </h2>
                 <div className="row g-3 mb-4">
                   {startedSessions.map(s => (

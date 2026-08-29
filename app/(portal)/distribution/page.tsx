@@ -352,7 +352,7 @@ export default function DistributionPage() {
                   {registrations.map((r, i) => (
                     <tr key={r.id}>
                       <td style={{ color: 'var(--bs-secondary-color)', padding: '8px 12px' }}>{page * PAGE_SIZE + i + 1}</td>
-                      <td style={{ fontWeight: 700, color: '#d4a032', padding: '8px 12px' }}>{r.thaalis?.thaali_number || '—'}</td>
+                      <td style={{ fontWeight: 700, color: theme.gold, padding: '8px 12px' }}>{r.thaalis?.thaali_number || '—'}</td>
                       <td style={{ padding: '8px 12px', color: 'var(--bs-body-color)' }}>{r.mumineen?.sf_no || '—'}</td>
                       <td style={{ padding: '8px 12px', color: 'var(--bs-secondary-color)' }}>{r.mumineen?.its_no || '—'}</td>
                       <td style={{ fontWeight: 500, padding: '8px 12px', color: 'var(--bs-body-color)' }}>{r.mumineen?.full_name || '—'}</td>

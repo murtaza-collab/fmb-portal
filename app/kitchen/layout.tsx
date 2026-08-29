@@ -10,6 +10,7 @@
 // so the choice is shared across both interfaces.
 
 import { useState, useEffect, useRef } from 'react';
+import { theme as fmb } from '@/lib/theme'
 
 type Theme = 'light' | 'dark' | 'system';
 
@@ -130,7 +131,7 @@ export default function KitchenLayout({ children }: { children: React.ReactNode 
               width: 32,
               height: 32,
               borderRadius: 8,
-              background: '#d4a032',
+              background: fmb.gold,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -229,10 +230,10 @@ export default function KitchenLayout({ children }: { children: React.ReactNode 
                     textAlign: 'left',
                   }}
                 >
-                  <span style={{ color: '#ffd97d', fontSize: 15 }}>{themeIcon(t)}</span>
+                  <span style={{ color: fmb.goldAccent, fontSize: 15 }}>{themeIcon(t)}</span>
                   <span style={{ flex: 1 }}>{themeLabel(t)}</span>
                   {theme === t && (
-                    <i className="bi bi-check2" style={{ color: '#0ab39c', fontWeight: 700 }}></i>
+                    <i className="bi bi-check2" style={{ color: fmb.success, fontWeight: 700 }}></i>
                   )}
                 </button>
               ))}

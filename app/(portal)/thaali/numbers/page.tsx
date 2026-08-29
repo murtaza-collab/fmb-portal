@@ -4,6 +4,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { theme } from '@/lib/theme'
 
 interface Thaali { id: number; thaali_number: number; status: string }
 
@@ -72,15 +73,15 @@ export default function ThaaliNumbersPage() {
                 <thead style={{ background: '#f8f9fa' }}>
                   <tr>
                     {['#', 'Thaali Number', 'Actions'].map(h => (
-                      <th key={h} style={{ fontSize: '13px', color: '#6c757d', fontWeight: 600 }}>{h}</th>
+                      <th key={h} style={{ fontSize: '13px', color: theme.muted, fontWeight: 600 }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.map((t, i) => (
                     <tr key={t.id}>
-                      <td style={{ fontSize: '13px', color: '#6c757d' }}>{i + 1}</td>
-                      <td style={{ fontWeight: 700, fontSize: '15px', color: '#d4a032' }}>#{t.thaali_number}</td>
+                      <td style={{ fontSize: '13px', color: theme.muted }}>{i + 1}</td>
+                      <td style={{ fontWeight: 700, fontSize: '15px', color: theme.gold }}>#{t.thaali_number}</td>
                       <td>
                         <button className="btn btn-sm btn-outline-primary" style={{ fontSize: '12px' }} onClick={() => openEdit(t)}>Edit</button>
                       </td>
@@ -110,7 +111,7 @@ export default function ThaaliNumbersPage() {
                 <label className="form-label" style={{ fontSize: '13px' }}>Thaali Number *</label>
                 <input type="number" className="form-control" min={1} max={9999}
                   placeholder="e.g. 42" value={numberInput} onChange={e => setNumberInput(e.target.value)} autoFocus />
-                <div className="mt-2" style={{ fontSize: '12px', color: '#6c757d' }}>Numbers between 1–9999. Each number is unique.</div>
+                <div className="mt-2" style={{ fontSize: '12px', color: theme.muted }}>Numbers between 1–9999. Each number is unique.</div>
               </div>
               <div className="modal-footer">
                 <button className="btn btn-light btn-sm" onClick={() => setShowModal(false)}>Cancel</button>

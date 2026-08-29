@@ -2,6 +2,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { theme } from '@/lib/theme'
 
 interface ThaaliType { id: number; name: string; status: string }
 
@@ -61,14 +62,14 @@ export default function ThaaliTypesPage() {
                 <thead style={{ background: '#f8f9fa' }}>
                   <tr>
                     {['#', 'Type Name', 'Status', 'Actions'].map(h => (
-                      <th key={h} style={{ fontSize: '13px', color: '#6c757d', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
+                      <th key={h} style={{ fontSize: '13px', color: theme.muted, fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {types.map((t, i) => (
                     <tr key={t.id}>
-                      <td style={{ fontSize: '13px', color: '#6c757d' }}>{i + 1}</td>
+                      <td style={{ fontSize: '13px', color: theme.muted }}>{i + 1}</td>
                       <td style={{ fontSize: '14px', fontWeight: 500 }}>{t.name}</td>
                       <td><span className={`badge ${t.status === 'active' ? 'bg-success' : 'bg-secondary'}`} style={{ fontSize: '11px' }}>{t.status}</span></td>
                       <td style={{ whiteSpace: 'nowrap' }}>

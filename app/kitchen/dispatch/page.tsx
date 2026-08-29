@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { todayISO } from '@/lib/kitchen-eligible';
 import { nowUTC } from '@/lib/time';
+import { theme } from '@/lib/theme'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -321,9 +322,9 @@ export default function Dispatch() {
               {atCounterASessions.length > 0 && (
                 <>
                   <h5 className="fw-bold mb-3" style={{ color: 'var(--bs-body-color)' }}>
-                    <i className="bi bi-stopwatch me-2" style={{ color: '#d4a032' }}></i>
+                    <i className="bi bi-stopwatch me-2" style={{ color: theme.gold }}></i>
                     At Counter A
-                    <span className="badge ms-2" style={{ background: '#d4a032' }}>{atCounterASessions.length}</span>
+                    <span className="badge ms-2" style={{ background: theme.gold }}>{atCounterASessions.length}</span>
                   </h5>
                   <div className="row g-3 mb-4">
                     {atCounterASessions.map(s => (
@@ -335,7 +336,7 @@ export default function Dispatch() {
                               <h6 className="fw-bold mb-0" style={{ color: 'var(--bs-body-color)' }}>
                                 {s.distributor_name}
                               </h6>
-                              <span className="badge text-white" style={{ background: '#d4a032' }}>
+                              <span className="badge text-white" style={{ background: theme.gold }}>
                                 <i className="bi bi-hourglass-split me-1"></i>Counter A
                               </span>
                             </div>

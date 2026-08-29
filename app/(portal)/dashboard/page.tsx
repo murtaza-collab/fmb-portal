@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { todayHijri, getFMBFiscalYear, formatHijri } from '@/lib/hijri'
+import { theme } from '@/lib/theme'
 
 interface ExtraItem { name: string; value: string }
 interface TodayMenu {
@@ -178,7 +179,7 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
 
   if (loading) return (
     <div className="d-flex justify-content-center align-items-center" style={{ minHeight:'60vh' }}>
-      <div className="spinner-border" style={{ color:'#d4a032' }} />
+      <div className="spinner-border" style={{ color:theme.gold }} />
     </div>
   )
 
@@ -218,7 +219,7 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
         </div>
         <div className="d-flex gap-2">
           <button onClick={() => router.push('/kitchen')} className="btn btn-sm"
-            style={{ background:'#d4a032', color:'#fff', borderRadius:8, fontSize:13, fontWeight:600 }}>
+            style={{ background:theme.gold, color:'#fff', borderRadius:8, fontSize:13, fontWeight:600 }}>
             <i className="bi bi-grid-3x3-gap me-1" />Kitchen Portal
           </button>
           <button onClick={fetchStats} className="btn btn-sm btn-outline-secondary" style={{ borderRadius:8, fontSize:13 }}>
@@ -237,13 +238,13 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
               <div className="d-flex justify-content-between align-items-start">
                 <div>
                   <p style={{ fontSize:11, textTransform:'uppercase', letterSpacing:'0.6px', fontWeight:600, color:'var(--bs-secondary-color)', marginBottom:4 }}>Active HOFs</p>
-                  <h3 className="mb-0 fw-bold" style={{ color:'#d4a032', fontSize:28 }}>{stats.activeHOFs}</h3>
+                  <h3 className="mb-0 fw-bold" style={{ color:theme.gold, fontSize:28 }}>{stats.activeHOFs}</h3>
                   <p style={{ fontSize:12, color:'var(--bs-secondary-color)', marginTop:4, marginBottom:0 }}>
                     {stats.totalMumineen} total mumineen (incl. members)
                   </p>
                 </div>
                 <div style={{ width:44, height:44, borderRadius:10, background:'#d4a03218', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                  <i className="bi bi-house-fill" style={{ fontSize:20, color:'#d4a032' }} />
+                  <i className="bi bi-house-fill" style={{ fontSize:20, color:theme.gold }} />
                 </div>
               </div>
             </div>
@@ -257,15 +258,15 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
               <div className="d-flex justify-content-between align-items-start">
                 <div>
                   <p style={{ fontSize:11, textTransform:'uppercase', letterSpacing:'0.6px', fontWeight:600, color:'var(--bs-secondary-color)', marginBottom:4 }}>Thaali Registrations</p>
-                  <h3 className="mb-0 fw-bold" style={{ color:'#0ab39c', fontSize:28 }}>{stats.thaaliRegistrations}</h3>
+                  <h3 className="mb-0 fw-bold" style={{ color:theme.success, fontSize:28 }}>{stats.thaaliRegistrations}</h3>
                   <p style={{ fontSize:12, marginTop:4, marginBottom:0 }}>
                     {stats.stoppedThaalis > 0
-                      ? <span style={{ color:'#f06548' }}>{stats.stoppedThaalis} stopped today</span>
-                      : <span style={{ color:'#0ab39c' }}>0 stopped today</span>}
+                      ? <span style={{ color:theme.danger }}>{stats.stoppedThaalis} stopped today</span>
+                      : <span style={{ color:theme.success }}>0 stopped today</span>}
                   </p>
                 </div>
                 <div style={{ width:44, height:44, borderRadius:10, background:'#0ab39c18', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                  <i className="bi bi-cup-hot" style={{ fontSize:20, color:'#0ab39c' }} />
+                  <i className="bi bi-cup-hot" style={{ fontSize:20, color:theme.success }} />
                 </div>
               </div>
             </div>
@@ -281,27 +282,27 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
                   <p style={{ fontSize:11, textTransform:'uppercase', letterSpacing:'0.6px', fontWeight:600, color:'var(--bs-secondary-color)', marginBottom:4 }}>Today's Thaali</p>
                   {todaySchedule === null ? (
                     <>
-                      <h3 className="mb-0 fw-bold" style={{ color:'#6c757d', fontSize:28 }}>—</h3>
+                      <h3 className="mb-0 fw-bold" style={{ color:theme.muted, fontSize:28 }}>—</h3>
                       <p style={{ fontSize:12, color:'var(--bs-secondary-color)', marginTop:4, marginBottom:0 }}>Not scheduled yet</p>
                     </>
                   ) : todaySchedule.thaali_enabled ? (
                     <>
-                      <h3 className="mb-0 fw-bold" style={{ color:'#ffd97d', fontSize:28 }}>{todaySchedule.total_thaalis}</h3>
+                      <h3 className="mb-0 fw-bold" style={{ color:theme.goldAccent, fontSize:28 }}>{todaySchedule.total_thaalis}</h3>
                       <p style={{ fontSize:12, color:'var(--bs-secondary-color)', marginTop:4, marginBottom:0 }} className="text-truncate">
                         {todaySchedule.event_name || 'Regular day'}
                       </p>
                     </>
                   ) : (
                     <>
-                      <h3 className="mb-0 fw-bold" style={{ color:'#f06548', fontSize:28 }}>Off</h3>
-                      <p style={{ fontSize:12, color:'#f06548', marginTop:4, marginBottom:0 }} className="text-truncate">
+                      <h3 className="mb-0 fw-bold" style={{ color:theme.danger, fontSize:28 }}>Off</h3>
+                      <p style={{ fontSize:12, color:theme.danger, marginTop:4, marginBottom:0 }} className="text-truncate">
                         {todaySchedule.event_name || 'No thaali today'}
                       </p>
                     </>
                   )}
                 </div>
                 <div style={{ width:44, height:44, borderRadius:10, background:'#ffd97d18', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                  <i className={`bi ${todaySchedule?.thaali_enabled === false ? 'bi-x-circle' : 'bi-calendar-check'}`} style={{ fontSize:20, color:'#ffd97d' }} />
+                  <i className={`bi ${todaySchedule?.thaali_enabled === false ? 'bi-x-circle' : 'bi-calendar-check'}`} style={{ fontSize:20, color:theme.goldAccent }} />
                 </div>
               </div>
             </div>
@@ -316,27 +317,27 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
               <div className="d-flex justify-content-between align-items-start">
                 <div>
                   <p style={{ fontSize:11, textTransform:'uppercase', letterSpacing:'0.6px', fontWeight:600, color:'var(--bs-secondary-color)', marginBottom:4 }}>Pending Actions</p>
-                  <h3 className="mb-0 fw-bold" style={{ color:'#299cdb', fontSize:28 }}>
+                  <h3 className="mb-0 fw-bold" style={{ color:theme.info, fontSize:28 }}>
                     {stats.pendingAddressRequests + stats.pendingTakhmeem}
                   </h3>
                   <div style={{ marginTop:4 }}>
                     {stats.pendingAddressRequests > 0 && (
-                      <span className="badge me-1" style={{ background:'#299cdb22', color:'#299cdb', fontSize:10 }}>
+                      <span className="badge me-1" style={{ background:'#299cdb22', color:theme.info, fontSize:10 }}>
                         {stats.pendingAddressRequests} address
                       </span>
                     )}
                     {stats.pendingTakhmeem > 0 && (
-                      <span className="badge" style={{ background:'#d4a03222', color:'#d4a032', fontSize:10 }}>
+                      <span className="badge" style={{ background:'#d4a03222', color:theme.gold, fontSize:10 }}>
                         {stats.pendingTakhmeem} niyyat
                       </span>
                     )}
                     {stats.pendingAddressRequests === 0 && stats.pendingTakhmeem === 0 && (
-                      <span style={{ fontSize:12, color:'#0ab39c' }}>All clear ✓</span>
+                      <span style={{ fontSize:12, color:theme.success }}>All clear ✓</span>
                     )}
                   </div>
                 </div>
                 <div style={{ width:44, height:44, borderRadius:10, background:'#299cdb18', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                  <i className="bi bi-bell-fill" style={{ fontSize:20, color:'#299cdb' }} />
+                  <i className="bi bi-bell-fill" style={{ fontSize:20, color:theme.info }} />
                 </div>
               </div>
             </div>
@@ -347,12 +348,12 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
       {/* Info strip */}
       <div className="d-flex gap-3 mb-4 flex-wrap">
         <div style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 14px', background:'var(--bs-tertiary-bg)', borderRadius:20, border:'1px solid var(--bs-border-color)', fontSize:12 }}>
-          <i className="bi bi-map-fill" style={{ color:'#ffd97d', fontSize:14 }} />
+          <i className="bi bi-map-fill" style={{ color:theme.goldAccent, fontSize:14 }} />
           <span style={{ color:'var(--bs-secondary-color)' }}>Sectors:</span>
           <strong style={{ color:'var(--bs-body-color)' }}>{stats.activeSectors} active</strong>
         </div>
         <div style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 14px', background:'var(--bs-tertiary-bg)', borderRadius:20, border:'1px solid var(--bs-border-color)', fontSize:12 }}>
-          <i className="bi bi-truck" style={{ color:'#299cdb', fontSize:14 }} />
+          <i className="bi bi-truck" style={{ color:theme.info, fontSize:14 }} />
           <span style={{ color:'var(--bs-secondary-color)' }}>Distributors:</span>
           <strong style={{ color:'var(--bs-body-color)' }}>{stats.activeDistributors} active</strong>
         </div>
@@ -362,13 +363,13 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
       {(rolloverOverdue || rolloverUrgent) && !rolloverDone && (
         <div className="mb-4" style={{
           background: rolloverOverdue ? '#e6394610' : '#ffd97d15',
-          border:`1px solid ${rolloverOverdue ? '#e63946' : '#ffd97d'}`,
+          border:`1px solid ${rolloverOverdue ? '#e63946' : theme.goldAccent}`,
           borderRadius:12, padding:'14px 18px',
           display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, flexWrap:'wrap'
         }}>
           <div className="d-flex align-items-center gap-3">
             <i className={`bi ${rolloverOverdue ? 'bi-exclamation-circle-fill' : 'bi-bell-fill'}`}
-              style={{ fontSize:22, color: rolloverOverdue ? '#e63946' : '#ffd97d' }} />
+              style={{ fontSize:22, color: rolloverOverdue ? '#e63946' : theme.goldAccent }} />
             <div>
               <div style={{ fontWeight:700, fontSize:14, color: rolloverOverdue ? '#e63946' : '#856404' }}>
                 {rolloverOverdue ? 'Rollover Required — Today is 1 Ramadan!' : `Ramadan in ${daysToRamadan} days — Rollover due soon`}
@@ -379,7 +380,7 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
             </div>
           </div>
           <button onClick={() => setShowRolloverConfirm(true)} className="btn btn-sm"
-            style={{ background: rolloverOverdue ? '#e63946' : '#ffd97d', color: rolloverOverdue ? '#fff' : '#212529', borderRadius:8, fontWeight:600, fontSize:13, whiteSpace:'nowrap' }}>
+            style={{ background: rolloverOverdue ? '#e63946' : theme.goldAccent, color: rolloverOverdue ? '#fff' : '#212529', borderRadius:8, fontWeight:600, fontSize:13, whiteSpace:'nowrap' }}>
             <i className="bi bi-arrow-repeat me-1" />Rollover Now
           </button>
         </div>
@@ -392,7 +393,7 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
             <div className="card-body p-3">
               <div className="d-flex align-items-center gap-2 mb-3">
                 <div style={{ width:32, height:32, borderRadius:8, background:'#d4a03218', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                  <i className="bi bi-grid-3x3-gap" style={{ color:'#d4a032', fontSize:16 }} />
+                  <i className="bi bi-grid-3x3-gap" style={{ color:theme.gold, fontSize:16 }} />
                 </div>
                 <div>
                   <h6 className="mb-0 fw-bold">Kitchen Operations</h6>
@@ -435,7 +436,7 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
             <div className="card-body p-3">
               <div className="d-flex align-items-center gap-2 mb-2">
                 <div style={{ width:32, height:32, borderRadius:8, background:'#ffd97d18', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                  <i className="bi bi-calendar3" style={{ color:'#ffd97d', fontSize:16 }} />
+                  <i className="bi bi-calendar3" style={{ color:theme.goldAccent, fontSize:16 }} />
                 </div>
                 <div>
                   <h6 className="mb-0 fw-bold">Today's Menu</h6>
@@ -444,7 +445,7 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
                   </p>
                 </div>
                 <button onClick={() => router.push('/calendar')} className="btn btn-sm ms-auto"
-                  style={{ background:'#ffd97d18', color:'#ffd97d', border:'none', borderRadius:7, fontSize:11, fontWeight:600 }}>
+                  style={{ background:'#ffd97d18', color:theme.goldAccent, border:'none', borderRadius:7, fontSize:11, fontWeight:600 }}>
                   Edit
                 </button>
               </div>
@@ -453,9 +454,9 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
                 <div className="mb-2 px-2 py-2 rounded d-flex align-items-center gap-2"
                   style={{ background: todaySchedule.thaali_enabled ? '#0ab39c15' : '#f0654815', border:`1px solid ${todaySchedule.thaali_enabled ? '#0ab39c30' : '#f0654830'}` }}>
                   <i className={`bi ${todaySchedule.thaali_enabled ? 'bi-check-circle-fill' : 'bi-x-circle-fill'}`}
-                    style={{ color: todaySchedule.thaali_enabled ? '#0ab39c' : '#f06548', fontSize:16, flexShrink:0 }} />
+                    style={{ color: todaySchedule.thaali_enabled ? theme.success : theme.danger, fontSize:16, flexShrink:0 }} />
                   <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:12, fontWeight:700, color: todaySchedule.thaali_enabled ? '#0ab39c' : '#f06548' }}>
+                    <div style={{ fontSize:12, fontWeight:700, color: todaySchedule.thaali_enabled ? theme.success : theme.danger }}>
                       {todaySchedule.thaali_enabled ? `Thaali Day — ${todaySchedule.total_thaalis} thaalis` : 'No Thaali Today'}
                     </div>
                     {todaySchedule.event_name && (
@@ -493,7 +494,7 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
                   <i className="bi bi-calendar-x" style={{ fontSize:24, display:'block', marginBottom:6, opacity:0.4 }} />
                   <p style={{ fontSize:12, margin:0 }}>No menu published</p>
                   <button onClick={() => router.push('/calendar')} className="btn btn-sm mt-2"
-                    style={{ background:'#ffd97d18', color:'#ffd97d', border:'none', fontSize:11, borderRadius:7 }}>
+                    style={{ background:'#ffd97d18', color:theme.goldAccent, border:'none', fontSize:11, borderRadius:7 }}>
                     Add menu
                   </button>
                 </div>
@@ -510,7 +511,7 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
             <div className="card-body p-3">
               <div className="d-flex align-items-center gap-2 mb-3">
                 <div style={{ width:32, height:32, borderRadius:8, background:'#d4a03218', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                  <i className="bi bi-moon-stars" style={{ color:'#d4a032', fontSize:16 }} />
+                  <i className="bi bi-moon-stars" style={{ color:theme.gold, fontSize:16 }} />
                 </div>
                 <div>
                   <h6 className="mb-0 fw-bold">Fiscal Year (Hijri)</h6>
@@ -520,11 +521,11 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
               <div className="row g-3">
                 <div className="col-md-4">
                   <div style={{ background:'#d4a03210', borderRadius:10, padding:14, border:'1px solid #d4a03225' }}>
-                    <div style={{ fontSize:11, fontWeight:700, color:'#d4a032', textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:6 }}>Current FY</div>
-                    <div style={{ fontSize:18, fontWeight:800, color:'#d4a032' }}>{currentFY.hijriYear}H</div>
+                    <div style={{ fontSize:11, fontWeight:700, color:theme.gold, textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:6 }}>Current FY</div>
+                    <div style={{ fontSize:18, fontWeight:800, color:theme.gold }}>{currentFY.hijriYear}H</div>
                     <div style={{ fontSize:12, color:'var(--bs-secondary-color)', marginTop:4 }}>{fmtDateShort(currentFY.startGregorian)} → {fmtDateShort(currentFY.endGregorian)}</div>
-                    <div style={{ fontSize:11, color:'#0ab39c', marginTop:4, fontWeight:600 }}>1 Ramadan {currentFY.hijriYear}H</div>
-                    {rolloverDone && <div style={{ marginTop:8, fontSize:11, color:'#0ab39c', fontWeight:600 }}><i className="bi bi-check-circle-fill me-1" />Rollover done</div>}
+                    <div style={{ fontSize:11, color:theme.success, marginTop:4, fontWeight:600 }}>1 Ramadan {currentFY.hijriYear}H</div>
+                    {rolloverDone && <div style={{ marginTop:8, fontSize:11, color:theme.success, fontWeight:600 }}><i className="bi bi-check-circle-fill me-1" />Rollover done</div>}
                   </div>
                 </div>
                 <div className="col-md-4">
@@ -532,7 +533,7 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
                     <div style={{ fontSize:11, fontWeight:700, color:'#856404', textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:6 }}>Next FY</div>
                     <div style={{ fontSize:18, fontWeight:800, color:'#856404' }}>{nextFY.hijriYear}H</div>
                     <div style={{ fontSize:12, color:'var(--bs-secondary-color)', marginTop:4 }}>{fmtDateShort(nextFY.startGregorian)} → {fmtDateShort(nextFY.endGregorian)}</div>
-                    <div style={{ fontSize:11, color:'#ffd97d', marginTop:4, fontWeight:600 }}>1 Ramadan {nextFY.hijriYear}H</div>
+                    <div style={{ fontSize:11, color:theme.goldAccent, marginTop:4, fontWeight:600 }}>1 Ramadan {nextFY.hijriYear}H</div>
                   </div>
                 </div>
                 <div className="col-md-4">
@@ -546,7 +547,7 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
                       <div style={{ fontSize:11, fontWeight:700, color:'var(--bs-secondary-color)', textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:6 }}>Year Rollover</div>
                       {rolloverDone ? (
                         <>
-                          <div style={{ fontSize:14, fontWeight:700, color:'#0ab39c' }}><i className="bi bi-check-circle-fill me-2" />Completed</div>
+                          <div style={{ fontSize:14, fontWeight:700, color:theme.success }}><i className="bi bi-check-circle-fill me-2" />Completed</div>
                           {rolloverResult && <div style={{ fontSize:12, color:'var(--bs-secondary-color)', marginTop:4 }}>{rolloverResult.count} mumineen reset</div>}
                         </>
                       ) : (
@@ -560,7 +561,7 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
                     </div>
                     {!rolloverDone && (
                       <button onClick={() => setShowRolloverConfirm(true)} disabled={rolloverLoading} className="btn btn-sm mt-3 w-100"
-                        style={{ background: rolloverOverdue ? '#e63946' : '#d4a032', color:'#fff', borderRadius:8, fontSize:13, fontWeight:600 }}>
+                        style={{ background: rolloverOverdue ? '#e63946' : theme.gold, color:'#fff', borderRadius:8, fontSize:13, fontWeight:600 }}>
                         {rolloverLoading
                           ? <><span className="spinner-border spinner-border-sm me-1" />Rolling over...</>
                           : <><i className="bi bi-arrow-repeat me-1" />Rollover to {nextFY.hijriYear}H</>}

@@ -2,6 +2,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { buildIlikeOr } from '@/lib/search'
+import { theme } from '@/lib/theme'
 
 interface Thaali          { id: number; thaali_number: number }
 interface ThaaliType      { id: number; name: string; status: string }
@@ -79,7 +80,7 @@ function SearchableSelect({
           maxHeight: 220, overflowY: 'auto', marginTop: 2,
         }}>
           {value && (
-            <div style={{ padding: '6px 10px', fontSize: 12, color: '#f06548', cursor: 'pointer',
+            <div style={{ padding: '6px 10px', fontSize: 12, color: theme.danger, cursor: 'pointer',
               borderBottom: '1px solid var(--bs-border-color)' }}
               onMouseDown={() => { onChange(''); setQuery(''); setOpen(false) }}>
               ✕ Clear selection
@@ -91,7 +92,7 @@ function SearchableSelect({
             <div key={o.id} style={{
               padding: '7px 10px', fontSize: 13, cursor: 'pointer',
               background: String(o.id) === value ? '#d4a03215' : undefined,
-              color: String(o.id) === value ? '#d4a032' : 'var(--bs-body-color)',
+              color: String(o.id) === value ? theme.gold : 'var(--bs-body-color)',
             }}
               onMouseDown={() => { onChange(String(o.id)); setQuery(''); setOpen(false) }}>
               {o.label}
@@ -470,12 +471,12 @@ function RegistrationsTab({ onStatsChange }: { onStatsChange: () => void }) {
                     {registrations.map((r, i) => (
                       <tr key={r.id}>
                         <td style={{ color: 'var(--bs-secondary-color)', padding: '10px 12px' }}>{page * PAGE_SIZE + i + 1}</td>
-                        <td style={{ padding: '10px 12px', fontWeight: 700, color: '#d4a032' }}>
+                        <td style={{ padding: '10px 12px', fontWeight: 700, color: theme.gold }}>
                           {r.thaalis?.thaali_number
                             ? `#${r.thaalis.thaali_number}`
                             : <span className="badge bg-warning text-dark" style={{ fontSize: 10 }}>No Number</span>}
                         </td>
-                        <td style={{ padding: '10px 12px', fontWeight: 600, color: '#d4a032' }}>{r.mumineen?.sf_no || '—'}</td>
+                        <td style={{ padding: '10px 12px', fontWeight: 600, color: theme.gold }}>{r.mumineen?.sf_no || '—'}</td>
                         <td style={{ padding: '10px 12px', color: 'var(--bs-body-color)', fontWeight: 500 }}>{r.mumineen?.full_name || '—'}</td>
                         <td style={{ padding: '10px 12px', color: 'var(--bs-body-color)' }}>{r.thaali_types?.name || '—'}</td>
                         <td style={{ padding: '10px 12px', color: 'var(--bs-body-color)' }}>{r.thaali_categories?.name || '—'}</td>
@@ -569,7 +570,7 @@ function RegistrationsTab({ onStatsChange }: { onStatsChange: () => void }) {
                       placeholder="— Search thaali number —"
                     />
                     {availableThaalis.length === 0 && allThaalis.length > 0 && !editing && (
-                      <div className="mt-1" style={{ fontSize: 11, color: '#f06548' }}>
+                      <div className="mt-1" style={{ fontSize: 11, color: theme.danger }}>
                         All thaali numbers assigned — add more in Settings
                       </div>
                     )}
@@ -602,7 +603,7 @@ function RegistrationsTab({ onStatsChange }: { onStatsChange: () => void }) {
                     <label className="form-label" style={{ fontSize: 13, color: 'var(--bs-body-color)' }}>
                       Distributor
                       {form.mumin_id > 0 && sectorDistributors.length !== distributors.length && (
-                        <span className="ms-2 badge" style={{ background: '#0ab39c20', color: '#0ab39c', fontSize: 10, fontWeight: 600 }}>
+                        <span className="ms-2 badge" style={{ background: '#0ab39c20', color: theme.success, fontSize: 10, fontWeight: 600 }}>
                           {sectorDistributors.length} in sector
                         </span>
                       )}

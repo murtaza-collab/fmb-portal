@@ -2,6 +2,7 @@
 import { Fragment, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { todayPKT } from '@/lib/time'
+import { theme } from '@/lib/theme'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -269,11 +270,11 @@ export default function CustomizationsPage() {
                       <Fragment key={r.id}>
                         <tr
                           style={{
-                            borderLeft: `3px solid ${r.stop_thaali ? '#dc3545' : '#299cdb'}`,
+                            borderLeft: `3px solid ${r.stop_thaali ? '#dc3545' : theme.info}`,
                             background: r.stop_thaali ? 'rgba(220,53,69,0.03)' : 'var(--bs-body-bg)',
                           }}
                         >
-                          <td style={{ padding: '10px 12px', fontWeight: 700, color: '#d4a032' }}>
+                          <td style={{ padding: '10px 12px', fontWeight: 700, color: theme.gold }}>
                             #{r.thaali_number}
                           </td>
                           <td style={{ padding: '10px 12px' }}>

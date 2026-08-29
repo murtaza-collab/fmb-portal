@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+import { theme } from '@/lib/theme'
 
 interface Notification {
   id: number
@@ -125,7 +126,7 @@ export default function NotificationBell() {
                 <button 
                   onClick={markAllAsRead}
                   className="btn btn-sm btn-link"
-                  style={{ fontSize: '12px', color: '#d4a032' }}
+                  style={{ fontSize: '12px', color: theme.gold }}
                 >
                   Mark all read
                 </button>

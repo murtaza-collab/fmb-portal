@@ -2,6 +2,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { theme } from '@/lib/theme'
 
 interface ThaaliCategory { id: number; name: string; description?: string }
 
@@ -57,16 +58,16 @@ export default function ThaaliCategoriesPage() {
                 <thead style={{ background: '#f8f9fa' }}>
                   <tr>
                     {['#', 'Category Name', 'Description', 'Actions'].map(h => (
-                      <th key={h} style={{ fontSize: '13px', color: '#6c757d', fontWeight: 600 }}>{h}</th>
+                      <th key={h} style={{ fontSize: '13px', color: theme.muted, fontWeight: 600 }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {categories.map((c, i) => (
                     <tr key={c.id}>
-                      <td style={{ fontSize: '13px', color: '#6c757d' }}>{i + 1}</td>
+                      <td style={{ fontSize: '13px', color: theme.muted }}>{i + 1}</td>
                       <td style={{ fontSize: '14px', fontWeight: 500 }}>{c.name}</td>
-                      <td style={{ fontSize: '13px', color: '#6c757d' }}>{c.description || '—'}</td>
+                      <td style={{ fontSize: '13px', color: theme.muted }}>{c.description || '—'}</td>
                       <td>
                         <button className="btn btn-sm btn-outline-primary" style={{ fontSize: '12px' }} onClick={() => openEdit(c)}>Edit</button>
                       </td>

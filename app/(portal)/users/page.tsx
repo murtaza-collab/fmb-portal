@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { theme } from '@/lib/theme'
 
 interface AdminUser {
   id: number
@@ -290,14 +291,14 @@ export default function UsersPage() {
                     <thead style={{ background: '#f8f9fa' }}>
                       <tr>
                         {['#', 'Full Name', 'Username', 'Group', 'Status', 'Actions'].map(h => (
-                          <th key={h} style={{ fontSize: '13px', color: '#6c757d', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
+                          <th key={h} style={{ fontSize: '13px', color: theme.muted, fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {filteredUsers.map((u, i) => (
                         <tr key={u.id}>
-                          <td style={{ fontSize: '13px', color: '#6c757d' }}>{i + 1}</td>
+                          <td style={{ fontSize: '13px', color: theme.muted }}>{i + 1}</td>
                           <td style={{ fontSize: '14px', whiteSpace: 'nowrap' }}>{u.full_name}</td>
                           <td style={{ fontSize: '13px' }}>{u.username}</td>
                           <td style={{ fontSize: '13px' }}>{u.user_groups?.name || '—'}</td>
@@ -355,9 +356,9 @@ export default function UsersPage() {
                   <table className="table table-sm mb-0" style={{ fontSize: '12px', minWidth: '320px' }}>
                     <thead style={{ background: '#f8f9fa' }}>
                       <tr>
-                        <th style={{ color: '#6c757d' }}>Module</th>
+                        <th style={{ color: theme.muted }}>Module</th>
                         {PERM_KEYS.map(k => (
-                          <th key={k} style={{ color: '#6c757d', textAlign: 'center' }}>{PERM_LABELS[k]}</th>
+                          <th key={k} style={{ color: theme.muted, textAlign: 'center' }}>{PERM_LABELS[k]}</th>
                         ))}
                       </tr>
                     </thead>
@@ -370,7 +371,7 @@ export default function UsersPage() {
                             {PERM_KEYS.map(k => (
                               <td key={k} style={{ textAlign: 'center' }}>
                                 {perm?.[k as keyof Permission]
-                                  ? <span style={{ color: '#0ab39c', fontWeight: 700 }}>✓</span>
+                                  ? <span style={{ color: theme.success, fontWeight: 700 }}>✓</span>
                                   : <span style={{ color: '#dee2e6' }}>—</span>}
                               </td>
                             ))}
@@ -419,7 +420,7 @@ export default function UsersPage() {
                           onChange={(e) => setUserForm(p => ({ ...p, password: e.target.value }))}
                           placeholder={editingUser ? 'Leave blank to keep' : 'Enter password'} />
                         {editingUser && isSuperAdmin && (
-                          <div style={{ fontSize: '11px', color: '#6c757d', marginTop: '4px' }}>🔒 Super Admin only</div>
+                          <div style={{ fontSize: '11px', color: theme.muted, marginTop: '4px' }}>🔒 Super Admin only</div>
                         )}
                       </>
                     )}
@@ -474,12 +475,12 @@ export default function UsersPage() {
                           <th key={k} style={{ textAlign: 'center', cursor: 'pointer' }}
                             onClick={() => toggleAllPermission(k)}>
                             {PERM_LABELS[k]}
-                            <div style={{ fontSize: '10px', color: '#8a6318' }}>all</div>
+                            <div style={{ fontSize: '10px', color: theme.goldDeep }}>all</div>
                           </th>
                         ))}
                         <th style={{ textAlign: 'center' }}>
                           All
-                          <div style={{ fontSize: '10px', color: '#6c757d' }}>row</div>
+                          <div style={{ fontSize: '10px', color: theme.muted }}>row</div>
                         </th>
                       </tr>
                     </thead>

@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { theme } from '@/lib/theme'
 
 type Template = {
   id: number; event_type: string; label: string
@@ -264,8 +265,8 @@ export default function NotificationsPage() {
         </div>
         {!loading && (
           <span className="badge rounded-pill d-flex align-items-center gap-1"
-            style={{ background:'rgba(54,69,116,0.1)', color:'#d4a032', fontSize:'12px', padding:'6px 12px' }}>
-            <i className="bi bi-bell-fill" style={{ color:'#ffd97d' }} />
+            style={{ background:'rgba(54,69,116,0.1)', color:theme.gold, fontSize:'12px', padding:'6px 12px' }}>
+            <i className="bi bi-bell-fill" style={{ color:theme.goldAccent }} />
             {enabledCount} of {templates.length} automated active
           </span>
         )}
@@ -277,15 +278,15 @@ export default function NotificationsPage() {
           <button key={t} onClick={() => setTab(t)} style={{
             background:'none', border:'none', padding:'8px 18px 10px', fontSize:'13px',
             fontWeight: tab===t ? 600 : 400, cursor:'pointer',
-            color: tab===t ? '#d4a032' : 'var(--bs-secondary-color)',
+            color: tab===t ? theme.gold : 'var(--bs-secondary-color)',
             borderBottom: tab===t ? '2px solid #d4a032' : '2px solid transparent',
             marginBottom:'-1px', transition:'all 0.15s',
           }}>
             <i className={`bi me-2 ${t==='automated' ? 'bi-lightning-charge-fill' : t==='broadcast' ? 'bi-megaphone-fill' : 'bi-clock-history'}`}
-              style={{ color: tab===t ? '#ffd97d' : 'inherit' }} />
+              style={{ color: tab===t ? theme.goldAccent : 'inherit' }} />
             {t.charAt(0).toUpperCase() + t.slice(1)}
             {t === 'logs' && logs.length > 0 && (
-              <span className="badge rounded-pill ms-2" style={{ background:'rgba(54,69,116,0.15)', color:'#d4a032', fontSize:'10px' }}>
+              <span className="badge rounded-pill ms-2" style={{ background:'rgba(54,69,116,0.15)', color:theme.gold, fontSize:'10px' }}>
                 {logs.length}{logsMore ? '+' : ''}
               </span>
             )}
@@ -335,7 +336,7 @@ export default function NotificationsPage() {
                         </div>
                       </div>
                       <div className="d-flex align-items-center gap-2">
-                        <span style={{ fontSize:'11px', fontWeight:600, color: t.enabled ? '#0ab39c' : 'var(--bs-secondary-color)' }}>
+                        <span style={{ fontSize:'11px', fontWeight:600, color: t.enabled ? theme.success : 'var(--bs-secondary-color)' }}>
                           {t.enabled ? 'ON' : 'OFF'}
                         </span>
                         <div className="form-check form-switch mb-0">
@@ -364,7 +365,7 @@ export default function NotificationsPage() {
                           <i className="bi bi-lightning-charge me-1" />Fires automatically on event
                         </span>
                         <button className="btn btn-sm" disabled={saving===t.id} onClick={() => saveTemplate(t)}
-                          style={{ background: saved===t.id ? '#0ab39c' : '#d4a032', color:'#fff',
+                          style={{ background: saved===t.id ? theme.success : theme.gold, color:'#fff',
                             border:'none', borderRadius:'8px', fontSize:'13px', padding:'5px 16px', minWidth:'80px', transition:'all 0.2s' }}>
                           {saving===t.id ? <span className="spinner-border spinner-border-sm" />
                             : saved===t.id ? <><i className="bi bi-check2 me-1" />Saved</>
@@ -379,7 +380,7 @@ export default function NotificationsPage() {
           </div>
           <div className="mt-4 p-3 rounded-3 d-flex align-items-start gap-2"
             style={{ background:'rgba(54,69,116,0.06)', border:'1px solid rgba(54,69,116,0.15)' }}>
-            <i className="bi bi-info-circle-fill mt-1" style={{ color:'#d4a032', flexShrink:0 }} />
+            <i className="bi bi-info-circle-fill mt-1" style={{ color:theme.gold, flexShrink:0 }} />
             <p className="mb-0" style={{ fontSize:'12px', color:'var(--bs-secondary-color)', lineHeight:1.6 }}>
               <strong>Niyyat Approved</strong> fires when a mumin's niyyat status is changed to Approved — covers yearly cycles and month-start.
               <strong> Welcome</strong> fires once on first app login. Toggle <strong>OFF</strong> to suppress any type without touching DB triggers.
@@ -395,7 +396,7 @@ export default function NotificationsPage() {
             <div className="card" style={{ border:'1px solid var(--bs-border-color)', borderRadius:'12px', boxShadow:'0 1px 4px rgba(0,0,0,0.06)' }}>
               <div className="card-header" style={{ background:'var(--bs-secondary-bg)', borderBottom:'1px solid var(--bs-border-color)', borderRadius:'12px 12px 0 0', padding:'12px 16px' }}>
                 <span className="fw-semibold" style={{ fontSize:'14px' }}>
-                  <i className="bi bi-megaphone-fill me-2" style={{ color:'#ffd97d' }} />Compose Notification
+                  <i className="bi bi-megaphone-fill me-2" style={{ color:theme.goldAccent }} />Compose Notification
                 </span>
               </div>
               <div className="card-body p-4">
@@ -447,7 +448,7 @@ export default function NotificationsPage() {
                 </div>
 
                 <button className="btn w-100" disabled={sending || !bTitle.trim() || !bBody.trim()} onClick={sendBroadcast}
-                  style={{ background:'#d4a032', color:'#fff', border:'none', borderRadius:'10px', padding:'10px', fontSize:'14px', fontWeight:600, transition:'all 0.2s' }}>
+                  style={{ background:theme.gold, color:'#fff', border:'none', borderRadius:'10px', padding:'10px', fontSize:'14px', fontWeight:600, transition:'all 0.2s' }}>
                   {sending
                     ? <><span className="spinner-border spinner-border-sm me-2" />Sending…</>
                     : <><i className="bi bi-send-fill me-2" />Send to {preview ?? '…'} device{preview !== 1 ? 's' : ''}</>}
@@ -461,14 +462,14 @@ export default function NotificationsPage() {
             <div className="card" style={{ border:'1px solid var(--bs-border-color)', borderRadius:'12px', boxShadow:'0 1px 4px rgba(0,0,0,0.06)' }}>
               <div className="card-header" style={{ background:'var(--bs-secondary-bg)', borderBottom:'1px solid var(--bs-border-color)', borderRadius:'12px 12px 0 0', padding:'12px 16px' }}>
                 <span className="fw-semibold" style={{ fontSize:'14px' }}>
-                  <i className="bi bi-phone me-2" style={{ color:'#ffd97d' }} />Live Preview
+                  <i className="bi bi-phone me-2" style={{ color:theme.goldAccent }} />Live Preview
                 </span>
               </div>
               <div className="card-body d-flex flex-column align-items-center justify-content-center p-4" style={{ minHeight:'260px' }}>
                 <div style={{ width:'100%', maxWidth:'290px', background:'#1c1c1e', borderRadius:'18px', padding:'14px 16px', boxShadow:'0 8px 32px rgba(0,0,0,0.28)' }}>
                   <div className="d-flex align-items-center gap-2 mb-2">
-                    <div style={{ width:'22px', height:'22px', borderRadius:'6px', background:'#d4a032', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                      <i className="bi bi-bell-fill" style={{ fontSize:'10px', color:'#ffd97d' }} />
+                    <div style={{ width:'22px', height:'22px', borderRadius:'6px', background:theme.gold, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                      <i className="bi bi-bell-fill" style={{ fontSize:'10px', color:theme.goldAccent }} />
                     </div>
                     <span style={{ fontSize:'11px', color:'#8e8e93', fontWeight:600, letterSpacing:'0.4px' }}>FMB</span>
                     <span style={{ fontSize:'11px', color:'#8e8e93', marginLeft:'auto' }}>now</span>
@@ -489,7 +490,7 @@ export default function NotificationsPage() {
             {/* Device info note */}
             <div className="mt-3 p-3 rounded-3 d-flex align-items-start gap-2"
               style={{ background:'rgba(54,69,116,0.06)', border:'1px solid rgba(54,69,116,0.15)' }}>
-              <i className="bi bi-info-circle-fill mt-1" style={{ color:'#d4a032', flexShrink:0, fontSize:'13px' }} />
+              <i className="bi bi-info-circle-fill mt-1" style={{ color:theme.gold, flexShrink:0, fontSize:'13px' }} />
               <p className="mb-0" style={{ fontSize:'12px', color:'var(--bs-secondary-color)', lineHeight:1.6 }}>
                 Device count = FCM tokens saved. Multiple devices on same account all receive the notification.
                 Uninstalled apps are cleaned up automatically on next send.
@@ -531,16 +532,16 @@ export default function NotificationsPage() {
                           </td>
                           <td className="px-3 py-3">
                             <span className="badge rounded-pill"
-                              style={{ background:'rgba(54,69,116,0.1)', color:'#d4a032', fontSize:'11px', padding:'4px 10px' }}>
+                              style={{ background:'rgba(54,69,116,0.1)', color:theme.gold, fontSize:'11px', padding:'4px 10px' }}>
                               {l.segment || l.event_type || '—'}
                             </span>
                           </td>
                           <td className="px-3 py-3">
-                            <span className="fw-semibold" style={{ color:'#0ab39c' }}>{l.sent_count}</span>
+                            <span className="fw-semibold" style={{ color:theme.success }}>{l.sent_count}</span>
                           </td>
                           <td className="px-3 py-3">
                             {l.failed_count
-                              ? <span className="fw-semibold" style={{ color:'#f06548' }}>{l.failed_count}</span>
+                              ? <span className="fw-semibold" style={{ color:theme.danger }}>{l.failed_count}</span>
                               : <span style={{ color:'var(--bs-secondary-color)' }}>—</span>}
                           </td>
                           <td className="px-3 py-3" style={{ color:'var(--bs-secondary-color)', whiteSpace:'nowrap' }}>

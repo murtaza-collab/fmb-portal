@@ -207,7 +207,7 @@ export default function CounterADetail() {
             <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--bs-secondary-color)', textTransform: 'uppercase', letterSpacing: 1 }}>
               Store Counter A
             </div>
-            <div style={{ color: '#d4a032' }}>{distributorName || '—'}</div>
+            <div style={{ color: theme.gold }}>{distributorName || '—'}</div>
           </h1>
           <span className={`badge fs-6 ${confirmed ? 'bg-success' : 'bg-warning text-dark'}`}>
             {confirmed ? '✓ Sent to Counters' : 'Awaiting Confirmation'}
@@ -239,8 +239,8 @@ export default function CounterADetail() {
                   display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
                   boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
                 }}>
-                  <i className="bi bi-box-seam" style={{ fontSize: 22, color: '#d4a032', opacity: 0.6, marginBottom: 4 }} />
-                  <div style={{ fontSize: 38, fontWeight: 800, lineHeight: 1, color: '#d4a032' }}>{totalCount}</div>
+                  <i className="bi bi-box-seam" style={{ fontSize: 22, color: theme.gold, opacity: 0.6, marginBottom: 4 }} />
+                  <div style={{ fontSize: 38, fontWeight: 800, lineHeight: 1, color: theme.gold }}>{totalCount}</div>
                   <div style={{ fontSize: 12, color: 'var(--bs-secondary-color)', fontWeight: 500, marginTop: 4 }}>Total Thaalis</div>
                 </div>
               </div>
@@ -263,12 +263,12 @@ export default function CounterADetail() {
                         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
                         WebkitTapHighlightColor: 'rgba(240,101,72,0.15)',
                       }}>
-                      <i className="bi bi-x-circle" style={{ fontSize: 22, color: '#f06548', opacity: isActive ? 1 : 0.7, marginBottom: 4 }} />
-                      <div style={{ fontSize: 38, fontWeight: 800, lineHeight: 1, color: '#f06548' }}>{stoppedCount}</div>
-                      <div style={{ fontSize: 12, color: isActive ? '#f06548' : 'var(--bs-secondary-color)', fontWeight: isActive ? 600 : 500, marginTop: 4 }}>Stopped</div>
+                      <i className="bi bi-x-circle" style={{ fontSize: 22, color: theme.danger, opacity: isActive ? 1 : 0.7, marginBottom: 4 }} />
+                      <div style={{ fontSize: 38, fontWeight: 800, lineHeight: 1, color: theme.danger }}>{stoppedCount}</div>
+                      <div style={{ fontSize: 12, color: isActive ? theme.danger : 'var(--bs-secondary-color)', fontWeight: isActive ? 600 : 500, marginTop: 4 }}>Stopped</div>
                       <div style={{ fontSize: 10, marginTop: 3, padding: '2px 8px', borderRadius: 10,
                         background: isActive ? '#f0654822' : 'var(--bs-tertiary-bg)',
-                        color: isActive ? '#f06548' : 'var(--bs-secondary-color)', fontWeight: 500 }}>
+                        color: isActive ? theme.danger : 'var(--bs-secondary-color)', fontWeight: 500 }}>
                         {isActive ? '▲ viewing' : '⊙ Back to store'}
                       </div>
                     </div>
@@ -325,12 +325,12 @@ export default function CounterADetail() {
                         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
                         WebkitTapHighlightColor: 'rgba(10,179,156,0.15)',
                       }}>
-                      <i className="bi bi-check2-square" style={{ fontSize: 22, color: '#0ab39c', opacity: isActive ? 1 : 0.7, marginBottom: 4 }} />
-                      <div style={{ fontSize: 38, fontWeight: 800, lineHeight: 1, color: '#0ab39c' }}>{counterCCount}</div>
-                      <div style={{ fontSize: 12, color: isActive ? '#0ab39c' : 'var(--bs-secondary-color)', fontWeight: isActive ? 600 : 500, marginTop: 4 }}>Counter C</div>
+                      <i className="bi bi-check2-square" style={{ fontSize: 22, color: theme.success, opacity: isActive ? 1 : 0.7, marginBottom: 4 }} />
+                      <div style={{ fontSize: 38, fontWeight: 800, lineHeight: 1, color: theme.success }}>{counterCCount}</div>
+                      <div style={{ fontSize: 12, color: isActive ? theme.success : 'var(--bs-secondary-color)', fontWeight: isActive ? 600 : 500, marginTop: 4 }}>Counter C</div>
                       <div style={{ fontSize: 10, marginTop: 3, padding: '2px 8px', borderRadius: 10,
                         background: isActive ? '#0ab39c22' : 'var(--bs-tertiary-bg)',
-                        color: isActive ? '#0ab39c' : 'var(--bs-secondary-color)', fontWeight: 500 }}>
+                        color: isActive ? theme.success : 'var(--bs-secondary-color)', fontWeight: 500 }}>
                         {isActive ? '▲ viewing' : '⊙ Default'}
                       </div>
                     </div>
@@ -346,8 +346,8 @@ export default function CounterADetail() {
                   display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
                   boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
                 }}>
-                  <i className="bi bi-truck" style={{ fontSize: 22, color: '#ffd97d', opacity: 0.7, marginBottom: 4 }} />
-                  <div style={{ fontSize: 38, fontWeight: 800, lineHeight: 1, color: '#ffd97d' }}>{toDispatch}</div>
+                  <i className="bi bi-truck" style={{ fontSize: 22, color: theme.goldAccent, opacity: 0.7, marginBottom: 4 }} />
+                  <div style={{ fontSize: 38, fontWeight: 800, lineHeight: 1, color: theme.goldAccent }}>{toDispatch}</div>
                   <div style={{ fontSize: 12, color: 'var(--bs-secondary-color)', fontWeight: 500, marginTop: 4 }}>To Dispatch</div>
                 </div>
               </div>
@@ -455,10 +455,10 @@ export default function CounterADetail() {
                             const isCustomized = !isStopped && customizedMuminIds.has(r.mumin_id);
                             return (
                               <tr key={r.mumin_id}
-                                style={{ borderLeft: isStopped ? '3px solid #f06548' : isCustomized ? `3px solid ${theme.info}` : '3px solid transparent' }}
+                                style={{ borderLeft: isStopped ? `3px solid ${theme.danger}` : isCustomized ? `3px solid ${theme.info}` : '3px solid transparent' }}
                                 className={isStopped ? 'table-danger' : isCustomized ? 'table-info' : ''}
                               >
-                                <td className="fw-bold fs-5" style={{ color: isStopped ? '#f06548' : '#d4a032' }}>
+                                <td className="fw-bold fs-5" style={{ color: isStopped ? theme.danger : theme.gold }}>
                                   #{r.thaali_number}
                                 </td>
                                 <td style={{ color: 'var(--bs-body-color)' }}>

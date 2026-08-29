@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { theme } from '@/lib/theme'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -335,8 +336,8 @@ export default function AddressRequestsPage() {
                   className="btn btn-sm"
                   style={{
                     borderRadius: 20, fontSize: '12px', padding: '3px 12px',
-                    border: `1.5px solid ${statusFilter === s ? '#d4a032' : 'var(--bs-border-color)'}`,
-                    background: statusFilter === s ? '#d4a032' : 'transparent',
+                    border: `1.5px solid ${statusFilter === s ? theme.gold : 'var(--bs-border-color)'}`,
+                    background: statusFilter === s ? theme.gold : 'transparent',
                     color: statusFilter === s ? '#fff' : 'var(--bs-secondary-color)',
                     fontWeight: statusFilter === s ? 600 : 400,
                   }}
@@ -383,7 +384,7 @@ export default function AddressRequestsPage() {
                           {r.mumin?.full_name || `Mumin #${r.mumin_id}`}
                         </td>
                         <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>
-                          <div style={{ color: '#d4a032', fontWeight: 600, fontSize: 12 }}>{r.mumin?.sf_no || '—'}</div>
+                          <div style={{ color: theme.gold, fontWeight: 600, fontSize: 12 }}>{r.mumin?.sf_no || '—'}</div>
                           <div style={{ color: 'var(--bs-secondary-color)', fontSize: 11 }}>{r.mumin?.its_no || '—'}</div>
                         </td>
                         <td style={{ padding: '10px 12px', verticalAlign: 'middle', maxWidth: 160 }}>
@@ -409,7 +410,7 @@ export default function AddressRequestsPage() {
                             <button
                               className="btn btn-sm"
                               title="View"
-                              style={{ padding: '2px 8px', color: '#299cdb', fontSize: 13 }}
+                              style={{ padding: '2px 8px', color: theme.info, fontSize: 13 }}
                               onClick={() => setViewing(r)}
                             >
                               <i className="bi bi-eye" />
@@ -418,7 +419,7 @@ export default function AddressRequestsPage() {
                               <>
                                 <button
                                   className="btn btn-sm"
-                                  style={{ padding: '2px 8px', background: '#0ab39c', color: '#fff', fontSize: 12, borderRadius: 6 }}
+                                  style={{ padding: '2px 8px', background: theme.success, color: '#fff', fontSize: 12, borderRadius: 6 }}
                                   onClick={() => openApprove(r)}
                                 >
                                   <i className="bi bi-check-lg me-1" />Approve
@@ -523,7 +524,7 @@ export default function AddressRequestsPage() {
               </div>
               <div className="modal-footer" style={{ borderTop: '1px solid var(--bs-border-color)' }}>
                 {viewing.status === 'pending' ? (
-                  <button className="btn btn-sm" style={{ background: '#0ab39c', color: '#fff' }}
+                  <button className="btn btn-sm" style={{ background: theme.success, color: '#fff' }}
                     onClick={() => { openApprove(viewing); setViewing(null) }}>
                     <i className="bi bi-check-circle me-1" />Review & Approve
                   </button>
@@ -630,8 +631,8 @@ export default function AddressRequestsPage() {
                     <div style={{
                       background: 'var(--bs-secondary-bg)', borderRadius: 6, padding: '8px 12px',
                       fontSize: 13, minHeight: 36,
-                      color: approvalPreview ? '#d4a032' : 'var(--bs-secondary-color)',
-                      borderLeft: `3px solid ${approvalPreview ? '#ffd97d' : 'var(--bs-border-color)'}`,
+                      color: approvalPreview ? theme.gold : 'var(--bs-secondary-color)',
+                      borderLeft: `3px solid ${approvalPreview ? theme.goldAccent : 'var(--bs-border-color)'}`,
                     }}>
                       {approvalPreview || 'Fill in fields above to preview…'}
                     </div>
@@ -644,7 +645,7 @@ export default function AddressRequestsPage() {
                       <div className="col-12">
                         <div className="p-3 rounded" style={{ background: 'var(--bs-tertiary-bg)', border: '1px solid var(--bs-border-color)' }}>
                           <div style={{ fontSize: 11, color: 'var(--bs-secondary-color)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 }}>
-                            <i className="bi bi-truck me-2" style={{ color: '#d4a032' }} />
+                            <i className="bi bi-truck me-2" style={{ color: theme.gold }} />
                             Distributor — {getSector(Number(approvalForm.address_sector_id))}
                           </div>
                           {sds.length === 0 ? (
@@ -653,7 +654,7 @@ export default function AddressRequestsPage() {
                             </div>
                           ) : sds.length === 1 ? (
                             <div style={{ fontSize: 14, color: 'var(--bs-body-color)', fontWeight: 600 }}>
-                              <i className="bi bi-check-circle me-2" style={{ color: '#0ab39c' }} />
+                              <i className="bi bi-check-circle me-2" style={{ color: theme.success }} />
                               {sds[0].full_name}
                               <span style={{ fontSize: 11, color: 'var(--bs-secondary-color)', fontWeight: 400, marginLeft: 8 }}>(auto-assigned)</span>
                             </div>
@@ -690,7 +691,7 @@ export default function AddressRequestsPage() {
 
               <div className="modal-footer" style={{ borderTop: '1px solid var(--bs-border-color)', gap: 8 }}>
                 <button className="btn btn-sm btn-outline-secondary" onClick={() => setApproving(null)} disabled={saving}>Cancel</button>
-                <button className="btn btn-sm" style={{ background: '#0ab39c', color: '#fff', minWidth: 130 }}
+                <button className="btn btn-sm" style={{ background: theme.success, color: '#fff', minWidth: 130 }}
                   onClick={handleApprove} disabled={saving}>
                   {saving ? <span className="spinner-border spinner-border-sm" /> : <><i className="bi bi-check-circle me-1" />Save & Approve</>}
                 </button>

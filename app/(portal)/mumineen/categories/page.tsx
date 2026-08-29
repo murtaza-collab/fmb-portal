@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { theme } from '@/lib/theme'
 
 interface MuminCategory {
   id: number
@@ -83,14 +84,14 @@ export default function MuminCategoriesPage() {
               <thead style={{ background: '#f8f9fa' }}>
                 <tr>
                   {['#', 'Name', 'Colour', 'Description', 'Status', ''].map(h => (
-                    <th key={h} style={{ fontSize: '12px', color: '#6c757d', fontWeight: 600 }}>{h}</th>
+                    <th key={h} style={{ fontSize: '12px', color: theme.muted, fontWeight: 600 }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {categories.map((c, i) => (
                   <tr key={c.id}>
-                    <td style={{ color: '#6c757d' }}>{i + 1}</td>
+                    <td style={{ color: theme.muted }}>{i + 1}</td>
                     <td>
                       <span className="badge" style={{ backgroundColor: c.colour + '22', color: c.colour, border: `1px solid ${c.colour}44`, fontWeight: 600, fontSize: '12px', padding: '4px 10px' }}>
                         {c.name}
@@ -99,10 +100,10 @@ export default function MuminCategoriesPage() {
                     <td>
                       <div className="d-flex align-items-center gap-2">
                         <div style={{ width: 18, height: 18, borderRadius: 4, background: c.colour, border: '1px solid #dee2e6', flexShrink: 0 }} />
-                        <span style={{ fontSize: '12px', color: '#6c757d', fontFamily: 'monospace' }}>{c.colour}</span>
+                        <span style={{ fontSize: '12px', color: theme.muted, fontFamily: 'monospace' }}>{c.colour}</span>
                       </div>
                     </td>
-                    <td style={{ color: '#6c757d', maxWidth: '300px' }}>{c.description || '—'}</td>
+                    <td style={{ color: theme.muted, maxWidth: '300px' }}>{c.description || '—'}</td>
                     <td>
                       <span className={`badge bg-opacity-10 ${c.status === 'active' ? 'bg-success text-success' : 'bg-secondary text-secondary'}`} style={{ fontSize: '11px' }}>
                         {c.status}
@@ -110,10 +111,10 @@ export default function MuminCategoriesPage() {
                     </td>
                     <td>
                       <div className="d-flex gap-1 justify-content-end">
-                        <button className="btn btn-sm" title="Edit" style={{ padding: '2px 7px', color: '#d4a032' }} onClick={() => openEdit(c)}>
+                        <button className="btn btn-sm" title="Edit" style={{ padding: '2px 7px', color: theme.gold }} onClick={() => openEdit(c)}>
                           <i className="bi bi-pencil" />
                         </button>
-                        <button className="btn btn-sm" title={c.status === 'active' ? 'Deactivate' : 'Activate'} style={{ padding: '2px 7px', color: c.status === 'active' ? '#f06548' : '#0ab39c' }} onClick={() => toggleStatus(c)}>
+                        <button className="btn btn-sm" title={c.status === 'active' ? 'Deactivate' : 'Activate'} style={{ padding: '2px 7px', color: c.status === 'active' ? theme.danger : theme.success }} onClick={() => toggleStatus(c)}>
                           <i className={`bi ${c.status === 'active' ? 'bi-slash-circle' : 'bi-check-circle'}`} />
                         </button>
                       </div>
