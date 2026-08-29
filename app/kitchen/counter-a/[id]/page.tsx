@@ -138,7 +138,9 @@ export default function CounterADetail() {
         return;
       }
 
-      const { error: ue } = await supabase
+      // .select() is required: a zero-row update returns error === null, so
+      // `if (ue) throw ue` alone would let a silent no-op through.
+      const { data: ur, error: ue } = await supabase
         .from('distribution_sessions')
         .update({
           total_thaalis:      totalCount,
@@ -147,8 +149,10 @@ export default function CounterADetail() {
           default_thaalis:    counterCCount,
           status:             'in_progress',
         })
-        .eq('id', sessionId);
+        .eq('id', sessionId)
+        .select('id');
       if (ue) throw ue;
+      if (!ur?.length) throw new Error('Session was not updated — it may have been removed, or you may not have permission.');
 
       const seedRows = allRows.map(r => ({
         session_id:    sessionId,

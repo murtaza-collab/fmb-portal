@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase'
+import { wrote } from '@/lib/db';
 import { todayISO } from '@/lib/kitchen-eligible';
 import { nowUTC } from '@/lib/time';
 import { theme } from '@/lib/theme'
@@ -190,10 +191,15 @@ export default function Dispatch() {
     setConfirming(true);
     setError('');
     try {
-      await supabase
-        .from('distribution_sessions')
-        .update({ status: 'dispatched', dispatched_at: nowUTC() })
-        .eq('id', activeSession.id);
+      const r = await wrote(
+        supabase
+          .from('distribution_sessions')
+          .update({ status: 'dispatched', dispatched_at: nowUTC() })
+          .eq('id', activeSession.id)
+          .select('id'),
+        'session',
+      );
+      if (!r.ok) { setError(r.message); return; }
       await loadSessions();
       setView('sessions');
       setActiveSession(null);

@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase'
+import { wrote } from '@/lib/db';
 import { todayISO } from '@/lib/kitchen-eligible';
 import { nowUTC } from '@/lib/time';
 import { theme } from '@/lib/theme'
@@ -121,10 +122,15 @@ export default function CounterC() {
       // 2. Mark session done
       // If Counter B already finished, set combined status so dispatch knows both are done
       const newStatus = activeSession.status === 'counter_b_done' ? 'counter_bc_done' : 'counter_c_done';
-      await supabase
-        .from('distribution_sessions')
-        .update({ status: newStatus })
-        .eq('id', activeSession.id);
+      const r = await wrote(
+        supabase
+          .from('distribution_sessions')
+          .update({ status: newStatus })
+          .eq('id', activeSession.id)
+          .select('id'),
+        'session',
+      );
+      if (!r.ok) { setError(r.message); return; }
 
       // 3. Back to session list
       await loadSessions();

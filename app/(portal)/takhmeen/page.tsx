@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { wrote } from '@/lib/db'
 import { theme } from '@/lib/theme'
 
 /*
@@ -429,13 +430,21 @@ export default function TakhmeenPage() {
     if (!approvalForm.approved_amount) { setApprovalError('Approved amount is required.'); return }
     setSaving(true); setApprovalError('')
     const { data: as_ } = await supabase.from('niyyat_statuses').select('id').eq('name', 'Approved').single()
-    await supabase.from('takhmeen').update({
-      approved_amount: parseFloat(approvalForm.approved_amount),
-      approved_at: approvalForm.approved_at || null,
-      remarks: approvalForm.remarks || null,
-      status: 'approved',
-    }).eq('id', approvingItem.id)
-    await supabase.from('mumineen').update({ niyyat_status_id: as_?.id }).eq('id', approvingItem.mumin_id)
+    const ra = await wrote(
+      supabase.from('takhmeen').update({
+        approved_amount: parseFloat(approvalForm.approved_amount),
+        approved_at: approvalForm.approved_at || null,
+        remarks: approvalForm.remarks || null,
+        status: 'approved',
+      }).eq('id', approvingItem.id).select('id'),
+      'takhmeen record',
+    )
+    if (!ra.ok) { setApprovalError(ra.message); setSaving(false); return }
+    const rn = await wrote(
+      supabase.from('mumineen').update({ niyyat_status_id: as_?.id }).eq('id', approvingItem.mumin_id).select('id'),
+      'mumin',
+    )
+    if (!rn.ok) { setApprovalError(rn.message); setSaving(false); return }
     await fetchApproval(); await fetchStats()
     setShowApprovalModal(false); setSaving(false)
   }

@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { wrote } from '@/lib/db'
 import { theme } from '@/lib/theme'
 
 interface StopRequest {
@@ -129,12 +130,24 @@ export default function StopRequestsPage() {
   }
 
   const handleApprove = async (id: number) => {
-    await supabase.from('stop_thaalis').update({ status: 'approved' }).eq('id', id)
+    // Only flip the row locally once the write is confirmed — this status
+    // drives kitchen exclusion, so a false "approved" ships a stopped thaali.
+    const r = await wrote(
+      supabase.from('stop_thaalis').update({ status: 'approved' }).eq('id', id).select('id'),
+      'request',
+    )
+    if (!r.ok) { setSaveError(r.message); return }
     setRequests(prev => prev.map(r => r.id === id ? { ...r, status: 'approved' } : r))
   }
 
   const handleReject = async (id: number) => {
-    await supabase.from('stop_thaalis').update({ status: 'rejected' }).eq('id', id)
+    // Only flip the row locally once the write is confirmed — this status
+    // drives kitchen exclusion, so a false "approved" ships a stopped thaali.
+    const r = await wrote(
+      supabase.from('stop_thaalis').update({ status: 'rejected' }).eq('id', id).select('id'),
+      'request',
+    )
+    if (!r.ok) { setSaveError(r.message); return }
     setRequests(prev => prev.map(r => r.id === id ? { ...r, status: 'rejected' } : r))
   }
 

@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase'
+import { wrote } from '@/lib/db';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { todayISO } from '@/lib/kitchen-eligible';
 import { nowUTC } from '@/lib/time';
@@ -186,18 +187,23 @@ export default function CounterB() {
 
   // FIX B1: UPDATE only — row was seeded by Counter A, no INSERT needed → no thaali_number NOT NULL issue
   const markFilled = async (thaali: ScannedThaali) => {
-    try {
-      await supabase
+    // Supabase does not throw on DB errors, it returns { error } — so the old
+    // try/catch never fired. .select() also catches the zero-row case, where a
+    // scan would look accepted while nothing was written.
+    const r = await wrote(
+      supabase
         .from('thaali_daily_status')
         .update({
           status:    'counter_b_filled',
           packed_at: nowUTC(),
         })
         .eq('session_id', thaali.session_id)
-        .eq('thaali_id',  thaali.thaali_id);
-    } catch (err) {
-      console.error('markFilled error:', err);
-    }
+        .eq('thaali_id',  thaali.thaali_id)
+        .select('thaali_id'),
+      'thaali',
+    );
+    if (!r.ok) setError(r.message);
+    return r.ok;
   };
 
   const handleScan = async (thaaliNumber: string) => {
@@ -412,10 +418,15 @@ export default function CounterB() {
     try {
       // If Counter C already finished, set combined status so dispatch knows both are done
       const newStatus = activeSession.status === 'counter_c_done' ? 'counter_bc_done' : 'counter_b_done';
-      await supabase
-        .from('distribution_sessions')
-        .update({ status: newStatus })
-        .eq('id', activeSession.id);
+      const r = await wrote(
+        supabase
+          .from('distribution_sessions')
+          .update({ status: newStatus })
+          .eq('id', activeSession.id)
+          .select('id'),
+        'session',
+      );
+      if (!r.ok) { setError(r.message); return; }
 
       await loadSessions();
       setView('sessions');
