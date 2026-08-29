@@ -147,12 +147,17 @@ export default function NotificationsPage() {
 
   const saveTemplate = async (t: Template) => {
     setSaving(t.id)
-    const { error } = await supabase
+    // .select() is required: an UPDATE matching zero rows (RLS block, stale id)
+    // returns HTTP 204 with error === null, so without it a no-op save would
+    // still report success. An empty array is the only signal.
+    const { data, error } = await supabase
       .from('notification_templates')
       .update({ title: t.title, body: t.body, enabled: t.enabled, updated_at: new Date().toISOString() })
       .eq('id', t.id)
+      .select('id')
     setSaving(null)
     if (error) { showToast('Failed to save', 'danger'); return }
+    if (!data?.length) { showToast('Not saved — template not found or permission denied', 'danger'); return }
     setSaved(t.id)
     showToast('Saved successfully')
     setTimeout(() => setSaved(null), 2000)
@@ -162,14 +167,15 @@ export default function NotificationsPage() {
   const toggleTemplate = async (t: Template, enabled: boolean) => {
     updateTemplate(t.id, { enabled })
     setSaving(t.id)
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('notification_templates')
       .update({ enabled, updated_at: new Date().toISOString() })
       .eq('id', t.id)
+      .select('id')
     setSaving(null)
-    if (error) {
-      updateTemplate(t.id, { enabled: !enabled }) // revert on failure
-      showToast('Failed to update', 'danger')
+    if (error || !data?.length) {
+      updateTemplate(t.id, { enabled: !enabled }) // revert on failure or no-op
+      showToast(error ? 'Failed to update' : 'Not updated — permission denied', 'danger')
     }
   }
 
