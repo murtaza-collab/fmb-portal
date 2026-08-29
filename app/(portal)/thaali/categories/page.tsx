@@ -2,6 +2,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { wrote } from '@/lib/db'
 import { theme } from '@/lib/theme'
 
 interface ThaaliCategory { id: number; name: string; description?: string }
@@ -14,6 +15,7 @@ export default function ThaaliCategoriesPage() {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [saving, setSaving] = useState(false)
+  const [actionError, setActionError] = useState('')
 
   useEffect(() => { fetchCategories() }, [])
 
@@ -31,7 +33,8 @@ export default function ThaaliCategoriesPage() {
     if (!name.trim()) return
     setSaving(true)
     if (editing) {
-      await supabase.from('thaali_categories').update({ name: name.trim(), description: description.trim() }).eq('id', editing.id)
+      const r = await wrote(supabase.from('thaali_categories').update({ name: name.trim(), description: description.trim() }).eq('id', editing.id).select('id'), 'category')
+      if (!r.ok) { setActionError(r.message); setSaving(false); return }
     } else {
       await supabase.from('thaali_categories').insert({ name: name.trim(), description: description.trim() })
     }
@@ -40,6 +43,12 @@ export default function ThaaliCategoriesPage() {
 
   return (
     <div>
+      {actionError && (
+        <div className="alert alert-danger d-flex justify-content-between align-items-center py-2 px-3" style={{ fontSize: 13 }}>
+          <span>{actionError}</span>
+          <button className="btn-close btn-sm" onClick={() => setActionError('')} />
+        </div>
+      )}
       <div className="d-flex flex-wrap justify-content-between align-items-start align-items-sm-center gap-2 mb-4">
         <div>
           <h4 className="mb-0">Thaali Categories</h4>

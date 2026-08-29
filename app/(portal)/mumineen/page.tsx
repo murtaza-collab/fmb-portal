@@ -2,6 +2,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { wrote } from '@/lib/db'
 import { buildIlikeOr } from '@/lib/search'
 import { theme } from '@/lib/theme'
 
@@ -325,7 +326,12 @@ export default function MumineenPage() {
     if (!showTransfer) return
     setTransferring(true)
     const remarksVal = transferReason ? `[Transferred] ${transferReason}` : '[Transferred]'
-    await supabase.from('mumineen').update({ status: 'transferred', remarks: remarksVal }).eq('id', showTransfer.id)
+    const rt = await wrote(
+      supabase.from('mumineen').update({ status: 'transferred', remarks: remarksVal }).eq('id', showTransfer.id).select('id'),
+      'mumin',
+    )
+    if (!rt.ok) { setSaveError(rt.message); setTransferring(false); return }
+    // NOT guarded: an HOF with no family members legitimately matches zero rows.
     await supabase.from('mumineen').update({ status: 'transferred' }).eq('hof_id', showTransfer.id)
     await fetchAll(); setShowTransfer(null); setTransferReason(''); setTransferring(false)
   }
@@ -335,7 +341,8 @@ export default function MumineenPage() {
   const handleDelete = async () => {
     if (!showDelete) return
     setDeleting(true)
-    await supabase.from('mumineen').delete().eq('id', showDelete.id)
+    const rd = await wrote(supabase.from('mumineen').delete().eq('id', showDelete.id).select('id'), 'mumin')
+    if (!rd.ok) { setSaveError(rd.message); setDeleting(false); return }
     await fetchAll(); setShowDelete(null); setDeleting(false)
   }
 
@@ -374,9 +381,10 @@ export default function MumineenPage() {
       hof_id: familyModalHof.id, is_hof: false, status: 'active',
     }
     const res = editingMember
-      ? await supabase.from('mumineen').update(payload).eq('id', editingMember.id)
-      : await supabase.from('mumineen').insert(payload)
+      ? await supabase.from('mumineen').update(payload).eq('id', editingMember.id).select('id')
+      : await supabase.from('mumineen').insert(payload).select('id')
     if (res.error) { setMemberError(res.error.message); setSavingMember(false); return }
+    if (!res.data?.length) { setMemberError('No member was saved — the record may have been removed, or you may not have permission.'); setSavingMember(false); return }
     await fetchAll(); setShowFamilyModal(false); setSavingMember(false)
   }
 

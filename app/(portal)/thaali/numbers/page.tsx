@@ -4,6 +4,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { wrote } from '@/lib/db'
 import { theme } from '@/lib/theme'
 
 interface Thaali { id: number; thaali_number: number; status: string }
@@ -38,7 +39,8 @@ export default function ThaaliNumbersPage() {
     if (existing) { setError(`Thaali #${num} already exists`); return }
     setSaving(true)
     if (editing) {
-      await supabase.from('thaalis').update({ thaali_number: num }).eq('id', editing.id)
+      const r = await wrote(supabase.from('thaalis').update({ thaali_number: num }).eq('id', editing.id).select('id'), 'thaali number')
+      if (!r.ok) { setError(r.message); setSaving(false); return }
     } else {
       await supabase.from('thaalis').insert({ thaali_number: num, status: 'active' })
     }

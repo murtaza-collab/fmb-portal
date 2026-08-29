@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { wrote } from '@/lib/db'
 import { theme } from '@/lib/theme'
 
 interface Distributor {
@@ -79,10 +80,12 @@ export default function DistributorsPage() {
     try {
       if (editing) {
         // Update distributor
-        const { error: ue } = await supabase.from('distributors')
+        const { data: ud, error: ue } = await supabase.from('distributors')
           .update({ full_name: form.full_name.trim(), phone_no: form.phone_no.trim() || null })
           .eq('id', editing.id)
+          .select('id')
         if (ue) throw ue
+        if (!ud?.length) throw new Error('Distributor was not updated — record not found, or you may not have permission.')
         // Update sectors
         await supabase.from('distributor_sectors').delete().eq('distributor_id', editing.id)
         if (formSectors.length > 0) {
@@ -130,7 +133,8 @@ export default function DistributorsPage() {
 
   const toggleStatus = async (d: Distributor) => {
     const newStatus = d.status === 'active' ? 'inactive' : 'active'
-    await supabase.from('distributors').update({ status: newStatus }).eq('id', d.id)
+    const r = await wrote(supabase.from('distributors').update({ status: newStatus }).eq('id', d.id).select('id'), 'distributor')
+    if (!r.ok) return showMsg(r.message, true)
     await fetchDistributors()
   }
 
@@ -150,8 +154,9 @@ export default function DistributorsPage() {
       return
     }
     if (!confirm(`Delete ${d.full_name}? This cannot be undone.`)) return
-    const { error } = await supabase.from('distributors').delete().eq('id', d.id)
+    const { data: dd, error } = await supabase.from('distributors').delete().eq('id', d.id).select('id')
     if (error) return showMsg('Delete failed: ' + error.message, true)
+    if (!dd?.length) return showMsg('Nothing was deleted — the distributor may already be gone, or you may not have permission.', true)
     showMsg('Distributor deleted')
     await fetchDistributors()
   }

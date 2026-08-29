@@ -2,6 +2,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { wrote } from '@/lib/db'
 import { theme } from '@/lib/theme'
 
 interface ThaaliType { id: number; name: string; status: string }
@@ -13,6 +14,7 @@ export default function ThaaliTypesPage() {
   const [editing, setEditing] = useState<ThaaliType | null>(null)
   const [name, setName] = useState('')
   const [saving, setSaving] = useState(false)
+  const [actionError, setActionError] = useState('')
 
   useEffect(() => { fetchTypes() }, [])
 
@@ -30,7 +32,8 @@ export default function ThaaliTypesPage() {
     if (!name.trim()) return
     setSaving(true)
     if (editing) {
-      await supabase.from('thaali_types').update({ name: name.trim() }).eq('id', editing.id)
+      const r = await wrote(supabase.from('thaali_types').update({ name: name.trim() }).eq('id', editing.id).select('id'), 'type')
+      if (!r.ok) { setActionError(r.message); setSaving(false); return }
     } else {
       await supabase.from('thaali_types').insert({ name: name.trim(), status: 'active' })
     }
@@ -38,12 +41,19 @@ export default function ThaaliTypesPage() {
   }
 
   const toggleStatus = async (t: ThaaliType) => {
-    await supabase.from('thaali_types').update({ status: t.status === 'active' ? 'inactive' : 'active' }).eq('id', t.id)
+    const r = await wrote(supabase.from('thaali_types').update({ status: t.status === 'active' ? 'inactive' : 'active' }).eq('id', t.id).select('id'), 'type')
+    if (!r.ok) { setActionError(r.message); return }
     await fetchTypes()
   }
 
   return (
     <div>
+      {actionError && (
+        <div className="alert alert-danger d-flex justify-content-between align-items-center py-2 px-3" style={{ fontSize: 13 }}>
+          <span>{actionError}</span>
+          <button className="btn-close btn-sm" onClick={() => setActionError('')} />
+        </div>
+      )}
       <div className="d-flex flex-wrap justify-content-between align-items-start align-items-sm-center gap-2 mb-4">
         <div>
           <h4 className="mb-0">Thaali Types</h4>

@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { wrote } from '@/lib/db'
 import { theme } from '@/lib/theme'
 import {
   gregorianToHijri, hijriToGregorian, formatHijri,
@@ -214,11 +215,12 @@ export default function CalendarPage() {
       extra_items: extraItems.filter(e => e.name.trim()),
       salad: null, extra: null, // clear old columns
     }
-    const { error } = editMenu
-      ? await supabase.from('daily_menu').update(payload).eq('id', editMenu.id)
-      : await supabase.from('daily_menu').insert(payload)
+    const { data: rows, error } = editMenu
+      ? await supabase.from('daily_menu').update(payload).eq('id', editMenu.id).select('id')
+      : await supabase.from('daily_menu').insert(payload).select('id')
     setSaving(false)
     if (error) return showMsg(error.message, true)
+    if (!rows?.length) return showMsg('Nothing was saved — the record may have been removed, or you may not have permission.', true)
     showMsg('Menu saved'); setShowModal(false); fetchData()
   }
 
@@ -236,23 +238,26 @@ export default function CalendarPage() {
       notes: scheduleForm.notes || null,
       updated_at: new Date().toISOString(),
     }
-    const { error } = editSchedule
-      ? await supabase.from('thaali_schedule').update(payload).eq('id', editSchedule.id)
-      : await supabase.from('thaali_schedule').insert(payload)
+    const { data: rows, error } = editSchedule
+      ? await supabase.from('thaali_schedule').update(payload).eq('id', editSchedule.id).select('id')
+      : await supabase.from('thaali_schedule').insert(payload).select('id')
     setSaving(false)
     if (error) return showMsg(error.message, true)
+    if (!rows?.length) return showMsg('Nothing was saved — the record may have been removed, or you may not have permission.', true)
     showMsg('Saved'); setShowModal(false); fetchData()
   }
 
   const deleteMenu = async () => {
     if (!editMenu || !confirm('Delete menu for this day?')) return
-    await supabase.from('daily_menu').delete().eq('id', editMenu.id)
+    const r = await wrote(supabase.from('daily_menu').delete().eq('id', editMenu.id).select('id'), 'menu')
+    if (!r.ok) return showMsg(r.message, true)
     showMsg('Deleted'); setShowModal(false); fetchData()
   }
 
   const deleteSchedule = async () => {
     if (!editSchedule || !confirm('Remove thaali schedule for this day?')) return
-    await supabase.from('thaali_schedule').delete().eq('id', editSchedule.id)
+    const r = await wrote(supabase.from('thaali_schedule').delete().eq('id', editSchedule.id).select('id'), 'schedule')
+    if (!r.ok) return showMsg(r.message, true)
     showMsg('Deleted'); setShowModal(false); fetchData()
   }
 

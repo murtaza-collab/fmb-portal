@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { wrote } from '@/lib/db'
 import { theme } from '@/lib/theme'
 
 interface MuminCategory {
@@ -57,7 +58,8 @@ export default function MuminCategoriesPage() {
   }
 
   const toggleStatus = async (c: MuminCategory) => {
-    await supabase.from('mumin_categories').update({ status: c.status === 'active' ? 'inactive' : 'active' }).eq('id', c.id)
+    const r = await wrote(supabase.from('mumin_categories').update({ status: c.status === 'active' ? 'inactive' : 'active' }).eq('id', c.id).select('id'), 'category')
+    if (!r.ok) { setSaveError(r.message); return }
     await fetchAll()
   }
 

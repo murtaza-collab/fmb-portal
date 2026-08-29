@@ -361,9 +361,13 @@ export default function TakhmeenPage() {
     try {
       const amount = parseFloat(niyyatForm.niyyat_amount)
       if (currentTakhmeem) {
-        await supabase.from('takhmeen').update({
-          niyyat_amount: amount, remarks: niyyatForm.remarks || null,
-        }).eq('id', currentTakhmeem.id)
+        const rn1 = await wrote(
+          supabase.from('takhmeen').update({
+            niyyat_amount: amount, remarks: niyyatForm.remarks || null,
+          }).eq('id', currentTakhmeem.id).select('id'),
+          'takhmeen record',
+        )
+        if (!rn1.ok) throw new Error(rn1.message)
         await supabase.from('takhmeen_niyyat_log').insert({
           takhmeen_id: currentTakhmeem.id, mumin_id: niyyatMumin.id,
           fiscal_year_id: activeFY.id, niyyat_amount: amount,
@@ -410,9 +414,13 @@ export default function TakhmeenPage() {
     if (!approvalForm.niyyat_amount) { setApprovalError('Niyyat amount required.'); return }
     setSaving(true)
     const amount = parseFloat(approvalForm.niyyat_amount)
-    await supabase.from('takhmeen').update({
-      niyyat_amount: amount, remarks: approvalForm.remarks || null,
-    }).eq('id', approvingItem.id)
+    const rn2 = await wrote(
+      supabase.from('takhmeen').update({
+        niyyat_amount: amount, remarks: approvalForm.remarks || null,
+      }).eq('id', approvingItem.id).select('id'),
+      'takhmeen record',
+    )
+    if (!rn2.ok) { setApprovalError(rn2.message); setSaving(false); return }
     await supabase.from('takhmeen_niyyat_log').insert({
       takhmeen_id: approvingItem.id, mumin_id: approvingItem.mumin_id,
       fiscal_year_id: approvingItem.fiscal_year_id, niyyat_amount: amount,

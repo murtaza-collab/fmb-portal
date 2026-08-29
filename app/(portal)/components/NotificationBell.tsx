@@ -47,14 +47,19 @@ export default function NotificationBell() {
   }
 
   const markAsRead = async (id: number) => {
-    await supabase
+    const { data, error } = await supabase
       .from('notifications')
       .update({ is_read: true, read_at: new Date().toISOString() })
       .eq('id', id)
+      .select('id')
+    if (error || !data?.length) {
+      console.warn('markAsRead: notification not updated', id, error?.message ?? 'zero rows')
+    }
     loadNotifications()
   }
 
   const markAllAsRead = async () => {
+    // Not guarded: with nothing unread this legitimately matches zero rows.
     await supabase
       .from('notifications')
       .update({ is_read: true, read_at: new Date().toISOString() })

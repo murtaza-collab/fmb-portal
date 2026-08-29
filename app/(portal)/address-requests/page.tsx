@@ -251,11 +251,13 @@ export default function AddressRequestsPage() {
       }
 
       // Step 3 — mark request approved
-      const { error: reqErr } = await supabase
+      const { data: reqRows, error: reqErr } = await supabase
         .from('address_change_requests')
         .update({ status: 'approved', reviewed_at: new Date().toISOString(), admin_notes: adminNotes || null })
         .eq('id', approving.id)
+        .select('id')
       if (reqErr) throw new Error(`Address saved but request status failed: ${reqErr.message}`)
+      if (!reqRows?.length) throw new Error('Address saved but the request was not marked approved — it may have been removed, or you may not have permission.')
 
       setApproving(null)
       fetchAll()
@@ -272,11 +274,13 @@ export default function AddressRequestsPage() {
   const handleReject = async () => {
     if (!rejecting) return
     setSaving(true); setSaveError('')
-    const { error } = await supabase
+    const { data: rejRows, error } = await supabase
       .from('address_change_requests')
       .update({ status: 'rejected', reviewed_at: new Date().toISOString(), admin_notes: rejectNotes || null })
       .eq('id', rejecting.id)
+      .select('id')
     if (error) { setSaveError(error.message); setSaving(false); return }
+    if (!rejRows?.length) { setSaveError('Request was not rejected — it may have been removed, or you may not have permission.'); setSaving(false); return }
     setRejecting(null)
     fetchAll()
     setSaving(false)

@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { wrote } from '@/lib/db'
 import { theme } from '@/lib/theme'
 
 interface AdminUser {
@@ -111,10 +112,14 @@ export default function UsersPage() {
     setSaving(true)
     try {
       if (editingUser) {
-        await supabase.from('admin_users').update({
-          full_name: userForm.full_name, username: userForm.username,
-          user_group_id: userForm.user_group_id ? parseInt(userForm.user_group_id) : null,
-        }).eq('id', editingUser.id)
+        const ru = await wrote(
+          supabase.from('admin_users').update({
+            full_name: userForm.full_name, username: userForm.username,
+            user_group_id: userForm.user_group_id ? parseInt(userForm.user_group_id) : null,
+          }).eq('id', editingUser.id).select('id'),
+          'user',
+        )
+        if (!ru.ok) { setFormError(ru.message); setSaving(false); return }
         if (isSuperAdmin && userForm.password.trim()) {
           const res = await fetch('/api/admin/change-password', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -140,7 +145,8 @@ export default function UsersPage() {
   }
 
   const toggleUserStatus = async (u: AdminUser) => {
-    await supabase.from('admin_users').update({ status: u.status === 'active' ? 'inactive' : 'active' }).eq('id', u.id)
+    const r = await wrote(supabase.from('admin_users').update({ status: u.status === 'active' ? 'inactive' : 'active' }).eq('id', u.id).select('id'), 'user')
+    if (!r.ok) { alert(r.message); return }
     await fetchUsers()
   }
 
@@ -215,14 +221,17 @@ export default function UsersPage() {
   }
 
   const toggleGroupStatus = async (g: UserGroup) => {
-    await supabase.from('user_groups').update({ status: g.status === 'active' ? 'inactive' : 'active' }).eq('id', g.id)
+    const r = await wrote(supabase.from('user_groups').update({ status: g.status === 'active' ? 'inactive' : 'active' }).eq('id', g.id).select('id'), 'group')
+    if (!r.ok) { alert(r.message); return }
     await fetchGroups()
   }
 
   const deleteGroup = async (g: UserGroup) => {
     if (!confirm(`Delete group "${g.name}"? This cannot be undone.`)) return
+    // NOT guarded: a group with no permission rows legitimately matches zero.
     await supabase.from('permissions').delete().eq('user_group_id', g.id)
-    await supabase.from('user_groups').delete().eq('id', g.id)
+    const rg = await wrote(supabase.from('user_groups').delete().eq('id', g.id).select('id'), 'group')
+    if (!rg.ok) { alert(rg.message); return }
     await fetchGroups()
   }
 

@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { wrote } from '@/lib/db'
 import { theme } from '@/lib/theme'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -247,7 +248,13 @@ export default function MuminDetailPage() {
       else if (g === 'child') child++
       else if (g === 'infant') infant++
     })
-    await supabase.from('mumineen').update({ total_adult: adult, total_child: child, total_infant: infant }).eq('id', Number(id))
+    // Derived counts — surface silently-dropped writes in the log rather than
+    // leaving the HOF totals stale with no trace.
+    const rc = await wrote(
+      supabase.from('mumineen').update({ total_adult: adult, total_child: child, total_infant: infant }).eq('id', Number(id)).select('id'),
+      'mumin',
+    )
+    if (!rc.ok) console.warn('recalc totals:', rc.message)
   }
 
   // ── HOF modal ──────────────────────────────────────────────────────────────
@@ -306,8 +313,9 @@ export default function MuminDetailPage() {
       total_child: Number(hofForm.total_child) || 0,
       total_infant: Number(hofForm.total_infant) || 0,
     }
-    const { error } = await supabase.from('mumineen').update(payload).eq('id', hof!.id)
+    const { data: hofRows, error } = await supabase.from('mumineen').update(payload).eq('id', hof!.id).select('id')
     if (error) { setHofSaveError(error.message); setHofSaving(false); return }
+    if (!hofRows?.length) { setHofSaveError('Nothing was saved — the record may have been removed, or you may not have permission.'); setHofSaving(false); return }
     await fetchAll(); setShowHofModal(false); setHofSaving(false)
   }
 

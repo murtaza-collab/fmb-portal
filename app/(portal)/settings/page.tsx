@@ -161,25 +161,29 @@ export default function SettingsPage() {
     const table = activeTab === 'sectors' ? 'house_sectors' : LOOKUP_TABLE[activeTab]!
     const payload: any = { name: formName.trim() }
     if (activeTab === 'mumin_categories') { payload.colour = formColour; payload.description = formDescription }
-    const { error } = editRow
-      ? await supabase.from(table).update(payload).eq('id', editRow.id)
-      : await supabase.from(table).insert(payload)
+    const { data: rows, error } = editRow
+      ? await supabase.from(table).update(payload).eq('id', editRow.id).select('id')
+      : await supabase.from(table).insert(payload).select('id')
     setSaving(false)
     if (error) return showMsg(error.message, true)
+    if (!rows?.length) return showMsg('Nothing was saved — the record may have been removed, or you may not have permission.', true)
     setShowModal(false); showMsg(editRow ? 'Updated' : 'Added'); loadTab(activeTab)
   }
   const deleteRow = async (id: number) => {
     if (!confirm('Delete this item? This cannot be undone.')) return
     const table = activeTab === 'sectors' ? 'house_sectors' : LOOKUP_TABLE[activeTab]!
-    const { error } = await supabase.from(table).delete().eq('id', id)
+    const { data: dr, error } = await supabase.from(table).delete().eq('id', id).select('id')
     if (error) return showMsg('Cannot delete — it may be in use', true)
+    if (!dr?.length) return showMsg('Nothing was deleted — the item may already be gone, or you may not have permission.', true)
     showMsg('Deleted'); loadTab(activeTab)
   }
   const removeDistributorFromSector = async (sectorId: number, distributorId: number) => {
     if (!confirm('Remove this distributor from the sector?')) return
-    const { error } = await supabase.from('distributor_sectors').delete()
+    const { data: rm, error } = await supabase.from('distributor_sectors').delete()
       .eq('sector_id', sectorId).eq('distributor_id', distributorId)
+      .select('sector_id')
     if (error) return showMsg(error.message, true)
+    if (!rm?.length) return showMsg('Nothing was removed — the assignment may already be gone, or you may not have permission.', true)
     showMsg('Distributor removed from sector'); loadTab('sectors')
   }
   const saveThaaliNumber = async () => {
@@ -193,8 +197,9 @@ export default function SettingsPage() {
   }
   const deleteThaali = async (id: number) => {
     if (!confirm('Delete this thaali number?')) return
-    const { error } = await supabase.from('thaalis').delete().eq('id', id)
+    const { data: dt, error } = await supabase.from('thaalis').delete().eq('id', id).select('id')
     if (error) return showMsg('Cannot delete — may be assigned to a mumin', true)
+    if (!dt?.length) return showMsg('Nothing was deleted — the thaali may already be gone, or you may not have permission.', true)
     showMsg('Deleted'); loadTab('thaali_numbers')
   }
   const saveKitchenSettings = async () => {

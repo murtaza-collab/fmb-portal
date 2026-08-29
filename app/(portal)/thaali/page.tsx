@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
+import { wrote } from '@/lib/db'
 import { buildIlikeOr } from '@/lib/search'
 import { theme } from '@/lib/theme'
 
@@ -339,7 +340,8 @@ function RegistrationsTab({ onStatsChange }: { onStatsChange: () => void }) {
 
   const handleDelete = async (r: Registration) => {
     if (!confirm(`Remove thaali registration for ${r.mumineen?.full_name}?`)) return
-    await supabase.from('thaali_registrations').delete().eq('id', r.id)
+    const rd = await wrote(supabase.from('thaali_registrations').delete().eq('id', r.id).select('id'), 'registration')
+    if (!rd.ok) { setFetchError(rd.message); return }
     await fetchRegistrations(); onStatsChange()
   }
 
@@ -353,8 +355,12 @@ function RegistrationsTab({ onStatsChange }: { onStatsChange: () => void }) {
       thaali_category_id: form.thaali_category_id  ? parseInt(form.thaali_category_id)  : null,
       distributor_id:     form.distributor_id       ? parseInt(form.distributor_id)       : null,
     }
-    if (editing) await supabase.from('thaali_registrations').update(payload).eq('id', editing.id)
-    else         await supabase.from('thaali_registrations').insert(payload)
+    if (editing) {
+      const ru = await wrote(supabase.from('thaali_registrations').update(payload).eq('id', editing.id).select('id'), 'registration')
+      if (!ru.ok) { setFetchError(ru.message); setSaving(false); return }
+    } else {
+      await supabase.from('thaali_registrations').insert(payload)
+    }
     await fetchRegistrations(); onStatsChange()
     setShowModal(false); setSaving(false)
   }
