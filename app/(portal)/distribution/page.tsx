@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { theme } from '@/lib/theme'
 import { todayPKT } from '@/lib/time';
 
 interface Registration {
@@ -251,7 +252,7 @@ export default function DistributionPage() {
         {[
           { label: 'Showing',          value: registrations.length, color: '#d4a032' },
           { label: 'Total registered', value: stats.total,          color: '#0ab39c' },
-          { label: 'Thaali assigned',  value: stats.withThaali,     color: '#405189' },
+          { label: 'Thaali assigned',  value: stats.withThaali,     color: theme.info },
           { label: 'Stopped today',    value: stats.stopped,        color: '#f06548' },
         ].map(s => (
           <div key={s.label} className="col-md-3">

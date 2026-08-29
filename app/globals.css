@@ -1,5 +1,62 @@
 @import "tailwindcss";
 
+/* ==========================================================================
+   FMB DESIGN TOKENS — single source of truth for colour & type
+   --------------------------------------------------------------------------
+   Change a value HERE and it propagates everywhere:
+     · plain CSS                 -> var(--fmb-gold)
+     · Bootstrap components      -> the override block further down maps
+                                    --bs-* onto these tokens
+     · React inline styles       -> import { theme } from '@/lib/theme'
+                                    style={{ color: theme.gold }}
+
+   Do not hardcode brand hexes in components — add a token instead.
+   ========================================================================== */
+
+:root {
+  /* ---- Brand ------------------------------------------------------------ */
+  --fmb-gold:          #d4a032;   /* primary  — buttons, active states       */
+  --fmb-gold-rgb:      212, 160, 50;
+  --fmb-gold-hover:    #bd8d2a;
+  --fmb-gold-active:   #a67a23;
+  --fmb-gold-accent:   #ffd97d;   /* on dark surfaces (sidebar)              */
+  --fmb-gold-deep:     #8a6318;   /* text/links — 5.4:1 on white (WCAG AA)   */
+  --fmb-brown:         #6b4010;   /* cinnamon — sidebar ground               */
+
+  /* ---- Derived tints (regenerate if --fmb-gold changes) ------------------ */
+  --fmb-gold-shade:    #966d1f;   /* darker than -active, for pressed borders */
+  --fmb-gold-tint-300: #e2be6d;   /* focus border                             */
+  --fmb-gold-tint-200: #ecd39b;   /* subtle border                            */
+  --fmb-gold-tint-050: #faf0dc;   /* subtle background                        */
+  --fmb-gold-dark-bg:  #2b1d06;   /* subtle background, dark theme            */
+  --fmb-gold-dark-hi:  #ffe7a8;   /* link hover, dark theme                   */
+
+  /* ---- Semantic --------------------------------------------------------- */
+  --fmb-success:       #0ab39c;
+  --fmb-danger:        #f06548;
+  --fmb-warning:       #f7b84b;
+  --fmb-info:          #299cdb;
+  --fmb-info-rgb:      41, 156, 219;
+  --fmb-muted:         #6c757d;
+
+  /* ---- Surfaces --------------------------------------------------------- */
+  --fmb-surface-subtle: #f8f9fa;
+  --fmb-border:         #dee2e6;
+
+  /* ---- Typography ------------------------------------------------------- */
+  --fmb-font-sans:  Arial, Helvetica, sans-serif;
+  --fmb-font-mono:  ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --fmb-text-xs:    11px;
+  --fmb-text-sm:    12px;
+  --fmb-text-base:  13px;   /* dominant size across the portal */
+  --fmb-text-md:    14px;
+  --fmb-text-lg:    16px;
+
+  /* ---- Shape ------------------------------------------------------------ */
+  --fmb-radius-sm:  6px;
+  --fmb-radius:     8px;
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -22,7 +79,7 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--fmb-font-sans);
 }
 
 /* ==========================================================================
@@ -33,112 +90,112 @@ body {
    --bs-primary, so overriding the root vars alone is not enough. Loaded after
    bootstrap.min.css (see app/layout.tsx), so equal-specificity rules win.
 
-   Palette: #d4a032 primary gold · #ffd97d accent · #6b4010 cinnamon brown
+   Palette: var(--fmb-gold) primary gold · var(--fmb-gold-accent) accent · var(--fmb-brown) cinnamon brown
    ========================================================================== */
 
 :root,
 [data-bs-theme="light"] {
-  --bs-primary: #d4a032;
-  --bs-primary-rgb: 212, 160, 50;
-  --bs-primary-text-emphasis: #6b4010;
-  --bs-primary-bg-subtle: #faf0dc;
-  --bs-primary-border-subtle: #ecd39b;
+  --bs-primary: var(--fmb-gold);
+  --bs-primary-rgb: var(--fmb-gold-rgb);
+  --bs-primary-text-emphasis: var(--fmb-brown);
+  --bs-primary-bg-subtle: var(--fmb-gold-tint-050);
+  --bs-primary-border-subtle: var(--fmb-gold-tint-200);
 
-  /* Links use a deeper gold: #d4a032 on white is only 2.4:1, this is 5.4:1 */
-  --bs-link-color: #8a6318;
+  /* Links use a deeper gold: var(--fmb-gold) on white is only 2.4:1, this is 5.4:1 */
+  --bs-link-color: var(--fmb-gold-deep);
   --bs-link-color-rgb: 138, 99, 24;
-  --bs-link-hover-color: #6b4010;
+  --bs-link-hover-color: var(--fmb-brown);
   --bs-link-hover-color-rgb: 107, 64, 16;
 
-  --bs-focus-ring-color: rgba(212, 160, 50, 0.25);
+  --bs-focus-ring-color: rgba(var(--fmb-gold-rgb), 0.25);
 }
 
 [data-bs-theme="dark"] {
-  --bs-primary-text-emphasis: #ffd97d;
-  --bs-primary-bg-subtle: #2b1d06;
-  --bs-primary-border-subtle: #6b4010;
-  --bs-link-color: #ffd97d;
+  --bs-primary-text-emphasis: var(--fmb-gold-accent);
+  --bs-primary-bg-subtle: var(--fmb-gold-dark-bg);
+  --bs-primary-border-subtle: var(--fmb-brown);
+  --bs-link-color: var(--fmb-gold-accent);
   --bs-link-color-rgb: 255, 217, 125;
-  --bs-link-hover-color: #ffe7a8;
+  --bs-link-hover-color: var(--fmb-gold-dark-hi);
   --bs-link-hover-color-rgb: 255, 231, 168;
 }
 
 /* Buttons — white on gold matches the 24 inline-styled gold buttons already
    in the app. Note this is 2.4:1; see the design note if that gets revisited. */
 .btn-primary {
-  --bs-btn-bg: #d4a032;
-  --bs-btn-border-color: #d4a032;
-  --bs-btn-hover-bg: #bd8d2a;
-  --bs-btn-hover-border-color: #a67a23;
-  --bs-btn-active-bg: #a67a23;
-  --bs-btn-active-border-color: #966d1f;
-  --bs-btn-disabled-bg: #d4a032;
-  --bs-btn-disabled-border-color: #d4a032;
-  --bs-btn-focus-shadow-rgb: 212, 160, 50;
+  --bs-btn-bg: var(--fmb-gold);
+  --bs-btn-border-color: var(--fmb-gold);
+  --bs-btn-hover-bg: var(--fmb-gold-hover);
+  --bs-btn-hover-border-color: var(--fmb-gold-active);
+  --bs-btn-active-bg: var(--fmb-gold-active);
+  --bs-btn-active-border-color: var(--fmb-gold-shade);
+  --bs-btn-disabled-bg: var(--fmb-gold);
+  --bs-btn-disabled-border-color: var(--fmb-gold);
+  --bs-btn-focus-shadow-rgb: var(--fmb-gold-rgb);
 }
 
 .btn-outline-primary {
-  --bs-btn-color: #8a6318;
-  --bs-btn-border-color: #d4a032;
-  --bs-btn-hover-bg: #d4a032;
-  --bs-btn-hover-border-color: #d4a032;
-  --bs-btn-active-bg: #d4a032;
-  --bs-btn-active-border-color: #d4a032;
-  --bs-btn-disabled-color: #d4a032;
-  --bs-btn-disabled-border-color: #d4a032;
-  --bs-btn-focus-shadow-rgb: 212, 160, 50;
+  --bs-btn-color: var(--fmb-gold-deep);
+  --bs-btn-border-color: var(--fmb-gold);
+  --bs-btn-hover-bg: var(--fmb-gold);
+  --bs-btn-hover-border-color: var(--fmb-gold);
+  --bs-btn-active-bg: var(--fmb-gold);
+  --bs-btn-active-border-color: var(--fmb-gold);
+  --bs-btn-disabled-color: var(--fmb-gold);
+  --bs-btn-disabled-border-color: var(--fmb-gold);
+  --bs-btn-focus-shadow-rgb: var(--fmb-gold-rgb);
 }
 
 /* Form controls — border-color and focus ring are hardcoded, not var-driven */
 .form-control:focus,
 .form-select:focus,
 .form-check-input:focus {
-  border-color: #e2be6d;
-  box-shadow: 0 0 0 0.25rem rgba(212, 160, 50, 0.25);
+  border-color: var(--fmb-gold-tint-300);
+  box-shadow: 0 0 0 0.25rem rgba(var(--fmb-gold-rgb), 0.25);
 }
 
 .form-check-input:checked {
-  background-color: #d4a032;
-  border-color: #d4a032;
+  background-color: var(--fmb-gold);
+  border-color: var(--fmb-gold);
 }
 
 .form-check-input[type="checkbox"]:indeterminate {
-  background-color: #d4a032;
-  border-color: #d4a032;
+  background-color: var(--fmb-gold);
+  border-color: var(--fmb-gold);
 }
 
-.form-range::-webkit-slider-thumb { background-color: #d4a032; }
-.form-range::-moz-range-thumb { background-color: #d4a032; }
-.form-range:focus::-webkit-slider-thumb { box-shadow: 0 0 0 1px #fff, 0 0 0 0.25rem rgba(212, 160, 50, 0.25); }
-.form-range:focus::-moz-range-thumb { box-shadow: 0 0 0 1px #fff, 0 0 0 0.25rem rgba(212, 160, 50, 0.25); }
+.form-range::-webkit-slider-thumb { background-color: var(--fmb-gold); }
+.form-range::-moz-range-thumb { background-color: var(--fmb-gold); }
+.form-range:focus::-webkit-slider-thumb { box-shadow: 0 0 0 1px #fff, 0 0 0 0.25rem rgba(var(--fmb-gold-rgb), 0.25); }
+.form-range:focus::-moz-range-thumb { box-shadow: 0 0 0 1px #fff, 0 0 0 0.25rem rgba(var(--fmb-gold-rgb), 0.25); }
 
 /* Navigation */
 .nav-pills {
-  --bs-nav-pills-link-active-bg: #d4a032;
+  --bs-nav-pills-link-active-bg: var(--fmb-gold);
 }
 
 .nav-link:focus-visible {
-  box-shadow: 0 0 0 0.25rem rgba(212, 160, 50, 0.25);
+  box-shadow: 0 0 0 0.25rem rgba(var(--fmb-gold-rgb), 0.25);
 }
 
 .nav-tabs .nav-link.active {
-  color: #8a6318;
+  color: var(--fmb-gold-deep);
 }
 
 .pagination {
-  --bs-pagination-active-bg: #d4a032;
-  --bs-pagination-active-border-color: #d4a032;
-  --bs-pagination-focus-box-shadow: 0 0 0 0.25rem rgba(212, 160, 50, 0.25);
+  --bs-pagination-active-bg: var(--fmb-gold);
+  --bs-pagination-active-border-color: var(--fmb-gold);
+  --bs-pagination-focus-box-shadow: 0 0 0 0.25rem rgba(var(--fmb-gold-rgb), 0.25);
 }
 
 .dropdown-menu {
-  --bs-dropdown-link-active-bg: #d4a032;
+  --bs-dropdown-link-active-bg: var(--fmb-gold);
 }
 
 .accordion {
-  --bs-accordion-btn-focus-box-shadow: 0 0 0 0.25rem rgba(212, 160, 50, 0.25);
+  --bs-accordion-btn-focus-box-shadow: 0 0 0 0.25rem rgba(var(--fmb-gold-rgb), 0.25);
 }
 
 .btn-close {
-  --bs-btn-close-focus-shadow: 0 0 0 0.25rem rgba(212, 160, 50, 0.25);
+  --bs-btn-close-focus-shadow: 0 0 0 0.25rem rgba(var(--fmb-gold-rgb), 0.25);
 }

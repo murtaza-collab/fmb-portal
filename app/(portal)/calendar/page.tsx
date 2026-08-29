@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { theme } from '@/lib/theme'
 import {
   gregorianToHijri, hijriToGregorian, formatHijri,
   HIJRI_MONTHS, HIJRI_MONTHS_SHORT,
@@ -628,7 +629,7 @@ export default function CalendarPage() {
                             return (
                               <button key={tt.id} onClick={() => !locked && toggleType(tt.id)} disabled={locked} style={{
                                 padding: '4px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: 'none',
-                                background: sel ? '#405189' : 'var(--bs-secondary-bg)',
+                                background: sel ? theme.gold : 'var(--bs-secondary-bg)',
                                 color: sel ? '#fff' : 'var(--bs-body-color)', transition: 'all 0.15s',
                               }}>{tt.name}</button>
                             )

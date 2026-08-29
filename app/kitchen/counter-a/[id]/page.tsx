@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase'
+import { theme, alpha } from '@/lib/theme';
 import { loadKitchenDayData, getStoppedMuminIds, todayISO, type TodaySchedule, type EligibleRegistration } from '@/lib/kitchen-eligible';
 
 type FilterView = 'stopped' | 'counter_b' | 'counter_c';
@@ -285,20 +286,20 @@ export default function CounterADetail() {
                       onKeyDown={e => e.key === 'Enter' && setFilter('counter_b')}
                       style={{
                         background: 'var(--bs-body-bg)', borderRadius: 16, padding: '20px 12px 16px', textAlign: 'center',
-                        border: isActive ? '2.5px solid #405189' : '1px solid var(--bs-border-color)',
+                        border: isActive ? `2.5px solid ${theme.info}` : '1px solid var(--bs-border-color)',
                         cursor: 'pointer', minHeight: 110,
                         transform: isActive ? 'translateY(-2px) scale(1.03)' : 'scale(1)',
-                        boxShadow: isActive ? '0 6px 18px #40518944' : '0 2px 8px rgba(0,0,0,0.07)',
+                        boxShadow: isActive ? `0 6px 18px ${alpha.info(0.27)}` : '0 2px 8px rgba(0,0,0,0.07)',
                         transition: 'all 0.15s ease',
                         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
                         WebkitTapHighlightColor: 'rgba(64,81,137,0.15)',
                       }}>
-                      <i className="bi bi-stars" style={{ fontSize: 22, color: '#405189', opacity: isActive ? 1 : 0.7, marginBottom: 4 }} />
-                      <div style={{ fontSize: 38, fontWeight: 800, lineHeight: 1, color: '#405189' }}>{counterBCount}</div>
-                      <div style={{ fontSize: 12, color: isActive ? '#405189' : 'var(--bs-secondary-color)', fontWeight: isActive ? 600 : 500, marginTop: 4 }}>Counter B</div>
+                      <i className="bi bi-stars" style={{ fontSize: 22, color: theme.info, opacity: isActive ? 1 : 0.7, marginBottom: 4 }} />
+                      <div style={{ fontSize: 38, fontWeight: 800, lineHeight: 1, color: theme.info }}>{counterBCount}</div>
+                      <div style={{ fontSize: 12, color: isActive ? theme.info : 'var(--bs-secondary-color)', fontWeight: isActive ? 600 : 500, marginTop: 4 }}>Counter B</div>
                       <div style={{ fontSize: 10, marginTop: 3, padding: '2px 8px', borderRadius: 10,
-                        background: isActive ? '#40518922' : 'var(--bs-tertiary-bg)',
-                        color: isActive ? '#405189' : 'var(--bs-secondary-color)', fontWeight: 500 }}>
+                        background: isActive ? alpha.info(0.13) : 'var(--bs-tertiary-bg)',
+                        color: isActive ? theme.info : 'var(--bs-secondary-color)', fontWeight: 500 }}>
                         {isActive ? '▲ viewing' : '⊙ Customized'}
                       </div>
                     </div>
@@ -360,7 +361,7 @@ export default function CounterADetail() {
                     <div style={{ fontSize: 13, color: 'var(--bs-secondary-color)' }}>
                       <span className="text-danger fw-semibold">{stoppedCount} stopped</span>
                       <span className="mx-2">·</span>
-                      <span style={{ color: '#405189' }} className="fw-semibold">{counterBCount} Counter B</span>
+                      <span style={{ color: theme.info }} className="fw-semibold">{counterBCount} Counter B</span>
                       <span className="mx-2">·</span>
                       <span className="text-success fw-semibold">{counterCCount} Counter C</span>
                       {extraCount > 0 && (
@@ -385,7 +386,7 @@ export default function CounterADetail() {
                 <div>
                   <strong>Sent to Counters</strong>
                   <span className="ms-3" style={{ fontSize: 13 }}>
-                    {counterBCount > 0 && <span style={{ color: '#405189' }} className="fw-semibold me-3">{counterBCount} → Counter B</span>}
+                    {counterBCount > 0 && <span style={{ color: theme.info }} className="fw-semibold me-3">{counterBCount} → Counter B</span>}
                     {counterCCount > 0 && <span className="text-success fw-semibold me-3">{counterCCount} → Counter C</span>}
                     {stoppedCount > 0 && <span className="text-danger fw-semibold">{stoppedCount} stopped</span>}
                   </span>
@@ -406,7 +407,7 @@ export default function CounterADetail() {
                   <ul className="nav nav-tabs card-header-tabs">
                     {([
                       { key: 'stopped',   label: 'Stopped',   count: stoppedCount,  color: '#f06548' },
-                      { key: 'counter_b', label: 'Counter B', count: counterBCount, color: '#405189' },
+                      { key: 'counter_b', label: 'Counter B', count: counterBCount, color: theme.info },
                       { key: 'counter_c', label: 'Counter C', count: counterCCount, color: '#0ab39c' },
                     ] as const).map(tab => (
                       <li className="nav-item" key={tab.key}>
@@ -454,7 +455,7 @@ export default function CounterADetail() {
                             const isCustomized = !isStopped && customizedMuminIds.has(r.mumin_id);
                             return (
                               <tr key={r.mumin_id}
-                                style={{ borderLeft: isStopped ? '3px solid #f06548' : isCustomized ? '3px solid #405189' : '3px solid transparent' }}
+                                style={{ borderLeft: isStopped ? '3px solid #f06548' : isCustomized ? `3px solid ${theme.info}` : '3px solid transparent' }}
                                 className={isStopped ? 'table-danger' : isCustomized ? 'table-info' : ''}
                               >
                                 <td className="fw-bold fs-5" style={{ color: isStopped ? '#f06548' : '#d4a032' }}>
