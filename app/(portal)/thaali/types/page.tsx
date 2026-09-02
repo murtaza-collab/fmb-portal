@@ -25,8 +25,8 @@ export default function ThaaliTypesPage() {
     setLoading(false)
   }
 
-  const openAdd = () => { setEditing(null); setName(''); setShowModal(true) }
-  const openEdit = (t: ThaaliType) => { setEditing(t); setName(t.name); setShowModal(true) }
+  const openAdd = () => { setEditing(null); setName(''); setActionError(''); setShowModal(true) }
+  const openEdit = (t: ThaaliType) => { setEditing(t); setName(t.name); setActionError(''); setShowModal(true) }
 
   const handleSave = async () => {
     if (!name.trim()) return
@@ -48,7 +48,7 @@ export default function ThaaliTypesPage() {
 
   return (
     <div>
-      {actionError && (
+      {actionError && !showModal && (
         <div className="alert alert-danger d-flex justify-content-between align-items-center py-2 px-3" style={{ fontSize: 13 }}>
           <span>{actionError}</span>
           <button className="btn-close btn-sm" onClick={() => setActionError('')} />
@@ -108,6 +108,11 @@ export default function ThaaliTypesPage() {
                 <button className="btn-close" onClick={() => setShowModal(false)} />
               </div>
               <div className="modal-body">
+                {actionError && (
+                  <div className="alert alert-danger py-2 px-3 mb-3" style={{ fontSize: 13 }}>
+                    {actionError}
+                  </div>
+                )}
                 <label className="form-label" style={{ fontSize: '13px' }}>Type Name *</label>
                 <input type="text" className="form-control" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Normal, Spicy, Chronic" autoFocus />
               </div>
