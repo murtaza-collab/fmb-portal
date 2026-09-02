@@ -430,8 +430,25 @@ export default function MumineenPage() {
       'mumin',
     )
     if (!rt.ok) { setSaveError(rt.message); setTransferring(false); return }
-    // NOT guarded: an HOF with no family members legitimately matches zero rows.
-    await supabase.from('mumineen').update({ status: 'transferred' }).eq('hof_id', showTransfer.id)
+
+    // Cascade to family members. Zero rows is legitimate (an HOF may have no
+    // members), so this is not passed through wrote() — but an ERROR must not
+    // be swallowed: the HOF is already transferred at this point, and the
+    // members list reads each member's OWN status column, so a failure here
+    // leaves members showing as active under a transferred HOF.
+    const { error: cascadeErr } = await supabase
+      .from('mumineen')
+      .update({ status: 'transferred' })
+      .eq('hof_id', showTransfer.id)
+    if (cascadeErr) {
+      setSaveError(
+        `HOF transferred, but its family members were not: ${cascadeErr.message}. ` +
+        `Re-run the transfer to finish, or the members will still show as active.`,
+      )
+      await fetchAll()
+      setTransferring(false)
+      return
+    }
     await fetchAll(); setShowTransfer(null); setTransferReason(''); setTransferring(false)
   }
 
