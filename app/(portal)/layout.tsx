@@ -105,7 +105,23 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
     return () => { document.body.style.overflow = '' }
   }, [sidebarOpen])
 
+  const [authError, setAuthError] = useState<string | null>(null)
+
+  // Wrapped so a single failed call cannot hang the whole portal. Without
+  // this, anything that throws here — an auth-lock timeout, an RLS refusal —
+  // skips setLoading(false) and every page spins forever, Dashboard included.
   const checkAuth = async () => {
+    try {
+      await runCheckAuth()
+    } catch (e) {
+      console.error('[portal] checkAuth failed:', e)
+      setAuthError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const runCheckAuth = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
 
@@ -158,6 +174,21 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--bs-body-bg)' }}>
         <div className="spinner-border text-primary" />
+      </div>
+    )
+  }
+
+  // Show the failure instead of an endless spinner. Whatever broke, the
+  // person looking at the screen should be able to read what it was.
+  if (authError) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: 24, background: 'var(--bs-body-bg)' }}>
+        <div style={{ maxWidth: 520, textAlign: 'center' }}>
+          <i className="bi bi-exclamation-triangle-fill" style={{ fontSize: 40, color: '#d97706' }} />
+          <h5 className="mt-3 mb-2 fw-semibold" style={{ color: 'var(--bs-body-color)' }}>Could not load your session</h5>
+          <p className="text-muted mb-3" style={{ fontSize: 13 }}>{authError}</p>
+          <button className="btn btn-sm btn-primary" onClick={() => window.location.reload()}>Try again</button>
+        </div>
       </div>
     )
   }
