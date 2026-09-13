@@ -4,6 +4,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import NotificationBell from './components/NotificationBell'
 import { theme as fmb } from '@/lib/theme'
+import { PortalSessionContext, buildCan } from '@/lib/permission-context'
 
 type Theme = 'light' | 'dark' | 'system'
 
@@ -54,6 +55,8 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   const pathname = usePathname()
   const [adminUser, setAdminUser] = useState<AdminUser | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false)
+  const [portalGroupName, setPortalGroupName] = useState('')
   const [permissions, setPermissions] = useState<Permission[]>([])
   const [menuItems, setMenuItems] = useState(ALL_MENU_ITEMS)
   const [showProfileDropdown, setShowProfileDropdown] = useState(false)
@@ -138,15 +141,18 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
     const groupName = adminData.user_groups?.name?.toLowerCase() || ''
     const isAdminUser = groupName === 'super admin' || groupName === 'admin' || groupName === 'super_admin'
     setIsAdmin(isAdminUser)
+    setIsSuperAdmin(groupName === 'super admin' || groupName === 'super_admin')
+    setPortalGroupName(adminData.user_groups?.name || '')
 
     // Super Admin / Admin see everything — skip permission filter
     if (isAdminUser) {
       setMenuItems(ALL_MENU_ITEMS)
     } else if (adminData.user_group_id) {
-      const { data: permsData } = await supabase
+      const { data: permsData, error: permsError } = await supabase
         .from('permissions')
         .select('module, can_view')
         .eq('user_group_id', adminData.user_group_id)
+      if (permsError) console.error('[portal] permissions read failed:', permsError)
       const perms = permsData || []
       setPermissions(perms)
       const allowed = perms.filter(p => p.can_view).map(p => p.module)
@@ -536,7 +542,18 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
           </div>
 
           <div className="fmb-page-content" style={{ padding: '24px' }}>
-            {children}
+            <PortalSessionContext.Provider
+              value={{
+                loading: false,
+                isAdmin,
+                isSuperAdmin,
+                groupName: portalGroupName,
+                permissions,
+                can: buildCan(isAdmin, permissions),
+              }}
+            >
+              {children}
+            </PortalSessionContext.Provider>
           </div>
         </div>
       </div>
