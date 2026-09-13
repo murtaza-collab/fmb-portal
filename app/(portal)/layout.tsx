@@ -4,6 +4,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import NotificationBell from './components/NotificationBell'
 import { theme as fmb } from '@/lib/theme'
+import { PortalSessionContext, buildCan, type ModulePermission } from '@/lib/permission-context'
 
 type Theme = 'light' | 'dark' | 'system'
 
@@ -37,10 +38,7 @@ interface AdminUser {
   user_groups?: { name: string }
 }
 
-interface Permission {
-  module: string
-  can_view: boolean
-}
+type Permission = ModulePermission
 
 const applyTheme = (t: Theme) => {
   const isDark = t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
@@ -54,6 +52,8 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   const pathname = usePathname()
   const [adminUser, setAdminUser] = useState<AdminUser | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false)
+  const [groupName, setGroupName] = useState('')
   const [permissions, setPermissions] = useState<Permission[]>([])
   const [menuItems, setMenuItems] = useState(ALL_MENU_ITEMS)
   const [showProfileDropdown, setShowProfileDropdown] = useState(false)
@@ -122,6 +122,8 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
     const groupName = adminData.user_groups?.name?.toLowerCase() || ''
     const isAdminUser = groupName === 'super admin' || groupName === 'admin' || groupName === 'super_admin'
     setIsAdmin(isAdminUser)
+    setIsSuperAdmin(groupName === 'super admin' || groupName === 'super_admin')
+    setGroupName(adminData.user_groups?.name || '')
 
     // Super Admin / Admin see everything — skip permission filter
     if (isAdminUser) {
@@ -129,7 +131,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
     } else if (adminData.user_group_id) {
       const { data: permsData } = await supabase
         .from('permissions')
-        .select('module, can_view')
+        .select('module, can_view, can_add, can_edit, can_deactivate')
         .eq('user_group_id', adminData.user_group_id)
       const perms = permsData || []
       setPermissions(perms)
@@ -505,7 +507,18 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
           </div>
 
           <div className="fmb-page-content" style={{ padding: '24px' }}>
-            {children}
+            <PortalSessionContext.Provider
+              value={{
+                loading: false,
+                isAdmin,
+                isSuperAdmin,
+                groupName,
+                permissions,
+                can: buildCan(isAdmin, permissions),
+              }}
+            >
+              {children}
+            </PortalSessionContext.Provider>
           </div>
         </div>
       </div>

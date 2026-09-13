@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { usePortalSession } from '@/lib/permission-context'
 import { wrote } from '@/lib/db'
 import { theme } from '@/lib/theme'
 
@@ -73,7 +74,9 @@ export default function UsersPage() {
   const [search, setSearch] = useState('')
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false)
+  // From the layout's single lookup — a second auth.getUser() here raced
+  // the layout's and timed out on the Supabase auth lock.
+  const { isSuperAdmin } = usePortalSession()
 
   const [showUserModal, setShowUserModal] = useState(false)
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null)
@@ -87,16 +90,7 @@ export default function UsersPage() {
   const [groupName, setGroupName] = useState('')
   const [groupPerms, setGroupPerms] = useState<Record<string, Record<string, boolean>>>({})
 
-  useEffect(() => { fetchUsers(); fetchGroups(); fetchResetRequests(); checkIfSuperAdmin() }, [])
-
-  const checkIfSuperAdmin = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    const { data: adminUser } = await supabase.from('admin_users')
-      .select('user_groups(name)').eq('auth_id', user.id).single()
-    const gn = (adminUser?.user_groups as any)?.name?.toLowerCase() || ''
-    setIsSuperAdmin(gn === 'super admin' || gn === 'super_admin')
-  }
+  useEffect(() => { fetchUsers(); fetchGroups(); fetchResetRequests() }, [])
 
   const fetchUsers = async () => {
     setLoading(true)

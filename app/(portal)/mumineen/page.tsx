@@ -2,6 +2,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { usePortalSession } from '@/lib/permission-context'
 import { wrote } from '@/lib/db'
 import { buildIlikeOr } from '@/lib/search'
 import { theme } from '@/lib/theme'
@@ -122,7 +123,9 @@ export default function MumineenPage() {
   const [houseTypes, setHouseTypes]       = useState<HouseType[]>([])
   const [niyyatStatuses, setNiyyatStatuses] = useState<NiyyatStatus[]>([])
   const [categories, setCategories]       = useState<MuminCategory[]>([])
-  const [isAdmin, setIsAdmin]             = useState(false)
+  // From the layout's single lookup — a second auth.getUser() in fetchAll
+  // raced the layout's and timed out on the Supabase auth lock.
+  const { isAdmin } = usePortalSession()
   const [noShowId, setNoShowId]           = useState<number | null>(null)
   const [loading, setLoading]             = useState(true)
 
@@ -294,12 +297,6 @@ export default function MumineenPage() {
 
   const fetchAll = async () => {
     setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      const { data: adminData } = await supabase.from('admin_users').select('user_groups(name)').eq('auth_id', user.id).single()
-      const gn = (adminData?.user_groups as any)?.name?.toLowerCase() || ''
-      setIsAdmin(gn === 'super admin' || gn === 'admin' || gn === 'super_admin')
-    }
     // Lookups only — mumineen rows come from fetchMumineen, one page at a time.
     const [sRes, bRes, tRes, nRes, cRes] = await Promise.all([
       supabase.from('house_sectors').select('id,name').order('name'),
