@@ -252,8 +252,16 @@ export default function DistributionPage() {
         {[
           { label: 'Showing',          value: registrations.length, color: 'var(--fmb-primary)' },
           { label: 'Total registered', value: stats.total,          color: '#0ab39c' },
-          { label: 'Thaali assigned',  value: stats.withThaali,     color: theme.info },
+          // Registration always assigns a thaali number, so a separate
+          // "Thaali assigned" count could never differ from Total registered.
+          // Show what distribution actually needs instead: how many go out today.
+          { label: 'Going out today',  value: Math.max(stats.total - stats.stopped, 0), color: theme.info },
           { label: 'Stopped today',    value: stats.stopped,        color: '#f06548' },
+          // Only appears if a registration somehow has no thaali number —
+          // normally absent, so it reads as a fault light rather than a stat.
+          ...(stats.total !== stats.withThaali
+            ? [{ label: 'Missing thaali no.', value: stats.total - stats.withThaali, color: '#f06548' }]
+            : []),
         ].map(s => (
           <div key={s.label} className="col-md-3">
             <div className="card border-0 shadow-sm" style={{ borderRadius: 10 }}>
