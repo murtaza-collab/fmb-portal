@@ -47,6 +47,40 @@ const applyTheme = (t: Theme) => {
 const saveTheme = (t: Theme) => { localStorage.setItem('fmb-theme', t); applyTheme(t) }
 const loadTheme = (): Theme => (localStorage.getItem('fmb-theme') as Theme) || 'light'
 
+/**
+ * Which permission module owns a route. Derived from ALL_MENU_ITEMS so the
+ * sidebar and the route guard can never disagree.
+ *
+ * Longest prefix wins, and a match must be exact or end at a "/" boundary, so
+ * /distributors does not match /distribution.
+ *
+ * Routes with no entry (currently /sectors) are NOT gated — better to leave a
+ * page open than to lock staff out of one by guessing its module.
+ */
+function moduleForPath(pathname: string): string | null {
+  let best: { href: string; module: string } | null = null
+  for (const item of ALL_MENU_ITEMS) {
+    const href = item.href
+    if (pathname === href || pathname.startsWith(href + '/')) {
+      if (!best || href.length > best.href.length) best = { href, module: item.module }
+    }
+  }
+  return best?.module ?? null
+}
+
+function NoAccess({ module }: { module: string }) {
+  return (
+    <div className="text-center py-5">
+      <i className="bi bi-shield-lock-fill" style={{ fontSize: 48, color: 'var(--bs-secondary-color)' }} />
+      <h5 className="mt-3 mb-1 fw-semibold" style={{ color: 'var(--bs-body-color)' }}>No access</h5>
+      <p className="text-muted mb-0" style={{ fontSize: 13 }}>
+        You do not have permission to view this page ({module.replace(/_/g, ' ')}).
+        Ask an administrator to grant your group access to this module.
+      </p>
+    </div>
+  )
+}
+
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -148,6 +182,12 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
     await supabase.auth.signOut()
     router.push('/login')
   }
+
+  // Hiding a sidebar link is not a guard — the URL still loads the page.
+  const currentModule = moduleForPath(pathname)
+  const canViewCurrent = currentModule
+    ? buildCan(isAdmin, permissions)(currentModule, 'can_view')
+    : true
 
   const themeOptions: { val: Theme; icon: string; label: string }[] = [
     { val: 'light',  icon: 'bi-sun-fill',    label: 'Light'  },
@@ -517,7 +557,9 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                 can: buildCan(isAdmin, permissions),
               }}
             >
-              {children}
+              {currentModule && !canViewCurrent
+                ? <NoAccess module={currentModule} />
+                : children}
             </PortalSessionContext.Provider>
           </div>
         </div>
