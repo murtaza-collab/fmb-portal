@@ -4,7 +4,6 @@ import { useRouter, usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import NotificationBell from './components/NotificationBell'
 import { theme as fmb } from '@/lib/theme'
-import { PortalSessionContext, buildCan, type ModulePermission } from '@/lib/permission-context'
 
 type Theme = 'light' | 'dark' | 'system'
 
@@ -38,7 +37,10 @@ interface AdminUser {
   user_groups?: { name: string }
 }
 
-type Permission = ModulePermission
+interface Permission {
+  module: string
+  can_view: boolean
+}
 
 const applyTheme = (t: Theme) => {
   const isDark = t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
@@ -47,47 +49,11 @@ const applyTheme = (t: Theme) => {
 const saveTheme = (t: Theme) => { localStorage.setItem('fmb-theme', t); applyTheme(t) }
 const loadTheme = (): Theme => (localStorage.getItem('fmb-theme') as Theme) || 'light'
 
-/**
- * Which permission module owns a route. Derived from ALL_MENU_ITEMS so the
- * sidebar and the route guard can never disagree.
- *
- * Longest prefix wins, and a match must be exact or end at a "/" boundary, so
- * /distributors does not match /distribution.
- *
- * Routes with no entry (currently /sectors) are NOT gated — better to leave a
- * page open than to lock staff out of one by guessing its module.
- */
-function moduleForPath(pathname: string): string | null {
-  let best: { href: string; module: string } | null = null
-  for (const item of ALL_MENU_ITEMS) {
-    const href = item.href
-    if (pathname === href || pathname.startsWith(href + '/')) {
-      if (!best || href.length > best.href.length) best = { href, module: item.module }
-    }
-  }
-  return best?.module ?? null
-}
-
-function NoAccess({ module }: { module: string }) {
-  return (
-    <div className="text-center py-5">
-      <i className="bi bi-shield-lock-fill" style={{ fontSize: 48, color: 'var(--bs-secondary-color)' }} />
-      <h5 className="mt-3 mb-1 fw-semibold" style={{ color: 'var(--bs-body-color)' }}>No access</h5>
-      <p className="text-muted mb-0" style={{ fontSize: 13 }}>
-        You do not have permission to view this page ({module.replace(/_/g, ' ')}).
-        Ask an administrator to grant your group access to this module.
-      </p>
-    </div>
-  )
-}
-
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
   const [adminUser, setAdminUser] = useState<AdminUser | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false)
-  const [groupName, setGroupName] = useState('')
   const [permissions, setPermissions] = useState<Permission[]>([])
   const [menuItems, setMenuItems] = useState(ALL_MENU_ITEMS)
   const [showProfileDropdown, setShowProfileDropdown] = useState(false)
@@ -156,8 +122,6 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
     const groupName = adminData.user_groups?.name?.toLowerCase() || ''
     const isAdminUser = groupName === 'super admin' || groupName === 'admin' || groupName === 'super_admin'
     setIsAdmin(isAdminUser)
-    setIsSuperAdmin(groupName === 'super admin' || groupName === 'super_admin')
-    setGroupName(adminData.user_groups?.name || '')
 
     // Super Admin / Admin see everything — skip permission filter
     if (isAdminUser) {
@@ -165,7 +129,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
     } else if (adminData.user_group_id) {
       const { data: permsData } = await supabase
         .from('permissions')
-        .select('module, can_view, can_add, can_edit, can_deactivate')
+        .select('module, can_view')
         .eq('user_group_id', adminData.user_group_id)
       const perms = permsData || []
       setPermissions(perms)
@@ -182,12 +146,6 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
     await supabase.auth.signOut()
     router.push('/login')
   }
-
-  // Hiding a sidebar link is not a guard — the URL still loads the page.
-  const currentModule = moduleForPath(pathname)
-  const canViewCurrent = currentModule
-    ? buildCan(isAdmin, permissions)(currentModule, 'can_view')
-    : true
 
   const themeOptions: { val: Theme; icon: string; label: string }[] = [
     { val: 'light',  icon: 'bi-sun-fill',    label: 'Light'  },
@@ -547,20 +505,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
           </div>
 
           <div className="fmb-page-content" style={{ padding: '24px' }}>
-            <PortalSessionContext.Provider
-              value={{
-                loading: false,
-                isAdmin,
-                isSuperAdmin,
-                groupName,
-                permissions,
-                can: buildCan(isAdmin, permissions),
-              }}
-            >
-              {currentModule && !canViewCurrent
-                ? <NoAccess module={currentModule} />
-                : children}
-            </PortalSessionContext.Provider>
+            {children}
           </div>
         </div>
       </div>
