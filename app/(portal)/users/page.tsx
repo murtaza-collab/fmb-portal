@@ -14,6 +14,16 @@ interface AdminUser {
   user_groups?: { name: string }
 }
 
+interface ResetRequest {
+  id: number
+  username: string
+  admin_user_id: number | null
+  full_name: string | null
+  status: string
+  requested_at: string
+  handled_at: string | null
+}
+
 interface UserGroup {
   id: number
   name: string
@@ -51,8 +61,13 @@ const PERM_LABELS: Record<string, string> = {
 }
 
 export default function UsersPage() {
-  const [activeTab, setActiveTab] = useState<'users' | 'groups'>('users')
+  const [activeTab, setActiveTab] = useState<'users' | 'groups' | 'resets'>('users')
   const [users, setUsers] = useState<AdminUser[]>([])
+  const [resetRequests, setResetRequests] = useState<ResetRequest[]>([])
+  // Reference point for the relative timestamps below, captured when the rows
+  // were fetched. Reading the clock during render is impure and makes the
+  // output differ between the server and client passes.
+  const [resetsFetchedAt, setResetsFetchedAt] = useState(0)
   const [groups, setGroups] = useState<UserGroup[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -64,12 +79,15 @@ export default function UsersPage() {
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null)
   const [userForm, setUserForm] = useState({ full_name: '', username: '', password: '', user_group_id: '' })
 
+  const [resetTarget, setResetTarget] = useState<ResetRequest | null>(null)
+  const [resetPassword, setResetPassword] = useState('')
+
   const [showGroupModal, setShowGroupModal] = useState(false)
   const [editingGroup, setEditingGroup] = useState<UserGroup | null>(null)
   const [groupName, setGroupName] = useState('')
   const [groupPerms, setGroupPerms] = useState<Record<string, Record<string, boolean>>>({})
 
-  useEffect(() => { fetchUsers(); fetchGroups(); checkIfSuperAdmin() }, [])
+  useEffect(() => { fetchUsers(); fetchGroups(); fetchResetRequests(); checkIfSuperAdmin() }, [])
 
   const checkIfSuperAdmin = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -90,6 +108,75 @@ export default function UsersPage() {
   const fetchGroups = async () => {
     const { data } = await supabase.from('user_groups').select('*, permissions(*)').order('name')
     setGroups(data || [])
+  }
+
+  const fetchResetRequests = async () => {
+    const { data } = await supabase
+      .from('password_reset_requests')
+      .select('*')
+      .order('requested_at', { ascending: false })
+      .limit(100)
+    setResetRequests(data || [])
+    setResetsFetchedAt(Date.now())
+  }
+
+  const openResetModal = (r: ResetRequest) => {
+    setResetTarget(r); setResetPassword(''); setFormError('')
+  }
+
+  /**
+   * Sets the new password, then closes the request. The account is looked up
+   * fresh rather than trusting admin_user_id: the row may predate a rename,
+   * and change-password needs the auth_id, which the request does not carry.
+   */
+  const handleResetPassword = async () => {
+    if (!resetTarget) return
+    if (resetPassword.trim().length < 6) { setFormError('Password must be at least 6 characters'); return }
+    setSaving(true); setFormError('')
+    try {
+      const target = users.find(u =>
+        (resetTarget.admin_user_id != null && u.id === resetTarget.admin_user_id) ||
+        u.username?.toLowerCase() === resetTarget.username.toLowerCase()
+      )
+      if (!target) {
+        setFormError('That account no longer exists — dismiss this request instead.')
+        setSaving(false); return
+      }
+
+      const res = await fetch('/api/admin/change-password', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ auth_id: target.auth_id, new_password: resetPassword.trim() })
+      })
+      const result = await res.json()
+      if (!res.ok) { setFormError(result.error || 'Password change failed'); setSaving(false); return }
+
+      const r = await wrote(
+        supabase.from('password_reset_requests')
+          .update({ status: 'completed', handled_at: new Date().toISOString() })
+          .eq('id', resetTarget.id).select('id'),
+        'reset request',
+      )
+      // The password IS already changed at this point — report the bookkeeping
+      // failure without implying the reset itself did not happen.
+      if (!r.ok) {
+        alert(`Password was changed, but the request could not be closed: ${r.message}`)
+      }
+      await fetchResetRequests()
+      setResetTarget(null)
+    } catch (e: unknown) { setFormError(e instanceof Error ? e.message : 'Something went wrong') }
+    setSaving(false)
+  }
+
+  const dismissResetRequest = async (r: ResetRequest) => {
+    if (!confirm(`Dismiss the reset request for "${r.full_name || r.username}"? No password will be changed.`)) return
+    const res = await wrote(
+      supabase.from('password_reset_requests')
+        .update({ status: 'dismissed', handled_at: new Date().toISOString() })
+        .eq('id', r.id).select('id'),
+      'reset request',
+    )
+    if (!res.ok) { alert(res.message); return }
+    await fetchResetRequests()
   }
 
   const openAddUser = () => {
@@ -235,6 +322,16 @@ export default function UsersPage() {
     await fetchGroups()
   }
 
+  const pendingResets = resetRequests.filter(r => r.status === 'pending')
+
+  const formatWhen = (iso: string) => {
+    const mins = Math.floor((resetsFetchedAt - new Date(iso).getTime()) / 60000)
+    if (mins < 1) return 'Just now'
+    if (mins < 60) return `${mins}m ago`
+    if (mins < 1440) return `${Math.floor(mins / 60)}h ago`
+    return new Date(iso).toLocaleDateString()
+  }
+
   const filteredUsers = users.filter(u =>
     u.full_name?.toLowerCase().includes(search.toLowerCase()) ||
     u.username?.toLowerCase().includes(search.toLowerCase())
@@ -248,9 +345,8 @@ export default function UsersPage() {
           <h4 className="mb-0">Users</h4>
           <p className="text-muted mb-0" style={{ fontSize: '13px' }}>Manage admin users and user groups</p>
         </div>
-        {activeTab === 'users'
-          ? <button className="btn btn-primary btn-sm" onClick={openAddUser}>+ Add User</button>
-          : <button className="btn btn-primary btn-sm" onClick={openAddGroup}>+ Add Group</button>}
+        {activeTab === 'users' && <button className="btn btn-primary btn-sm" onClick={openAddUser}>+ Add User</button>}
+        {activeTab === 'groups' && <button className="btn btn-primary btn-sm" onClick={openAddGroup}>+ Add Group</button>}
       </div>
 
       {/* Stats */}
@@ -280,6 +376,15 @@ export default function UsersPage() {
         <li className="nav-item">
           <button className={`nav-link ${activeTab === 'groups' ? 'active' : ''}`}
             onClick={() => setActiveTab('groups')} style={{ fontSize: '13px' }}>Groups & Permissions</button>
+        </li>
+        <li className="nav-item">
+          <button className={`nav-link ${activeTab === 'resets' ? 'active' : ''}`}
+            onClick={() => setActiveTab('resets')} style={{ fontSize: '13px' }}>
+            Reset Requests
+            {pendingResets.length > 0 && (
+              <span className="badge bg-danger ms-2" style={{ fontSize: '10px' }}>{pendingResets.length}</span>
+            )}
+          </button>
         </li>
       </ul>
 
@@ -394,6 +499,108 @@ export default function UsersPage() {
             </div>
           ))}
           {groups.length === 0 && <div className="text-center text-muted py-4">No groups found</div>}
+        </div>
+      )}
+
+      {/* RESET REQUESTS TAB */}
+      {activeTab === 'resets' && (
+        <div className="card" style={{ border: 'none', boxShadow: '0 1px 4px rgba(0,0,0,0.1)', borderRadius: '10px' }}>
+          <div className="card-body">
+            <p className="text-muted" style={{ fontSize: '13px' }}>
+              Admin accounts have no email on file, so resets are handled by hand: set a new
+              password here, then pass it to the user directly.
+            </p>
+
+            {!isSuperAdmin && (
+              <div className="alert alert-warning py-2" style={{ fontSize: '13px' }}>
+                <i className="bi bi-info-circle me-2" />
+                Only a Super Admin can set a new password. You can still review and dismiss requests.
+              </div>
+            )}
+
+            <div className="table-responsive">
+              <table className="table table-hover mb-0">
+                <thead style={{ background: '#f8f9fa' }}>
+                  <tr>
+                    {['#', 'Full Name', 'Username', 'Requested', 'Status', 'Actions'].map(h => (
+                      <th key={h} style={{ fontSize: '13px', color: theme.muted, fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {resetRequests.map((r, i) => (
+                    <tr key={r.id}>
+                      <td style={{ fontSize: '13px', color: theme.muted }}>{i + 1}</td>
+                      <td style={{ fontSize: '14px', whiteSpace: 'nowrap' }}>{r.full_name || '—'}</td>
+                      <td style={{ fontSize: '13px' }}>@{r.username}</td>
+                      <td style={{ fontSize: '13px', color: theme.muted, whiteSpace: 'nowrap' }}>{formatWhen(r.requested_at)}</td>
+                      <td>
+                        <span className={`badge ${
+                          r.status === 'pending' ? 'bg-warning' : r.status === 'completed' ? 'bg-success' : 'bg-secondary'
+                        }`} style={{ fontSize: '11px' }}>{r.status}</span>
+                      </td>
+                      <td style={{ whiteSpace: 'nowrap' }}>
+                        {r.status === 'pending' ? (
+                          <>
+                            <button className="btn btn-sm btn-outline-primary me-1" style={{ fontSize: '12px' }}
+                              onClick={() => openResetModal(r)} disabled={!isSuperAdmin}
+                              title={isSuperAdmin ? undefined : 'Super Admin only'}>
+                              Set new password
+                            </button>
+                            <button className="btn btn-sm btn-outline-secondary" style={{ fontSize: '12px' }}
+                              onClick={() => dismissResetRequest(r)}>Dismiss</button>
+                          </>
+                        ) : (
+                          <span style={{ fontSize: '12px', color: theme.muted }}>
+                            {r.handled_at ? `Handled ${formatWhen(r.handled_at)}` : '—'}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {resetRequests.length === 0 && (
+                    <tr><td colSpan={6} className="text-center text-muted py-4">No password reset requests</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* RESET PASSWORD MODAL */}
+      {resetTarget && (
+        <div className="modal show d-block" style={{ background: 'rgba(0,0,0,0.5)' }} onClick={() => setResetTarget(null)}>
+          <div className="modal-dialog" onClick={e => e.stopPropagation()}>
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Set New Password</h5>
+                <button className="btn-close" onClick={() => setResetTarget(null)} />
+              </div>
+              <div className="modal-body">
+                {formError && <div className="alert alert-danger py-2" style={{ fontSize: '13px' }}>{formError}</div>}
+                <p style={{ fontSize: '13px' }}>
+                  Setting a new password for <strong>{resetTarget.full_name || resetTarget.username}</strong>
+                  {' '}(@{resetTarget.username}).
+                </p>
+                <label className="form-label" style={{ fontSize: '13px' }}>New Password *</label>
+                <input type="text" className="form-control form-control-sm" value={resetPassword}
+                  autoFocus autoComplete="off"
+                  onChange={(e) => setResetPassword(e.target.value)}
+                  placeholder="Minimum 6 characters" />
+                <div className="form-text" style={{ fontSize: '12px' }}>
+                  Shown in plain text so you can read it back to the user. They are not prompted to
+                  change it at next sign-in, so pick something they can use as-is.
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button className="btn btn-sm btn-secondary" onClick={() => setResetTarget(null)}>Cancel</button>
+                <button className="btn btn-sm btn-primary" onClick={handleResetPassword} disabled={saving}>
+                  {saving ? 'Saving…' : 'Set Password & Close Request'}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
