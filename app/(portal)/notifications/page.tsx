@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { theme } from '@/lib/theme'
+import { usePermission } from '@/lib/use-permission'
 
 type Template = {
   id: number; event_type: string; label: string
@@ -67,6 +68,10 @@ export default function NotificationsPage() {
   const [bBody, setBBody]       = useState('')
   const [preview, setPreview]   = useState<number | null>(null)
   const [sending, setSending]   = useState(false)
+
+  // Sidebar hiding is not a guard — /notifications loads for anyone who types
+  // the URL. Real enforcement is the RLS policy on the notification tables.
+  const { loading: permLoading, allowed: canView } = usePermission('notifications', 'can_view')
 
   const showToast = (msg: string, type: 'success' | 'danger' = 'success') => {
     setToast({ msg, type })
@@ -240,6 +245,29 @@ export default function NotificationsPage() {
   }
 
   const enabledCount = templates.filter(t => t.enabled).length
+
+  if (permLoading) {
+    return (
+      <div className="d-flex justify-content-center py-5">
+        <div className="spinner-border" style={{ color: theme.primary }} role="status">
+          <span className="visually-hidden">Loading…</span>
+        </div>
+      </div>
+    )
+  }
+
+  if (!canView) {
+    return (
+      <div className="text-center py-5">
+        <i className="bi bi-shield-lock-fill" style={{ fontSize: 48, color: 'var(--bs-secondary-color)' }} />
+        <h5 className="mt-3 mb-1 fw-semibold" style={{ color: 'var(--bs-body-color)' }}>No access</h5>
+        <p className="text-muted mb-0" style={{ fontSize: 13 }}>
+          You do not have permission to view Notifications. Ask an administrator
+          to grant your group access to this module.
+        </p>
+      </div>
+    )
+  }
 
   return (
     <>
