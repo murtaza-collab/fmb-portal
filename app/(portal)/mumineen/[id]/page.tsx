@@ -99,8 +99,8 @@ const getNiyyatColor = (name: string) => {
   const n = name.toLowerCase()
   if (n.includes('approved'))                       return { bg: '#0ab39c20', color: '#0ab39c' }
   if (n.includes('no-show') || n.includes('no show')) return { bg: '#e6394620', color: '#e63946' }
-  if (n.includes('pending'))                        return { bg: '#ffd97d20', color: '#856404' }
-  return { bg: '#d4a03220', color: '#d4a032' }
+  if (n.includes('pending'))                        return { bg: 'var(--fmb-accent)20', color: '#856404' }
+  return { bg: 'var(--fmb-primary)20', color: 'var(--fmb-primary)' }
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
@@ -453,7 +453,7 @@ export default function MuminDetailPage() {
               <div style={metaLabel}>Thaali Number</div>
               {thaaliReg
                 ? thaaliReg.thaali_number
-                  ? <span className="badge" style={{ background: theme.gold, color: '#fff', fontSize: 13, padding: '5px 12px', letterSpacing: 0.5 }}>
+                  ? <span className="badge" style={{ background: theme.primary, color: '#fff', fontSize: 13, padding: '5px 12px', letterSpacing: 0.5 }}>
                       #{thaaliReg.thaali_number}
                     </span>
                   : <span className="badge" style={{ background: '#fff3cd', color: '#856404', fontSize: 12 }}>Registered — No Number</span>
@@ -472,7 +472,7 @@ export default function MuminDetailPage() {
               { label: 'Adults',         value: hof.total_adult  || 0, color: '#0ab39c' },
               { label: 'Children',       value: hof.total_child  || 0, color: '#299cdb' },
               { label: 'Infants',        value: hof.total_infant || 0, color: '#f06548' },
-              { label: 'Family Members', value: family.length,         color: '#d4a032' },
+              { label: 'Family Members', value: family.length,         color: 'var(--fmb-primary)' },
             ].map(({ label, value, color }) => (
               <div key={label} className="text-center">
                 <div style={{ fontSize: 24, fontWeight: 700, color }}>{value}</div>
@@ -488,7 +488,7 @@ export default function MuminDetailPage() {
         <div className="card-body">
           <div className="d-flex justify-content-between align-items-center mb-3">
             <h6 className="mb-0 fw-bold" style={{ color: 'var(--bs-body-color)' }}>Family Members</h6>
-            <button className="btn btn-sm" style={{ background: theme.gold, color: '#fff' }} onClick={openAddMember}>
+            <button className="btn btn-sm" style={{ background: theme.primary, color: '#fff' }} onClick={openAddMember}>
               <i className="bi bi-plus me-1" />Add Member
             </button>
           </div>
@@ -521,7 +521,7 @@ export default function MuminDetailPage() {
                       </td>
                       <td>
                         <div className="d-flex gap-1 justify-content-end">
-                          <button className="btn btn-sm" title="Edit" style={{ padding: '2px 7px', color: theme.gold }} onClick={() => openEditMember(m)}><i className="bi bi-pencil" /></button>
+                          <button className="btn btn-sm" title="Edit" style={{ padding: '2px 7px', color: theme.primary }} onClick={() => openEditMember(m)}><i className="bi bi-pencil" /></button>
                           <button className="btn btn-sm" title="Delete" style={{ padding: '2px 7px', color: '#dc3545' }} onClick={() => setShowDeleteMember(m)}><i className="bi bi-trash" /></button>
                         </div>
                       </td>
@@ -643,7 +643,7 @@ export default function MuminDetailPage() {
               </div>
               <div className="col-12">
                 <label style={labelStyle}>Full Address Preview</label>
-                <div style={{ background: 'var(--bs-secondary-bg)', borderRadius: 6, padding: '8px 12px', fontSize: 13, borderLeft: `3px solid ${hofAddrPreview ? theme.goldAccent : 'var(--bs-border-color)'}`, minHeight: 36, color: hofAddrPreview ? theme.gold : 'var(--bs-secondary-color)' }}>
+                <div style={{ background: 'var(--bs-secondary-bg)', borderRadius: 6, padding: '8px 12px', fontSize: 13, borderLeft: `3px solid ${hofAddrPreview ? theme.accent : 'var(--bs-border-color)'}`, minHeight: 36, color: hofAddrPreview ? theme.primary : 'var(--bs-secondary-color)' }}>
                   {hofAddrPreview || (hof.full_address
                     ? <><span style={{ color: 'var(--bs-body-color)' }}>{hof.full_address}</span> <span style={{ color: 'var(--bs-secondary-color)', fontSize: 12 }}>(fill fields above to update)</span></>
                     : 'Fill in the fields above to preview…')}
@@ -671,7 +671,7 @@ export default function MuminDetailPage() {
           </div>
           <div className="modal-footer" style={{ borderTop: '1px solid var(--bs-border-color)' }}>
             <button className="btn btn-light btn-sm" onClick={() => setShowHofModal(false)}>Cancel</button>
-            <button className="btn btn-sm" style={{ background: theme.gold, color: '#fff' }} onClick={handleSaveHof} disabled={hofSaving}>
+            <button className="btn btn-sm" style={{ background: theme.primary, color: '#fff' }} onClick={handleSaveHof} disabled={hofSaving}>
               {hofSaving ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
@@ -729,7 +729,7 @@ export default function MuminDetailPage() {
           </div>
           <div className="modal-footer" style={{ borderTop: '1px solid var(--bs-border-color)' }}>
             <button className="btn btn-light btn-sm" onClick={() => setShowMemberModal(false)}>Cancel</button>
-            <button className="btn btn-sm" style={{ background: theme.gold, color: '#fff' }} onClick={handleSaveMember} disabled={memberSaving}>
+            <button className="btn btn-sm" style={{ background: theme.primary, color: '#fff' }} onClick={handleSaveMember} disabled={memberSaving}>
               {memberSaving ? 'Saving...' : 'Save'}
             </button>
           </div>

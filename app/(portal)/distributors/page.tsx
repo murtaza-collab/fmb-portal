@@ -181,7 +181,7 @@ export default function DistributorsPage() {
           <p className="mb-0" style={{ fontSize: 13, color: 'var(--bs-secondary-color)' }}>Manage delivery distributors</p>
         </div>
         <button className="btn btn-sm" onClick={openAdd}
-          style={{ background: theme.gold, color: '#fff', borderRadius: 8, fontWeight: 600, fontSize: 13 }}>
+          style={{ background: theme.primary, color: '#fff', borderRadius: 8, fontWeight: 600, fontSize: 13 }}>
           <i className="bi bi-plus me-1" />Add Distributor
         </button>
       </div>
@@ -224,7 +224,7 @@ export default function DistributorsPage() {
                       </td>
                       <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
                         <button className="btn btn-sm me-1" onClick={() => openEdit(d)}
-                          style={{ fontSize: 11, padding: '3px 10px', background: '#d4a03215', color: theme.gold, border: 'none', borderRadius: 6 }}>
+                          style={{ fontSize: 11, padding: '3px 10px', background: 'var(--fmb-primary)15', color: theme.primary, border: 'none', borderRadius: 6 }}>
                           <i className="bi bi-pencil me-1" />Edit
                         </button>
                         <button className="btn btn-sm me-1" onClick={() => openSectors(d)}
@@ -233,7 +233,7 @@ export default function DistributorsPage() {
                         </button>
                         <button className="btn btn-sm me-1" onClick={() => toggleStatus(d)}
                           style={{ fontSize: 11, padding: '3px 10px',
-                            background: d.status === 'active' ? '#ffd97d15' : '#0ab39c15',
+                            background: d.status === 'active' ? 'var(--fmb-accent)15' : '#0ab39c15',
                             color: d.status === 'active' ? '#856404' : theme.success,
                             border: 'none', borderRadius: 6 }}>
                           {d.status === 'active' ? 'Deactivate' : 'Activate'}
@@ -297,7 +297,7 @@ export default function DistributorsPage() {
                 <div>
                   <label className="form-label fw-semibold mb-2" style={{ fontSize: 13, color: 'var(--bs-body-color)' }}>
                     Assign Sectors
-                    <span className="ms-2 badge" style={{ background: '#d4a03220', color: theme.gold, fontSize: 11 }}>
+                    <span className="ms-2 badge" style={{ background: 'var(--fmb-primary)20', color: theme.primary, fontSize: 11 }}>
                       {formSectors.length} selected
                     </span>
                   </label>
@@ -311,9 +311,9 @@ export default function DistributorsPage() {
                           <div key={s.id} className="col-12 col-sm-6 col-md-4">
                             <div onClick={() => toggleFormSector(s.id)} style={{
                               padding: '8px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 13,
-                              background: active ? theme.gold : 'var(--bs-tertiary-bg)',
+                              background: active ? theme.primary : 'var(--bs-tertiary-bg)',
                               color: active ? '#fff' : 'var(--bs-body-color)',
-                              border: `1px solid ${active ? theme.gold : 'var(--bs-border-color)'}`,
+                              border: `1px solid ${active ? theme.primary : 'var(--bs-border-color)'}`,
                               transition: 'all 0.15s',
                             }}>
                               {active ? <i className="bi bi-check-circle-fill me-2" /> : <i className="bi bi-circle me-2" style={{ opacity: 0.4 }} />}
@@ -329,7 +329,7 @@ export default function DistributorsPage() {
               <div className="modal-footer" style={{ borderTop: '1px solid var(--bs-border-color)' }}>
                 <button className="btn btn-sm btn-outline-secondary" onClick={() => setShowModal(false)} style={{ borderRadius: 8 }}>Cancel</button>
                 <button className="btn btn-sm" onClick={handleSave} disabled={saving || !form.full_name.trim()}
-                  style={{ background: theme.gold, color: '#fff', borderRadius: 8, fontWeight: 600 }}>
+                  style={{ background: theme.primary, color: '#fff', borderRadius: 8, fontWeight: 600 }}>
                   {saving ? <><span className="spinner-border spinner-border-sm me-1" />Saving...</> : 'Save'}
                 </button>
               </div>
@@ -361,9 +361,9 @@ export default function DistributorsPage() {
                       <div key={s.id} className="col-12 col-sm-6">
                         <div onClick={() => toggleAssignedSector(s.id)} style={{
                           padding: '8px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 13,
-                          background: active ? theme.gold : 'var(--bs-tertiary-bg)',
+                          background: active ? theme.primary : 'var(--bs-tertiary-bg)',
                           color: active ? '#fff' : 'var(--bs-body-color)',
-                          border: `1px solid ${active ? theme.gold : 'var(--bs-border-color)'}`,
+                          border: `1px solid ${active ? theme.primary : 'var(--bs-border-color)'}`,
                           transition: 'all 0.15s',
                         }}>
                           {active ? <i className="bi bi-check-circle-fill me-2" /> : <i className="bi bi-circle me-2" style={{ opacity: 0.4 }} />}
@@ -377,7 +377,7 @@ export default function DistributorsPage() {
               <div className="modal-footer" style={{ borderTop: '1px solid var(--bs-border-color)' }}>
                 <button className="btn btn-sm btn-outline-secondary" onClick={() => setShowSectorModal(false)} style={{ borderRadius: 8 }}>Cancel</button>
                 <button className="btn btn-sm" onClick={saveSectors} disabled={saving}
-                  style={{ background: theme.gold, color: '#fff', borderRadius: 8, fontWeight: 600 }}>
+                  style={{ background: theme.primary, color: '#fff', borderRadius: 8, fontWeight: 600 }}>
                   {saving ? 'Saving...' : 'Save Sectors'}
                 </button>
               </div>

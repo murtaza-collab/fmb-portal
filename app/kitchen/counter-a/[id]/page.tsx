@@ -211,7 +211,7 @@ export default function CounterADetail() {
             <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--bs-secondary-color)', textTransform: 'uppercase', letterSpacing: 1 }}>
               Store Counter A
             </div>
-            <div style={{ color: theme.gold }}>{distributorName || '—'}</div>
+            <div style={{ color: theme.primary }}>{distributorName || '—'}</div>
           </h1>
           <span className={`badge fs-6 ${confirmed ? 'bg-success' : 'bg-warning text-dark'}`}>
             {confirmed ? '✓ Sent to Counters' : 'Awaiting Confirmation'}
@@ -243,8 +243,8 @@ export default function CounterADetail() {
                   display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
                   boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
                 }}>
-                  <i className="bi bi-box-seam" style={{ fontSize: 22, color: theme.gold, opacity: 0.6, marginBottom: 4 }} />
-                  <div style={{ fontSize: 38, fontWeight: 800, lineHeight: 1, color: theme.gold }}>{totalCount}</div>
+                  <i className="bi bi-box-seam" style={{ fontSize: 22, color: theme.primary, opacity: 0.6, marginBottom: 4 }} />
+                  <div style={{ fontSize: 38, fontWeight: 800, lineHeight: 1, color: theme.primary }}>{totalCount}</div>
                   <div style={{ fontSize: 12, color: 'var(--bs-secondary-color)', fontWeight: 500, marginTop: 4 }}>Total Thaalis</div>
                 </div>
               </div>
@@ -350,8 +350,8 @@ export default function CounterADetail() {
                   display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
                   boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
                 }}>
-                  <i className="bi bi-truck" style={{ fontSize: 22, color: theme.goldAccent, opacity: 0.7, marginBottom: 4 }} />
-                  <div style={{ fontSize: 38, fontWeight: 800, lineHeight: 1, color: theme.goldAccent }}>{toDispatch}</div>
+                  <i className="bi bi-truck" style={{ fontSize: 22, color: theme.accent, opacity: 0.7, marginBottom: 4 }} />
+                  <div style={{ fontSize: 38, fontWeight: 800, lineHeight: 1, color: theme.accent }}>{toDispatch}</div>
                   <div style={{ fontSize: 12, color: 'var(--bs-secondary-color)', fontWeight: 500, marginTop: 4 }}>To Dispatch</div>
                 </div>
               </div>
@@ -462,7 +462,7 @@ export default function CounterADetail() {
                                 style={{ borderLeft: isStopped ? `3px solid ${theme.danger}` : isCustomized ? `3px solid ${theme.info}` : '3px solid transparent' }}
                                 className={isStopped ? 'table-danger' : isCustomized ? 'table-info' : ''}
                               >
-                                <td className="fw-bold fs-5" style={{ color: isStopped ? theme.danger : theme.gold }}>
+                                <td className="fw-bold fs-5" style={{ color: isStopped ? theme.danger : theme.primary }}>
                                   #{r.thaali_number}
                                 </td>
                                 <td style={{ color: 'var(--bs-body-color)' }}>

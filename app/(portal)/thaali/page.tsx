@@ -92,8 +92,8 @@ function SearchableSelect({
           ) : filtered.slice(0, 100).map(o => (
             <div key={o.id} style={{
               padding: '7px 10px', fontSize: 13, cursor: 'pointer',
-              background: String(o.id) === value ? '#d4a03215' : undefined,
-              color: String(o.id) === value ? theme.gold : 'var(--bs-body-color)',
+              background: String(o.id) === value ? 'var(--fmb-primary)15' : undefined,
+              color: String(o.id) === value ? theme.primary : 'var(--bs-body-color)',
             }}
               onMouseDown={() => { onChange(String(o.id)); setQuery(''); setOpen(false) }}>
               {o.label}
@@ -141,7 +141,7 @@ export default function ThaaliPage() {
 
       <div className="row g-3 mb-4">
         {[
-          { label: 'Registered',         value: stats.totalRegs,        color: '#d4a032', title: 'HOFs with a thaali registration' },
+          { label: 'Registered',         value: stats.totalRegs,        color: 'var(--fmb-primary)', title: 'HOFs with a thaali registration' },
           { label: 'Thaali Assigned',     value: stats.withNumber,       color: '#0ab39c', title: 'Registrations with a thaali number' },
           { label: 'HOFs Not Registered', value: stats.unregisteredHofs, color: '#f06548', title: 'Active HOFs with no thaali registration yet' },
         ].map((s, i) => (
@@ -477,12 +477,12 @@ function RegistrationsTab({ onStatsChange }: { onStatsChange: () => void }) {
                     {registrations.map((r, i) => (
                       <tr key={r.id}>
                         <td style={{ color: 'var(--bs-secondary-color)', padding: '10px 12px' }}>{page * PAGE_SIZE + i + 1}</td>
-                        <td style={{ padding: '10px 12px', fontWeight: 700, color: theme.gold }}>
+                        <td style={{ padding: '10px 12px', fontWeight: 700, color: theme.primary }}>
                           {r.thaalis?.thaali_number
                             ? `#${r.thaalis.thaali_number}`
                             : <span className="badge bg-warning text-dark" style={{ fontSize: 10 }}>No Number</span>}
                         </td>
-                        <td style={{ padding: '10px 12px', fontWeight: 600, color: theme.gold }}>{r.mumineen?.sf_no || '—'}</td>
+                        <td style={{ padding: '10px 12px', fontWeight: 600, color: theme.primary }}>{r.mumineen?.sf_no || '—'}</td>
                         <td style={{ padding: '10px 12px', color: 'var(--bs-body-color)', fontWeight: 500 }}>{r.mumineen?.full_name || '—'}</td>
                         <td style={{ padding: '10px 12px', color: 'var(--bs-body-color)' }}>{r.thaali_types?.name || '—'}</td>
                         <td style={{ padding: '10px 12px', color: 'var(--bs-body-color)' }}>{r.thaali_categories?.name || '—'}</td>

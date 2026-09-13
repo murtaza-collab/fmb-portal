@@ -6,20 +6,27 @@
  * CSS, every Bootstrap component, and every inline style at once.
  *
  *   import { theme } from '@/lib/theme'
- *   <div style={{ color: theme.gold, fontSize: theme.text.base }} />
+ *   <div style={{ color: theme.primary, fontSize: theme.text.base }} />
+ *
+ * The palette is jade and gold: `primary` (jade) carries the interface and is
+ * the only colour that belongs under white text; `accent` (gold) is for dark
+ * surfaces only — the active nav item, a highlight on the sidebar. Gold on a
+ * light background fails contrast, which is exactly the defect this palette
+ * replaced, so reach for `primaryDeep` for text and links instead.
  *
  * For a colour with opacity, use alpha() — the raw hex+alpha suffix trick
- * (`'#d4a03220'`) does not work with var(), so alpha() goes through the
- * --fmb-gold-rgb triplet instead.
+ * (`'#0b6b5320'`) does not work with var(), so alpha() goes through the
+ * --fmb-*-rgb triplets instead.
  */
 export const theme = {
   // Brand
-  gold:       'var(--fmb-gold)',
-  goldHover:  'var(--fmb-gold-hover)',
-  goldActive: 'var(--fmb-gold-active)',
-  goldAccent: 'var(--fmb-gold-accent)',
-  goldDeep:   'var(--fmb-gold-deep)',
-  brown:      'var(--fmb-brown)',
+  primary:       'var(--fmb-primary)',
+  primaryHover:  'var(--fmb-primary-hover)',
+  primaryActive: 'var(--fmb-primary-active)',
+  primaryDeep:   'var(--fmb-primary-deep)',
+  accent:        'var(--fmb-accent)',
+  ground:        'var(--fmb-ground)',
+  groundDeep:    'var(--fmb-ground-deep)',
 
   // Semantic
   success: 'var(--fmb-success)',
@@ -50,8 +57,9 @@ export const theme = {
   radius:   'var(--fmb-radius)',
 } as const
 
-/** Brand gold at a given opacity, e.g. alpha.gold(0.12) */
+/** A brand colour at a given opacity, e.g. alpha.primary(0.12) */
 export const alpha = {
-  gold: (a: number) => `rgba(var(--fmb-gold-rgb), ${a})`,
-  info: (a: number) => `rgba(var(--fmb-info-rgb), ${a})`,
+  primary: (a: number) => `rgba(var(--fmb-primary-rgb), ${a})`,
+  accent:  (a: number) => `rgba(var(--fmb-accent-rgb), ${a})`,
+  info:    (a: number) => `rgba(var(--fmb-info-rgb), ${a})`,
 } as const

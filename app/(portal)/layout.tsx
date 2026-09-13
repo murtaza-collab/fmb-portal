@@ -210,9 +210,9 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                     padding: sidebarCollapsed ? '11px 0' : '11px 16px',
                     justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
                     cursor: 'pointer',
-                    background: isGroupActive ? 'rgba(255,191,105,0.15)' : 'transparent',
-                    borderLeft: isGroupActive ? '3px solid #ffd97d' : '3px solid transparent',
-                    color: isGroupActive ? fmb.goldAccent : 'rgba(255,255,255,0.65)',
+                    background: isGroupActive ? 'rgba(var(--fmb-accent-rgb), 0.15)' : 'transparent',
+                    borderLeft: isGroupActive ? '3px solid var(--fmb-accent)' : '3px solid transparent',
+                    color: isGroupActive ? fmb.accent : 'rgba(255,255,255,0.65)',
                     fontSize: '14px', transition: 'all 0.2s',
                   }}
                   onMouseEnter={e => { if (!isGroupActive) e.currentTarget.style.background = 'rgba(255,255,255,0.07)' }}
@@ -234,9 +234,9 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                       style={{
                         display: 'flex', alignItems: 'center', gap: '10px',
                         padding: '9px 16px 9px 40px', cursor: 'pointer',
-                        background: isChildActive ? 'rgba(255,191,105,0.1)' : 'transparent',
-                        borderLeft: isChildActive ? '3px solid rgba(255,191,105,0.6)' : '3px solid transparent',
-                        color: isChildActive ? fmb.goldAccent : 'rgba(255,255,255,0.5)',
+                        background: isChildActive ? 'rgba(var(--fmb-accent-rgb), 0.1)' : 'transparent',
+                        borderLeft: isChildActive ? '3px solid rgba(var(--fmb-accent-rgb), 0.6)' : '3px solid transparent',
+                        color: isChildActive ? fmb.accent : 'rgba(255,255,255,0.5)',
                         fontSize: '13px', transition: 'all 0.15s',
                       }}
                       onMouseEnter={e => { if (!isChildActive) e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
@@ -262,9 +262,9 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                 padding: sidebarCollapsed ? '11px 0' : '11px 16px',
                 justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
                 cursor: 'pointer',
-                background: isActive ? 'rgba(255,191,105,0.15)' : 'transparent',
-                borderLeft: isActive ? '3px solid #ffd97d' : '3px solid transparent',
-                color: isActive ? fmb.goldAccent : 'rgba(255,255,255,0.65)',
+                background: isActive ? 'rgba(var(--fmb-accent-rgb), 0.15)' : 'transparent',
+                borderLeft: isActive ? '3px solid var(--fmb-accent)' : '3px solid transparent',
+                color: isActive ? fmb.accent : 'rgba(255,255,255,0.65)',
                 fontSize: '14px', transition: 'all 0.2s',
               }}
               onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'rgba(255,255,255,0.07)' }}
@@ -301,7 +301,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         {sidebarCollapsed ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
             <div title={adminUser?.full_name}
-              style={{ width: '32px', height: '32px', borderRadius: '50%', background: fmb.goldAccent, display: 'flex', alignItems: 'center', justifyContent: 'center', color: fmb.gold, fontSize: '13px', fontWeight: 700, cursor: 'default' }}>
+              style={{ width: '32px', height: '32px', borderRadius: '50%', background: fmb.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', color: fmb.primaryActive, fontSize: '13px', fontWeight: 700, cursor: 'default' }}>
               {adminUser?.full_name?.charAt(0).toUpperCase()}
             </div>
             <button onClick={handleLogout} title="Logout"
@@ -312,7 +312,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         ) : (
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: fmb.goldAccent, display: 'flex', alignItems: 'center', justifyContent: 'center', color: fmb.gold, fontSize: '13px', fontWeight: 700, flexShrink: 0 }}>
+              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: fmb.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', color: fmb.primaryActive, fontSize: '13px', fontWeight: 700, flexShrink: 0 }}>
                 {adminUser?.full_name?.charAt(0).toUpperCase()}
               </div>
               <div style={{ overflow: 'hidden' }}>
@@ -346,7 +346,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         .fmb-sidebar-drawer {
           position: fixed; top: 0; left: 0;
           width: 270px; height: 100vh;
-          background: #6b4010; z-index: 1050;
+          background: var(--fmb-ground); z-index: 1050;
           transform: translateX(-100%);
           transition: transform 0.27s cubic-bezier(0.4, 0, 0.2, 1);
           display: flex; flex-direction: column;
@@ -373,7 +373,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       <script dangerouslySetInnerHTML={{ __html: `window.__fmbIsAdmin = ${isAdmin}` }} />
 
       <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bs-tertiary-bg)' }}>
-        <div className="fmb-sidebar-desktop" style={{ width: sidebarCollapsed ? '60px' : '240px', background: fmb.brown, flexDirection: 'column', flexShrink: 0, position: 'fixed', top: 0, left: 0, height: '100vh', zIndex: 100, transition: 'width 0.25s cubic-bezier(0.4,0,0.2,1)', overflow: 'hidden' }}>
+        <div className="fmb-sidebar-desktop" style={{ width: sidebarCollapsed ? '60px' : '240px', background: fmb.ground, flexDirection: 'column', flexShrink: 0, position: 'fixed', top: 0, left: 0, height: '100vh', zIndex: 100, transition: 'width 0.25s cubic-bezier(0.4,0,0.2,1)', overflow: 'hidden' }}>
           <SidebarContent />
         </div>
 
@@ -390,12 +390,12 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
             boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
             position: 'sticky', top: 0, zIndex: 50,
           }}>
-            <button className="fmb-hamburger" onClick={() => setSidebarOpen(true)} style={{ display: 'none', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 8px', borderRadius: '6px', color: fmb.gold }}>
+            <button className="fmb-hamburger" onClick={() => setSidebarOpen(true)} style={{ display: 'none', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 8px', borderRadius: '6px', color: fmb.primary }}>
               <i className="bi bi-list" style={{ fontSize: '24px' }} />
             </button>
 
             <div className="d-lg-none" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '13px', fontWeight: 700, color: fmb.gold, marginLeft: '4px' }}>FMB Portal</span>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: fmb.primary, marginLeft: '4px' }}>FMB Portal</span>
             </div>
 
             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -413,7 +413,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                     color: 'var(--bs-body-color)', fontSize: '13px', transition: 'all 0.15s',
                   }}
                 >
-                  <i className={`bi ${currentOpt.icon}`} style={{ fontSize: '14px', color: fmb.goldAccent }} />
+                  <i className={`bi ${currentOpt.icon}`} style={{ fontSize: '14px', color: fmb.accent }} />
                   <span className="d-none d-sm-inline" style={{ fontSize: '12px', fontWeight: 500 }}>{currentOpt.label}</span>
                   <i className="bi bi-chevron-down" style={{ fontSize: '10px', opacity: 0.5 }} />
                 </button>
@@ -438,9 +438,9 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                           transition: 'background 0.12s',
                         }}
                       >
-                        <i className={`bi ${opt.icon}`} style={{ color: fmb.goldAccent, width: '16px', flexShrink: 0 }} />
+                        <i className={`bi ${opt.icon}`} style={{ color: fmb.accent, width: '16px', flexShrink: 0 }} />
                         <span style={{ flex: 1 }}>{opt.label}</span>
-                        {theme === opt.val && <i className="bi bi-check2" style={{ color: fmb.gold }} />}
+                        {theme === opt.val && <i className="bi bi-check2" style={{ color: fmb.primary }} />}
                       </div>
                     ))}
                   </div>
@@ -460,7 +460,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                   onMouseEnter={e => { if (!showProfileDropdown) e.currentTarget.style.background = 'var(--bs-secondary-bg)' }}
                   onMouseLeave={e => { if (!showProfileDropdown) e.currentTarget.style.background = 'transparent' }}
                 >
-                  <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: fmb.gold, display: 'flex', alignItems: 'center', justifyContent: 'center', color: fmb.goldAccent, fontSize: '13px', fontWeight: 700, flexShrink: 0 }}>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: fmb.primary, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '13px', fontWeight: 700, flexShrink: 0 }}>
                     {adminUser?.full_name?.charAt(0).toUpperCase()}
                   </div>
                   <div className="d-none d-sm-block">

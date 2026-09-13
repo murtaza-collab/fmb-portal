@@ -506,7 +506,7 @@ export default function TakhmeenPage() {
           <h4 className="mb-0 fw-bold" style={{ color: 'var(--bs-body-color)' }}>Takhmeen</h4>
           <p className="mb-0" style={{ fontSize: 13, color: 'var(--bs-secondary-color)' }}>Annual niyyat verification and approval</p>
         </div>
-        <span className="badge" style={{ background: theme.gold, fontSize: 13, padding: '7px 14px' }}>
+        <span className="badge" style={{ background: theme.primary, fontSize: 13, padding: '7px 14px' }}>
           {fyLabel} ★
         </span>
       </div>
@@ -561,7 +561,7 @@ export default function TakhmeenPage() {
                       {verifyList.map((m, i) => (
                         <tr key={m.id}>
                           <td style={{ color:'var(--bs-secondary-color)' }}>{page*PAGE_SIZE+i+1}</td>
-                          <td style={{ fontWeight:600, color:theme.gold }}>{m.sf_no}</td>
+                          <td style={{ fontWeight:600, color:theme.primary }}>{m.sf_no}</td>
                           <td style={{ color:'var(--bs-secondary-color)' }}>{m.its_no||'—'}</td>
                           <td style={{ fontWeight:500, color:'var(--bs-body-color)' }}>{m.full_name}</td>
                           <td style={{ color:'var(--bs-secondary-color)' }}>{(m as any).mumin_categories?.name||'—'}</td>
@@ -600,7 +600,7 @@ export default function TakhmeenPage() {
                       {niyyatList.map((m, i) => (
                         <tr key={m.id}>
                           <td style={{ color:'var(--bs-secondary-color)' }}>{page*PAGE_SIZE+i+1}</td>
-                          <td style={{ fontWeight:600, color:theme.gold }}>{m.sf_no}</td>
+                          <td style={{ fontWeight:600, color:theme.primary }}>{m.sf_no}</td>
                           <td style={{ color:'var(--bs-secondary-color)' }}>{m.its_no||'—'}</td>
                           <td style={{ fontWeight:500, color:'var(--bs-body-color)' }}>{m.full_name}</td>
                           <td>{(m as any).house_sectors?.name||'—'}</td>
@@ -631,9 +631,9 @@ export default function TakhmeenPage() {
               <button key={key} onClick={() => { setApprovalSubTab(key as any); setPage(0) }}
                 style={{
                   border:'none', background:'none', padding:'8px 16px', fontSize:12.5, cursor:'pointer',
-                  color: approvalSubTab===key ? theme.gold : 'var(--bs-secondary-color)',
+                  color: approvalSubTab===key ? theme.primary : 'var(--bs-secondary-color)',
                   fontWeight: approvalSubTab===key ? 600 : 400,
-                  borderBottom: approvalSubTab===key ? '2px solid #d4a032' : '2px solid transparent',
+                  borderBottom: approvalSubTab===key ? '2px solid var(--fmb-primary)' : '2px solid transparent',
                   marginBottom: -1,
                 }}>{label}</button>
             ))}
@@ -662,9 +662,9 @@ export default function TakhmeenPage() {
                           {approvalList.map((item, i) => (
                             <tr key={item.id}>
                               <td style={{ color:'var(--bs-secondary-color)' }}>{page*PAGE_SIZE+i+1}</td>
-                              <td style={{ fontWeight:600, color:theme.gold }}>{(item.mumineen as any)?.sf_no||'—'}</td>
+                              <td style={{ fontWeight:600, color:theme.primary }}>{(item.mumineen as any)?.sf_no||'—'}</td>
                               <td style={{ fontWeight:500, color:'var(--bs-body-color)' }}>{(item.mumineen as any)?.full_name||'—'}</td>
-                              <td style={{ fontWeight:700, color:theme.gold, fontSize:14 }}>{fmtAmount(item.niyyat_amount)}</td>
+                              <td style={{ fontWeight:700, color:theme.primary, fontSize:14 }}>{fmtAmount(item.niyyat_amount)}</td>
                               <td style={{ maxWidth:200, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', color:'var(--bs-secondary-color)' }}>{item.remarks||'—'}</td>
                               <td>
                                 <button className="btn btn-sm btn-success" style={{ fontSize:11 }} onClick={() => openApprovalModal(item)}>
@@ -690,7 +690,7 @@ export default function TakhmeenPage() {
                           {approvedList.map((item, i) => (
                             <tr key={item.id}>
                               <td style={{ color:'var(--bs-secondary-color)' }}>{page*PAGE_SIZE+i+1}</td>
-                              <td style={{ fontWeight:600, color:theme.gold }}>{(item.mumineen as any)?.sf_no||'—'}</td>
+                              <td style={{ fontWeight:600, color:theme.primary }}>{(item.mumineen as any)?.sf_no||'—'}</td>
                               <td style={{ fontWeight:500, color:'var(--bs-body-color)' }}>{(item.mumineen as any)?.full_name||'—'}</td>
                               <td style={{ color:'var(--bs-secondary-color)' }}>{fmtAmount(item.niyyat_amount)}</td>
                               <td style={{ fontWeight:700, color:theme.success, fontSize:14 }}>{fmtAmount(item.approved_amount)}</td>
@@ -832,7 +832,7 @@ export default function TakhmeenPage() {
                         {importRows.slice(0, 100).map((row, i) => (
                           <tr key={i}>
                             <td style={{ color:'var(--bs-secondary-color)' }}>{i+1}</td>
-                            <td style={{ fontWeight:600, color:theme.gold }}>{row.sf_no}</td>
+                            <td style={{ fontWeight:600, color:theme.primary }}>{row.sf_no}</td>
                             {importYears.map(y => (
                               <td key={y} style={{ color: row.amounts[y] ? 'var(--bs-body-color)' : 'var(--bs-secondary-color)' }}>
                                 {row.amounts[y] ? `Rs. ${Number(row.amounts[y]).toLocaleString()}` : '—'}
@@ -920,7 +920,7 @@ export default function TakhmeenPage() {
                 <div className="p-3 mb-4 rounded" style={{ background:'var(--bs-secondary-bg)', border:'1px solid var(--bs-border-color)' }}>
                   <p style={sectionLabel}>HOF Information</p>
                   <div className="row g-3">
-                    <div className="col-3"><div style={metaLabel}>SF#</div><div style={{ ...metaValue, color:theme.gold, fontWeight:700 }}>{verifyingMumin.sf_no}</div></div>
+                    <div className="col-3"><div style={metaLabel}>SF#</div><div style={{ ...metaValue, color:theme.primary, fontWeight:700 }}>{verifyingMumin.sf_no}</div></div>
                     <div className="col-3"><div style={metaLabel}>ITS#</div><div style={metaValue}>{verifyingMumin.its_no||'—'}</div></div>
                     <div className="col-3"><div style={metaLabel}>Category</div><div style={metaValue}>{(verifyingMumin as any).mumin_categories?.name||'—'}</div></div>
                     <div className="col-3"><div style={metaLabel}>Sector</div><div style={metaValue}>{(verifyingMumin as any).house_sectors?.name||'—'}</div></div>
@@ -928,7 +928,7 @@ export default function TakhmeenPage() {
                       <div style={metaLabel}>Thaali #</div>
                       <div>
                         {verifyThaali?.thaali_number
-                          ? <span className="badge" style={{ background:theme.gold, color:'#fff', fontSize:12 }}>#{verifyThaali.thaali_number}</span>
+                          ? <span className="badge" style={{ background:theme.primary, color:'#fff', fontSize:12 }}>#{verifyThaali.thaali_number}</span>
                           : <span style={{ ...metaValue, color:'var(--bs-secondary-color)' }}>Not assigned</span>}
                       </div>
                     </div>
@@ -1000,7 +1000,7 @@ export default function TakhmeenPage() {
                   </div>
                   <div className="col-12">
                     <label style={labelStyle}>Address Preview</label>
-                    <div style={{ background:'var(--bs-secondary-bg)', borderRadius:6, padding:'8px 12px', fontSize:13, minHeight:36, borderLeft:`3px solid ${verifyAddrPreview?theme.goldAccent:'var(--bs-border-color)'}`, color: verifyAddrPreview?theme.gold:'var(--bs-secondary-color)' }}>
+                    <div style={{ background:'var(--bs-secondary-bg)', borderRadius:6, padding:'8px 12px', fontSize:13, minHeight:36, borderLeft:`3px solid ${verifyAddrPreview?theme.accent:'var(--bs-border-color)'}`, color: verifyAddrPreview?theme.primary:'var(--bs-secondary-color)' }}>
                       {verifyAddrPreview || 'Fill fields above to preview…'}
                     </div>
                   </div>
@@ -1036,7 +1036,7 @@ export default function TakhmeenPage() {
                 {/* Mumin info */}
                 <div className="p-3 mb-3 rounded" style={{ background:'var(--bs-secondary-bg)', border:'1px solid var(--bs-border-color)' }}>
                   <div className="row g-2">
-                    <div className="col-3"><div style={metaLabel}>SF#</div><div style={{ ...metaValue, color:theme.gold, fontWeight:700 }}>{niyyatMumin.sf_no}</div></div>
+                    <div className="col-3"><div style={metaLabel}>SF#</div><div style={{ ...metaValue, color:theme.primary, fontWeight:700 }}>{niyyatMumin.sf_no}</div></div>
                     <div className="col-3"><div style={metaLabel}>ITS#</div><div style={metaValue}>{niyyatMumin.its_no||'—'}</div></div>
                     <div className="col-3"><div style={metaLabel}>WhatsApp</div><div style={metaValue}>{niyyatMumin.whatsapp_no||'—'}</div></div>
                     <div className="col-3"><div style={metaLabel}>Sector</div><div style={metaValue}>{(niyyatMumin as any).house_sectors?.name||'—'}</div></div>
@@ -1105,7 +1105,7 @@ export default function TakhmeenPage() {
                                 {log.action==='entered'?'First Entry':'Revised'}
                               </span>
                             </td>
-                            <td style={{ fontWeight:600, color:theme.gold }}>{fmtAmount(log.niyyat_amount)}</td>
+                            <td style={{ fontWeight:600, color:theme.primary }}>{fmtAmount(log.niyyat_amount)}</td>
                             <td style={{ color:'var(--bs-secondary-color)' }}>{log.remarks||'—'}</td>
                           </tr>
                         ))}
@@ -1163,7 +1163,7 @@ export default function TakhmeenPage() {
                   <div className="col-md-8">
                     <div className="p-3 rounded h-100" style={{ background:'var(--bs-secondary-bg)', border:'1px solid var(--bs-border-color)' }}>
                       <div className="row g-2">
-                        <div className="col-4"><div style={metaLabel}>SF#</div><div style={{ ...metaValue, color:theme.gold, fontWeight:700 }}>{(approvingItem.mumineen as any)?.sf_no||'—'}</div></div>
+                        <div className="col-4"><div style={metaLabel}>SF#</div><div style={{ ...metaValue, color:theme.primary, fontWeight:700 }}>{(approvingItem.mumineen as any)?.sf_no||'—'}</div></div>
                         <div className="col-4"><div style={metaLabel}>ITS#</div><div style={metaValue}>{(approvingItem.mumineen as any)?.its_no||'—'}</div></div>
                         <div className="col-4"><div style={metaLabel}>Sector</div><div style={metaValue}>{(approvingItem.mumineen as any)?.house_sectors?.name||'—'}</div></div>
                         <div className="col-6"><div style={metaLabel}>WhatsApp</div><div style={metaValue}>{(approvingItem.mumineen as any)?.whatsapp_no||'—'}</div></div>
@@ -1172,9 +1172,9 @@ export default function TakhmeenPage() {
                     </div>
                   </div>
                   <div className="col-md-4">
-                    <div className="p-3 rounded h-100 text-center d-flex flex-column justify-content-center" style={{ background:theme.gold, border:'1px solid #d4a032' }}>
+                    <div className="p-3 rounded h-100 text-center d-flex flex-column justify-content-center" style={{ background:theme.primary, border:'1px solid var(--fmb-primary)' }}>
                       <div style={{ fontSize:11, color:'rgba(255,255,255,0.7)', marginBottom:4, textTransform:'uppercase', letterSpacing:'0.5px' }}>Niyyat Amount</div>
-                      <div style={{ fontSize:26, fontWeight:800, color:theme.goldAccent }}>{fmtAmount(approvingItem.niyyat_amount)}</div>
+                      <div style={{ fontSize:26, fontWeight:800, color:theme.accent }}>{fmtAmount(approvingItem.niyyat_amount)}</div>
                       <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)', marginTop:4 }}>{fyLabel}</div>
                     </div>
                   </div>
@@ -1202,7 +1202,7 @@ export default function TakhmeenPage() {
                                 {log.action==='entered'?'First Entry':log.action==='approved_edit'?'Admin Edit':'Revised'}
                               </span>
                             </td>
-                            <td style={{ fontWeight:600, color:theme.gold }}>{fmtAmount(log.niyyat_amount)}</td>
+                            <td style={{ fontWeight:600, color:theme.primary }}>{fmtAmount(log.niyyat_amount)}</td>
                             <td style={{ color:'var(--bs-secondary-color)' }}>{log.remarks||'—'}</td>
                           </tr>
                         ))}

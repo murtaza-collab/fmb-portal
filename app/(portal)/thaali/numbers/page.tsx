@@ -83,7 +83,7 @@ export default function ThaaliNumbersPage() {
                   {filtered.map((t, i) => (
                     <tr key={t.id}>
                       <td style={{ fontSize: '13px', color: theme.muted }}>{i + 1}</td>
-                      <td style={{ fontWeight: 700, fontSize: '15px', color: theme.gold }}>#{t.thaali_number}</td>
+                      <td style={{ fontWeight: 700, fontSize: '15px', color: theme.primary }}>#{t.thaali_number}</td>
                       <td>
                         <button className="btn btn-sm btn-outline-primary" style={{ fontSize: '12px' }} onClick={() => openEdit(t)}>Edit</button>
                       </td>

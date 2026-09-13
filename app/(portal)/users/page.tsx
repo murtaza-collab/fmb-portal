@@ -256,7 +256,7 @@ export default function UsersPage() {
       {/* Stats */}
       <div className="row g-3 mb-4">
         {[
-          { label: 'Total Users', value: users.length, color: '#d4a032' },
+          { label: 'Total Users', value: users.length, color: 'var(--fmb-primary)' },
           { label: 'Active', value: users.filter(u => u.status === 'active').length, color: '#0ab39c' },
           { label: 'User Groups', value: groups.length, color: '#f7b84b' },
         ].map((s, i) => (
@@ -484,7 +484,7 @@ export default function UsersPage() {
                           <th key={k} style={{ textAlign: 'center', cursor: 'pointer' }}
                             onClick={() => toggleAllPermission(k)}>
                             {PERM_LABELS[k]}
-                            <div style={{ fontSize: '10px', color: theme.goldDeep }}>all</div>
+                            <div style={{ fontSize: '10px', color: theme.primaryDeep }}>all</div>
                           </th>
                         ))}
                         <th style={{ textAlign: 'center' }}>

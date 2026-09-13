@@ -170,7 +170,7 @@ export default function CustomizationsPage() {
       {/* Stats */}
       <div className="row g-3 mb-4">
         {[
-          { label: 'Total Requests', value: filtered.length, color: '#d4a032' },
+          { label: 'Total Requests', value: filtered.length, color: 'var(--fmb-primary)' },
           { label: 'Customized',     value: customCount,     color: '#299cdb' },
           { label: 'Stop Thaali',    value: stopCount,       color: '#dc3545' },
         ].map((s, i) => (
@@ -274,7 +274,7 @@ export default function CustomizationsPage() {
                             background: r.stop_thaali ? 'rgba(220,53,69,0.03)' : 'var(--bs-body-bg)',
                           }}
                         >
-                          <td style={{ padding: '10px 12px', fontWeight: 700, color: theme.gold }}>
+                          <td style={{ padding: '10px 12px', fontWeight: 700, color: theme.primary }}>
                             #{r.thaali_number}
                           </td>
                           <td style={{ padding: '10px 12px' }}>

@@ -306,7 +306,7 @@ export default function AddressRequestsPage() {
           { label: 'Pending',  value: counts.pending,  color: '#856404' },
           { label: 'Approved', value: counts.approved, color: '#0ab39c' },
           { label: 'Rejected', value: counts.rejected, color: '#dc3545' },
-          { label: 'Total',    value: requests.length, color: '#d4a032' },
+          { label: 'Total',    value: requests.length, color: 'var(--fmb-primary)' },
         ].map((s, i) => (
           <div key={i} className="col-6 col-md-3">
             <div className="card" style={{ border: 'none', boxShadow: '0 1px 4px rgba(0,0,0,0.08)', borderRadius: '10px', background: 'var(--bs-body-bg)' }}>
@@ -340,8 +340,8 @@ export default function AddressRequestsPage() {
                   className="btn btn-sm"
                   style={{
                     borderRadius: 20, fontSize: '12px', padding: '3px 12px',
-                    border: `1.5px solid ${statusFilter === s ? theme.gold : 'var(--bs-border-color)'}`,
-                    background: statusFilter === s ? theme.gold : 'transparent',
+                    border: `1.5px solid ${statusFilter === s ? theme.primary : 'var(--bs-border-color)'}`,
+                    background: statusFilter === s ? theme.primary : 'transparent',
                     color: statusFilter === s ? '#fff' : 'var(--bs-secondary-color)',
                     fontWeight: statusFilter === s ? 600 : 400,
                   }}
@@ -388,7 +388,7 @@ export default function AddressRequestsPage() {
                           {r.mumin?.full_name || `Mumin #${r.mumin_id}`}
                         </td>
                         <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>
-                          <div style={{ color: theme.gold, fontWeight: 600, fontSize: 12 }}>{r.mumin?.sf_no || '—'}</div>
+                          <div style={{ color: theme.primary, fontWeight: 600, fontSize: 12 }}>{r.mumin?.sf_no || '—'}</div>
                           <div style={{ color: 'var(--bs-secondary-color)', fontSize: 11 }}>{r.mumin?.its_no || '—'}</div>
                         </td>
                         <td style={{ padding: '10px 12px', verticalAlign: 'middle', maxWidth: 160 }}>
@@ -635,8 +635,8 @@ export default function AddressRequestsPage() {
                     <div style={{
                       background: 'var(--bs-secondary-bg)', borderRadius: 6, padding: '8px 12px',
                       fontSize: 13, minHeight: 36,
-                      color: approvalPreview ? theme.gold : 'var(--bs-secondary-color)',
-                      borderLeft: `3px solid ${approvalPreview ? theme.goldAccent : 'var(--bs-border-color)'}`,
+                      color: approvalPreview ? theme.primary : 'var(--bs-secondary-color)',
+                      borderLeft: `3px solid ${approvalPreview ? theme.accent : 'var(--bs-border-color)'}`,
                     }}>
                       {approvalPreview || 'Fill in fields above to preview…'}
                     </div>
@@ -649,7 +649,7 @@ export default function AddressRequestsPage() {
                       <div className="col-12">
                         <div className="p-3 rounded" style={{ background: 'var(--bs-tertiary-bg)', border: '1px solid var(--bs-border-color)' }}>
                           <div style={{ fontSize: 11, color: 'var(--bs-secondary-color)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 }}>
-                            <i className="bi bi-truck me-2" style={{ color: theme.gold }} />
+                            <i className="bi bi-truck me-2" style={{ color: theme.primary }} />
                             Distributor — {getSector(Number(approvalForm.address_sector_id))}
                           </div>
                           {sds.length === 0 ? (

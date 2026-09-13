@@ -1,27 +1,46 @@
 'use client'
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useState } from 'react'
+import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { theme } from '@/lib/theme'
+import AuthShell from '@/components/AuthShell'
 
 export default function LoginPage() {
+  // useSearchParams needs a Suspense boundary to keep this page prerenderable.
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
+  )
+}
+
+function LoginForm() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [submitError, setSubmitError] = useState('')
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // The portal layout bounces deactivated users here as /login?error=inactive.
+  // Derived rather than stored, so it survives a re-render without an effect.
+  const error = submitError || (searchParams.get('error') === 'inactive'
+    ? 'Your account has been deactivated. Please contact admin.'
+    : '')
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    setError('')
+    setSubmitError('')
 
     const email = `${username.toLowerCase().trim()}@fmb.internal`
 
     const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
 
     if (authError) {
-      setError('Invalid username or password')
+      setSubmitError('Invalid username or password')
       setLoading(false)
       return
     }
@@ -34,7 +53,7 @@ export default function LoginPage() {
 
     if (!adminData || adminData.status !== 'active') {
       await supabase.auth.signOut()
-      setError('Your account has been deactivated. Please contact admin.')
+      setSubmitError('Your account has been deactivated. Please contact admin.')
       setLoading(false)
       return
     }
@@ -43,99 +62,77 @@ export default function LoginPage() {
   }
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(to bottom, #d4a032, #233044)',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '2rem 1rem',
-    }}>
-      <div style={{ width: '100%', maxWidth: 440, marginLeft: 'auto', marginRight: 'auto' }}>
+    <AuthShell title="Welcome back" subtitle="Sign in to continue">
+      {error && (
+        <div className="alert alert-danger d-flex align-items-start gap-2 py-2 px-3"
+          role="alert" aria-live="polite"
+          style={{ fontSize: theme.text.base, borderRadius: theme.radius }}>
+          <i className="bi bi-exclamation-triangle-fill" style={{ lineHeight: 1.5 }} />
+          <span>{error}</span>
+        </div>
+      )}
 
-        {/* Logo + title */}
-        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '1.5rem' }}>
-          <img
-            src="/fmb-logo-2-2.svg"
-            alt="FMB"
-            style={{ height: 90, marginBottom: 20, filter: 'brightness(0) invert(1)' }}
+      <form onSubmit={handleLogin}>
+        <div className="mb-3">
+          <label htmlFor="username" className="form-label fw-semibold" style={{ fontSize: theme.text.base }}>
+            Username
+          </label>
+          <input
+            id="username"
+            type="text"
+            className="form-control"
+            placeholder="Enter username"
+            value={username}
+            onChange={e => setUsername(e.target.value)}
+            autoComplete="username"
+            autoFocus
+            required
           />
-          <h3 className="text-white fw-bold mb-1">Faiz Ul Mawaid Il Burhaniyah</h3>
-          <p style={{ color: 'rgba(255,255,255,0.5)', marginBottom: 0 }}>FMB Portal</p>
         </div>
 
-        {/* Card */}
-        <div className="card border-0 shadow-lg" style={{ borderRadius: 16 }}>
-          <div className="card-body p-4 p-md-5">
-
-            <div className="text-center mb-4">
-              <h5 className="fw-bold mb-1" style={{ color: theme.gold }}>Welcome</h5>
-              <p className="text-muted mb-0" style={{ fontSize: '0.9rem' }}>Sign in to continue</p>
-            </div>
-
-            {error && (
-              <div className="alert alert-danger py-2" style={{ fontSize: '0.9rem' }}>
-                <i className="bi bi-exclamation-triangle me-2"></i>{error}
-              </div>
-            )}
-
-            <form onSubmit={handleLogin}>
-              <div className="mb-3">
-                <label className="form-label fw-semibold" style={{ fontSize: '0.9rem' }}>
-                  Username
-                </label>
-                <input
-                  type="text"
-                  className="form-control form-control-lg"
-                  placeholder="Enter username"
-                  value={username}
-                  onChange={e => setUsername(e.target.value)}
-                  autoComplete="username"
-                  autoFocus
-                  required
-                />
-              </div>
-
-              <div className="mb-4">
-                <label className="form-label fw-semibold" style={{ fontSize: '0.9rem' }}>
-                  Password
-                </label>
-                <input
-                  type="password"
-                  className="form-control form-control-lg"
-                  placeholder="Enter password"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  autoComplete="current-password"
-                  required
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="btn btn-lg w-100 fw-bold text-white"
-                style={{ background: theme.gold, border: 'none', borderRadius: 8 }}
-                disabled={loading}
-              >
-                {loading
-                  ? <><span className="spinner-border spinner-border-sm me-2"></span>Signing in…</>
-                  : 'Sign In'
-                }
-              </button>
-            </form>
-
+        <div className="mb-2">
+          <label htmlFor="password" className="form-label fw-semibold" style={{ fontSize: theme.text.base }}>
+            Password
+          </label>
+          <div className="input-group">
+            <input
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              className="form-control"
+              placeholder="Enter password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              autoComplete="current-password"
+              required
+            />
+            <button
+              type="button"
+              className="btn"
+              onClick={() => setShowPassword(v => !v)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              tabIndex={-1}
+            >
+              <i className={`bi ${showPassword ? 'bi-eye-slash' : 'bi-eye'}`} />
+            </button>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="text-center mt-4">
-          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.82rem', marginBottom: 0 }}>
-            Faiz ul Mawaid il Burhaniyah © {new Date().getFullYear()}
-          </p>
+        <div className="text-end mb-4">
+          <Link href="/forgot-password" className="fmb-auth-link">Forgot password?</Link>
         </div>
 
-      </div>
-    </div>
+        <button
+          type="submit"
+          className="btn btn-primary w-100 fw-bold text-white"
+          style={{ fontSize: theme.text.md, padding: '0.6rem', borderRadius: theme.radius }}
+          disabled={loading}
+        >
+          {loading
+            ? <><span className="spinner-border spinner-border-sm me-2" aria-hidden="true" />Signing in…</>
+            : 'Sign In'
+          }
+        </button>
+      </form>
+    </AuthShell>
   )
 }

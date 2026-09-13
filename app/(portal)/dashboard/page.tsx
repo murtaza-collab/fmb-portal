@@ -179,7 +179,7 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
 
   if (loading) return (
     <div className="d-flex justify-content-center align-items-center" style={{ minHeight:'60vh' }}>
-      <div className="spinner-border" style={{ color:theme.gold }} />
+      <div className="spinner-border" style={{ color:theme.primary }} />
     </div>
   )
 
@@ -198,12 +198,12 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
     { label:'Yet to Arrive', value:kitchenStats.yetToArrive,  color:'#6c757d', bg:'#6c757d18', icon:'bi-hourglass' },
     { label:'Arrived',       value:kitchenStats.arrived,      color:'#299cdb', bg:'#299cdb18', icon:'bi-person-check' },
     { label:'Filling',       value:kitchenStats.inProgress + kitchenStats.counterBDone + kitchenStats.counterCDone,
-                                                              color:'#ffd97d', bg:'#ffd97d18', icon:'bi-cup-hot',
+                                                              color:'var(--fmb-accent)', bg:'var(--fmb-accent)18', icon:'bi-cup-hot',
                                                               sub:`${kitchenStats.totalThaalisInProcess} thaalis` },
     { label:'Ready',         value:kitchenStats.counterBDone + kitchenStats.counterCDone,
                                                               color:'#0ab39c', bg:'#0ab39c18', icon:'bi-check2-circle',
                                                               sub:`${kitchenStats.totalThaalisReady} thaalis` },
-    { label:'Dispatched',    value:kitchenStats.dispatched,   color:'#d4a032', bg:'#d4a03218', icon:'bi-truck',
+    { label:'Dispatched',    value:kitchenStats.dispatched,   color:'var(--fmb-primary)', bg:'var(--fmb-primary)18', icon:'bi-truck',
                                                               sub:`${kitchenStats.totalThaalisDispatched} thaalis` },
   ]
 
@@ -219,7 +219,7 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
         </div>
         <div className="d-flex gap-2">
           <button onClick={() => router.push('/kitchen')} className="btn btn-sm"
-            style={{ background:theme.gold, color:'#fff', borderRadius:8, fontSize:13, fontWeight:600 }}>
+            style={{ background:theme.primary, color:'#fff', borderRadius:8, fontSize:13, fontWeight:600 }}>
             <i className="bi bi-grid-3x3-gap me-1" />Kitchen Portal
           </button>
           <button onClick={fetchStats} className="btn btn-sm btn-outline-secondary" style={{ borderRadius:8, fontSize:13 }}>
@@ -238,13 +238,13 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
               <div className="d-flex justify-content-between align-items-start">
                 <div>
                   <p style={{ fontSize:11, textTransform:'uppercase', letterSpacing:'0.6px', fontWeight:600, color:'var(--bs-secondary-color)', marginBottom:4 }}>Active HOFs</p>
-                  <h3 className="mb-0 fw-bold" style={{ color:theme.gold, fontSize:28 }}>{stats.activeHOFs}</h3>
+                  <h3 className="mb-0 fw-bold" style={{ color:theme.primary, fontSize:28 }}>{stats.activeHOFs}</h3>
                   <p style={{ fontSize:12, color:'var(--bs-secondary-color)', marginTop:4, marginBottom:0 }}>
                     {stats.totalMumineen} total mumineen (incl. members)
                   </p>
                 </div>
-                <div style={{ width:44, height:44, borderRadius:10, background:'#d4a03218', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                  <i className="bi bi-house-fill" style={{ fontSize:20, color:theme.gold }} />
+                <div style={{ width:44, height:44, borderRadius:10, background:'var(--fmb-primary)18', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                  <i className="bi bi-house-fill" style={{ fontSize:20, color:theme.primary }} />
                 </div>
               </div>
             </div>
@@ -287,7 +287,7 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
                     </>
                   ) : todaySchedule.thaali_enabled ? (
                     <>
-                      <h3 className="mb-0 fw-bold" style={{ color:theme.goldAccent, fontSize:28 }}>{todaySchedule.total_thaalis}</h3>
+                      <h3 className="mb-0 fw-bold" style={{ color:theme.accent, fontSize:28 }}>{todaySchedule.total_thaalis}</h3>
                       <p style={{ fontSize:12, color:'var(--bs-secondary-color)', marginTop:4, marginBottom:0 }} className="text-truncate">
                         {todaySchedule.event_name || 'Regular day'}
                       </p>
@@ -301,8 +301,8 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
                     </>
                   )}
                 </div>
-                <div style={{ width:44, height:44, borderRadius:10, background:'#ffd97d18', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                  <i className={`bi ${todaySchedule?.thaali_enabled === false ? 'bi-x-circle' : 'bi-calendar-check'}`} style={{ fontSize:20, color:theme.goldAccent }} />
+                <div style={{ width:44, height:44, borderRadius:10, background:'var(--fmb-accent)18', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                  <i className={`bi ${todaySchedule?.thaali_enabled === false ? 'bi-x-circle' : 'bi-calendar-check'}`} style={{ fontSize:20, color:theme.accent }} />
                 </div>
               </div>
             </div>
@@ -327,7 +327,7 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
                       </span>
                     )}
                     {stats.pendingTakhmeem > 0 && (
-                      <span className="badge" style={{ background:'#d4a03222', color:theme.gold, fontSize:10 }}>
+                      <span className="badge" style={{ background:'var(--fmb-primary)22', color:theme.primary, fontSize:10 }}>
                         {stats.pendingTakhmeem} niyyat
                       </span>
                     )}
@@ -348,7 +348,7 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
       {/* Info strip */}
       <div className="d-flex gap-3 mb-4 flex-wrap">
         <div style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 14px', background:'var(--bs-tertiary-bg)', borderRadius:20, border:'1px solid var(--bs-border-color)', fontSize:12 }}>
-          <i className="bi bi-map-fill" style={{ color:theme.goldAccent, fontSize:14 }} />
+          <i className="bi bi-map-fill" style={{ color:theme.accent, fontSize:14 }} />
           <span style={{ color:'var(--bs-secondary-color)' }}>Sectors:</span>
           <strong style={{ color:'var(--bs-body-color)' }}>{stats.activeSectors} active</strong>
         </div>
@@ -362,14 +362,14 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
       {/* Rollover urgent banner */}
       {(rolloverOverdue || rolloverUrgent) && !rolloverDone && (
         <div className="mb-4" style={{
-          background: rolloverOverdue ? '#e6394610' : '#ffd97d15',
-          border:`1px solid ${rolloverOverdue ? '#e63946' : theme.goldAccent}`,
+          background: rolloverOverdue ? '#e6394610' : 'var(--fmb-accent)15',
+          border:`1px solid ${rolloverOverdue ? '#e63946' : theme.accent}`,
           borderRadius:12, padding:'14px 18px',
           display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, flexWrap:'wrap'
         }}>
           <div className="d-flex align-items-center gap-3">
             <i className={`bi ${rolloverOverdue ? 'bi-exclamation-circle-fill' : 'bi-bell-fill'}`}
-              style={{ fontSize:22, color: rolloverOverdue ? '#e63946' : theme.goldAccent }} />
+              style={{ fontSize:22, color: rolloverOverdue ? '#e63946' : theme.accent }} />
             <div>
               <div style={{ fontWeight:700, fontSize:14, color: rolloverOverdue ? '#e63946' : '#856404' }}>
                 {rolloverOverdue ? 'Rollover Required — Today is 1 Ramadan!' : `Ramadan in ${daysToRamadan} days — Rollover due soon`}
@@ -380,7 +380,7 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
             </div>
           </div>
           <button onClick={() => setShowRolloverConfirm(true)} className="btn btn-sm"
-            style={{ background: rolloverOverdue ? '#e63946' : theme.goldAccent, color: rolloverOverdue ? '#fff' : '#212529', borderRadius:8, fontWeight:600, fontSize:13, whiteSpace:'nowrap' }}>
+            style={{ background: rolloverOverdue ? '#e63946' : theme.accent, color: rolloverOverdue ? '#fff' : '#212529', borderRadius:8, fontWeight:600, fontSize:13, whiteSpace:'nowrap' }}>
             <i className="bi bi-arrow-repeat me-1" />Rollover Now
           </button>
         </div>
@@ -392,8 +392,8 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
           <div className="card h-100" style={{ borderRadius:12, border:'none', boxShadow:'0 1px 6px rgba(0,0,0,0.07)' }}>
             <div className="card-body p-3">
               <div className="d-flex align-items-center gap-2 mb-3">
-                <div style={{ width:32, height:32, borderRadius:8, background:'#d4a03218', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                  <i className="bi bi-grid-3x3-gap" style={{ color:theme.gold, fontSize:16 }} />
+                <div style={{ width:32, height:32, borderRadius:8, background:'var(--fmb-primary)18', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                  <i className="bi bi-grid-3x3-gap" style={{ color:theme.primary, fontSize:16 }} />
                 </div>
                 <div>
                   <h6 className="mb-0 fw-bold">Kitchen Operations</h6>
@@ -416,9 +416,9 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
                 <span style={{ fontSize:11, color:'var(--bs-secondary-color)', fontWeight:600, display:'flex', alignItems:'center' }}>Quick access:</span>
                 {[
                   { label:'Arrival',   href:'/kitchen',           icon:'bi-qr-code-scan',  color:'#299cdb' },
-                  { label:'Counter B', href:'/kitchen/counter-b', icon:'bi-upc-scan',       color:'#ffd97d' },
+                  { label:'Counter B', href:'/kitchen/counter-b', icon:'bi-upc-scan',       color:'var(--fmb-accent)' },
                   { label:'Counter C', href:'/kitchen/counter-c', icon:'bi-check2-square',  color:'#0ab39c' },
-                  { label:'Dispatch',  href:'/kitchen/dispatch',  icon:'bi-truck',           color:'#d4a032' },
+                  { label:'Dispatch',  href:'/kitchen/dispatch',  icon:'bi-truck',           color:'var(--fmb-primary)' },
                 ].map((link, i) => (
                   <button key={i} onClick={() => router.push(link.href)} className="btn btn-sm"
                     style={{ background:link.color+'15', color:link.color, border:`1px solid ${link.color}33`, borderRadius:7, fontSize:12, fontWeight:600, padding:'4px 10px' }}>
@@ -435,8 +435,8 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
           <div className="card h-100" style={{ borderRadius:12, border:'none', boxShadow:'0 1px 6px rgba(0,0,0,0.07)' }}>
             <div className="card-body p-3">
               <div className="d-flex align-items-center gap-2 mb-2">
-                <div style={{ width:32, height:32, borderRadius:8, background:'#ffd97d18', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                  <i className="bi bi-calendar3" style={{ color:theme.goldAccent, fontSize:16 }} />
+                <div style={{ width:32, height:32, borderRadius:8, background:'var(--fmb-accent)18', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                  <i className="bi bi-calendar3" style={{ color:theme.accent, fontSize:16 }} />
                 </div>
                 <div>
                   <h6 className="mb-0 fw-bold">Today's Menu</h6>
@@ -445,7 +445,7 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
                   </p>
                 </div>
                 <button onClick={() => router.push('/calendar')} className="btn btn-sm ms-auto"
-                  style={{ background:'#ffd97d18', color:theme.goldAccent, border:'none', borderRadius:7, fontSize:11, fontWeight:600 }}>
+                  style={{ background:'var(--fmb-accent)18', color:theme.accent, border:'none', borderRadius:7, fontSize:11, fontWeight:600 }}>
                   Edit
                 </button>
               </div>
@@ -494,7 +494,7 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
                   <i className="bi bi-calendar-x" style={{ fontSize:24, display:'block', marginBottom:6, opacity:0.4 }} />
                   <p style={{ fontSize:12, margin:0 }}>No menu published</p>
                   <button onClick={() => router.push('/calendar')} className="btn btn-sm mt-2"
-                    style={{ background:'#ffd97d18', color:theme.goldAccent, border:'none', fontSize:11, borderRadius:7 }}>
+                    style={{ background:'var(--fmb-accent)18', color:theme.accent, border:'none', fontSize:11, borderRadius:7 }}>
                     Add menu
                   </button>
                 </div>
@@ -510,8 +510,8 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
           <div className="card" style={{ borderRadius:12, border:'none', boxShadow:'0 1px 6px rgba(0,0,0,0.07)' }}>
             <div className="card-body p-3">
               <div className="d-flex align-items-center gap-2 mb-3">
-                <div style={{ width:32, height:32, borderRadius:8, background:'#d4a03218', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                  <i className="bi bi-moon-stars" style={{ color:theme.gold, fontSize:16 }} />
+                <div style={{ width:32, height:32, borderRadius:8, background:'var(--fmb-primary)18', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                  <i className="bi bi-moon-stars" style={{ color:theme.primary, fontSize:16 }} />
                 </div>
                 <div>
                   <h6 className="mb-0 fw-bold">Fiscal Year (Hijri)</h6>
@@ -520,20 +520,20 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
               </div>
               <div className="row g-3">
                 <div className="col-md-4">
-                  <div style={{ background:'#d4a03210', borderRadius:10, padding:14, border:'1px solid #d4a03225' }}>
-                    <div style={{ fontSize:11, fontWeight:700, color:theme.gold, textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:6 }}>Current FY</div>
-                    <div style={{ fontSize:18, fontWeight:800, color:theme.gold }}>{currentFY.hijriYear}H</div>
+                  <div style={{ background:'var(--fmb-primary)10', borderRadius:10, padding:14, border:'1px solid var(--fmb-primary)25' }}>
+                    <div style={{ fontSize:11, fontWeight:700, color:theme.primary, textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:6 }}>Current FY</div>
+                    <div style={{ fontSize:18, fontWeight:800, color:theme.primary }}>{currentFY.hijriYear}H</div>
                     <div style={{ fontSize:12, color:'var(--bs-secondary-color)', marginTop:4 }}>{fmtDateShort(currentFY.startGregorian)} → {fmtDateShort(currentFY.endGregorian)}</div>
                     <div style={{ fontSize:11, color:theme.success, marginTop:4, fontWeight:600 }}>1 Ramadan {currentFY.hijriYear}H</div>
                     {rolloverDone && <div style={{ marginTop:8, fontSize:11, color:theme.success, fontWeight:600 }}><i className="bi bi-check-circle-fill me-1" />Rollover done</div>}
                   </div>
                 </div>
                 <div className="col-md-4">
-                  <div style={{ background:'#ffd97d10', borderRadius:10, padding:14, border:'1px solid #ffd97d30' }}>
+                  <div style={{ background:'var(--fmb-accent)10', borderRadius:10, padding:14, border:'1px solid var(--fmb-accent)30' }}>
                     <div style={{ fontSize:11, fontWeight:700, color:'#856404', textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:6 }}>Next FY</div>
                     <div style={{ fontSize:18, fontWeight:800, color:'#856404' }}>{nextFY.hijriYear}H</div>
                     <div style={{ fontSize:12, color:'var(--bs-secondary-color)', marginTop:4 }}>{fmtDateShort(nextFY.startGregorian)} → {fmtDateShort(nextFY.endGregorian)}</div>
-                    <div style={{ fontSize:11, color:theme.goldAccent, marginTop:4, fontWeight:600 }}>1 Ramadan {nextFY.hijriYear}H</div>
+                    <div style={{ fontSize:11, color:theme.accent, marginTop:4, fontWeight:600 }}>1 Ramadan {nextFY.hijriYear}H</div>
                   </div>
                 </div>
                 <div className="col-md-4">
@@ -561,7 +561,7 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
                     </div>
                     {!rolloverDone && (
                       <button onClick={() => setShowRolloverConfirm(true)} disabled={rolloverLoading} className="btn btn-sm mt-3 w-100"
-                        style={{ background: rolloverOverdue ? '#e63946' : theme.gold, color:'#fff', borderRadius:8, fontSize:13, fontWeight:600 }}>
+                        style={{ background: rolloverOverdue ? '#e63946' : theme.primary, color:'#fff', borderRadius:8, fontSize:13, fontWeight:600 }}>
                         {rolloverLoading
                           ? <><span className="spinner-border spinner-border-sm me-1" />Rolling over...</>
                           : <><i className="bi bi-arrow-repeat me-1" />Rollover to {nextFY.hijriYear}H</>}
@@ -578,12 +578,12 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
       {/* Quick Links */}
       <div className="row g-3">
         {[
-          { label:'Mumineen',         sub:'Manage community members',         icon:'bi-people-fill',      color:'#d4a032', href:'/mumineen' },
+          { label:'Mumineen',         sub:'Manage community members',         icon:'bi-people-fill',      color:'var(--fmb-primary)', href:'/mumineen' },
           { label:'Thaali',           sub:'Registrations & stickers',         icon:'bi-cup-hot',          color:'#0ab39c', href:'/thaali' },
           { label:'Address Requests', sub:`${stats.pendingAddressRequests} pending`, icon:'bi-geo-alt-fill', color:'#299cdb', href:'/address-requests' },
-          { label:'Takhmeen',         sub:`${stats.pendingTakhmeem} pending niyyat`, icon:'bi-clipboard-check', color:'#ffd97d', href:'/takhmeen' },
-          { label:'Distributors',     sub:'Manage distributors',              icon:'bi-truck',            color:'#d4a032', href:'/distributors' },
-          { label:'Calendar',         sub:'Events & daily menu',              icon:'bi-calendar3',        color:'#ffd97d', href:'/calendar' },
+          { label:'Takhmeen',         sub:`${stats.pendingTakhmeem} pending niyyat`, icon:'bi-clipboard-check', color:'var(--fmb-accent)', href:'/takhmeen' },
+          { label:'Distributors',     sub:'Manage distributors',              icon:'bi-truck',            color:'var(--fmb-primary)', href:'/distributors' },
+          { label:'Calendar',         sub:'Events & daily menu',              icon:'bi-calendar3',        color:'var(--fmb-accent)', href:'/calendar' },
         ].map((item, i) => (
           <div key={i} className="col-xl-2 col-md-4 col-6">
             <div className="card h-100" onClick={() => router.push(item.href)}
