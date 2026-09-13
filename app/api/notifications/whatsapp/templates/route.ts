@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { requireAdminAuth } from '@/lib/api-auth'
+import { requirePermission } from '@/lib/api-auth'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -8,7 +8,7 @@ const supabase = createClient(
 )
 
 export async function GET() {
-  const auth = await requireAdminAuth()
+  const auth = await requirePermission('notifications', 'can_view')
   if (!auth.ok) return auth.response
 
   const { data, error } = await supabase
@@ -22,7 +22,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = await requireAdminAuth()
+  const auth = await requirePermission('notifications', 'can_add')
   if (!auth.ok) return auth.response
 
   const { title, body } = await req.json()
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const auth = await requireAdminAuth()
+  const auth = await requirePermission('notifications', 'can_deactivate')
   if (!auth.ok) return auth.response
 
   const { id } = await req.json()

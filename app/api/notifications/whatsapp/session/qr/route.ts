@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
-import { requireAdminAuth } from '@/lib/api-auth'
+import { requirePermission } from '@/lib/api-auth'
 
 export async function GET() {
-  const auth = await requireAdminAuth()
+  const auth = await requirePermission('notifications', 'can_edit')
   if (!auth.ok) return auth.response
 
   const wahaBase = process.env.WAHA_BASE_URL

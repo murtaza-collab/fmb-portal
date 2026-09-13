@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { requireAdminAuth } from '@/lib/api-auth'
+import { requirePermission } from '@/lib/api-auth'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -8,7 +8,7 @@ const supabase = createClient(
 )
 
 export async function GET() {
-  const auth = await requireAdminAuth()
+  const auth = await requirePermission('notifications', 'can_view')
   if (!auth.ok) return auth.response
 
   const { data, error } = await supabase
