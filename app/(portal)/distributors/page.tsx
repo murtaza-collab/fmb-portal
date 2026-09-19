@@ -31,6 +31,14 @@ export default function DistributorsPage() {
   // Form — only required fields + sector assignment inline on add
   const [form, setForm] = useState({ full_name: '', phone_no: '' })
   const [formSectors, setFormSectors] = useState<number[]>([])
+  // 170 active sectors is far too many to scan by eye, so both pickers filter
+  // by name. Filtering only changes what is shown — selections are held in
+  // state, so a sector stays selected while it is filtered out of view.
+  const [formSectorSearch, setFormSectorSearch]     = useState('')
+  const [modalSectorSearch, setModalSectorSearch]   = useState('')
+
+  const matchSector = (s: Sector, q: string) =>
+    !q.trim() || s.name.toLowerCase().includes(q.trim().toLowerCase())
 
   useEffect(() => { fetchDistributors(); fetchSectors() }, [])
 
@@ -54,7 +62,7 @@ export default function DistributorsPage() {
   const openAdd = () => {
     setEditing(null)
     setForm({ full_name: '', phone_no: '' })
-    setFormSectors([])
+    setFormSectors([]); setFormSectorSearch('')
     setShowModal(true)
   }
 
@@ -71,6 +79,7 @@ export default function DistributorsPage() {
     setSelectedDist(d)
     const { data } = await supabase.from('distributor_sectors').select('sector_id').eq('distributor_id', d.id)
     setAssignedSectors((data || []).map((r: any) => r.sector_id))
+    setModalSectorSearch('')
     setShowSectorModal(true)
   }
 
@@ -304,8 +313,19 @@ export default function DistributorsPage() {
                   {sectors.length === 0 ? (
                     <div style={{ fontSize: 12, color: 'var(--bs-secondary-color)' }}>No active sectors available</div>
                   ) : (
-                    <div className="row g-2">
-                      {sectors.map(s => {
+                    <>
+                  <div className="position-relative mb-2">
+                    <i className="bi bi-search position-absolute" style={{ left: 10, top: 9, fontSize: 12, color: 'var(--bs-secondary-color)' }} />
+                    <input
+                      className="form-control form-control-sm"
+                      style={{ paddingLeft: 30, borderRadius: 8, fontSize: 13 }}
+                      placeholder="Search sectors…"
+                      value={formSectorSearch}
+                      onChange={e => setFormSectorSearch(e.target.value)}
+                    />
+                  </div>
+                    <div className="row g-2" style={{ maxHeight: 260, overflowY: 'auto' }}>
+                      {sectors.filter(s => matchSector(s, formSectorSearch)).map(s => {
                         const active = formSectors.includes(s.id)
                         return (
                           <div key={s.id} className="col-12 col-sm-6 col-md-4">
@@ -323,6 +343,7 @@ export default function DistributorsPage() {
                         )
                       })}
                     </div>
+                    </>
                   )}
                 </div>
               </div>
@@ -354,8 +375,18 @@ export default function DistributorsPage() {
                 <p style={{ fontSize: 12, color: 'var(--bs-secondary-color)' }} className="mb-3">
                   {assignedSectors.length} sector(s) selected
                 </p>
-                <div className="row g-2">
-                  {sectors.map(s => {
+                <div className="position-relative mb-2">
+                  <i className="bi bi-search position-absolute" style={{ left: 10, top: 9, fontSize: 12, color: 'var(--bs-secondary-color)' }} />
+                  <input
+                    className="form-control form-control-sm"
+                    style={{ paddingLeft: 30, borderRadius: 8, fontSize: 13 }}
+                    placeholder="Search sectors…"
+                    value={modalSectorSearch}
+                    onChange={e => setModalSectorSearch(e.target.value)}
+                  />
+                </div>
+                <div className="row g-2" style={{ maxHeight: 340, overflowY: 'auto' }}>
+                  {sectors.filter(s => matchSector(s, modalSectorSearch)).map(s => {
                     const active = assignedSectors.includes(s.id)
                     return (
                       <div key={s.id} className="col-12 col-sm-6">
