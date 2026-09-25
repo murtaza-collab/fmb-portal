@@ -1,3 +1,21 @@
+-- ############################################################################
+-- CORRECTION (2026-09-20): the diagnosis below is WRONG.
+--
+-- This file states that call_push_notification "does not exist in this
+-- database". It does exist, and always did — but only with an INTEGER first
+-- parameter. fcm_tokens.mumin_id is BIGINT, and PostgreSQL will not implicitly
+-- narrow bigint to integer when resolving a function call, so it reported
+-- 42883 "function ... does not exist", which actually means "no overload
+-- accepts bigint".
+--
+-- Dropping welcome_push_trigger did fix token registration, but for the wrong
+-- reason. See 20260920_fix_push_bigint_overloads.sql, which adds the bigint
+-- overloads and explains the real cause.
+--
+-- The SQL in this file was applied as written and is left unchanged; only the
+-- explanation was mistaken.
+-- ############################################################################
+
 -- ============================================================================
 -- FIX: push notifications were silently dead + lock admin tables to admins
 -- ============================================================================
